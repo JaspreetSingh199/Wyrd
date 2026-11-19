@@ -690,6 +690,7 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
                 "verified": True,
             })
 
+        targets.extend(candidates)
         for entry in instance.get("executables", []):
             title = entry.get("title", "").strip()
             binary = _resolve_windows_path(entry.get("binary", ""), prefix_root, game_path)
