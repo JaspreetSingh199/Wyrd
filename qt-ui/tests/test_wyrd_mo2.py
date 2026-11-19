@@ -75,8 +75,10 @@ class WyrdMO2Tests(unittest.TestCase):
                 "gamePath=Z:\\\\games\\\\Skyrim Special Edition\\\\SkyrimSE.exe\n"
                 "selected_profile=Default\n\n"
                 "[customExecutables]\n"
-                "customExecutable_1_title=SKSE\n"
-                "customExecutable_1_binary=Z:\\\\games\\\\Skyrim Special Edition\\\\skse64_loader.exe\n",
+                "size=1\n\n"
+                "[customExecutables\\\\1]\n"
+                "title=SKSE\n"
+                "binary=Z:\\\\games\\\\Skyrim Special Edition\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             (other / "ModOrganizer.ini").write_text(
