@@ -636,7 +636,7 @@ def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Pat
     return resolved
 
 
-def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
+def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_name: str | None = None) -> dict:
     """Validate Skyrim/SKSE executable targets from the first detected Skyrim instance."""
     inventory = inspect_mo2_instances(prefix_root)
     if not inventory.get("ok"):
@@ -646,7 +646,12 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
 
     targets = []
     warnings = []
-    for instance in inventory["skyrim_instances"]:
+    selected_instances = inventory["skyrim_instances"]
+    if instance_name is not None:
+        selected_instances = [item for item in selected_instances if item["name"] == instance_name]
+        if not selected_instances:
+            return {"ok": False, "targets": [], "message": "The selected Skyrim MO2 instance was not found."}
+    for instance in selected_instances:
         candidates = []
         # MO2 gamePath may be stored as either the game directory or
         # SkyrimSE.exe itself. The registered path is authoritative only
