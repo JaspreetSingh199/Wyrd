@@ -760,8 +760,9 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not instance_match:
         return {"ok": False, "message": "The selected Skyrim instance is no longer present in Wyrd's managed prefix."}
     target_match = next(
-        (item for item in inspect_skyrim_launch_targets(paths["prefix"], game_path).get("targets", [])
-         if item["title"] == title), None
+        (item for item in inspect_skyrim_launch_targets(
+            paths["prefix"], game_path, instance_name=instance
+        ).get("targets", []) if item["title"] == title), None
     )
     if not target_match:
         return {"ok": False, "message": "The selected Skyrim executable is no longer verified in this MO2 instance."}
