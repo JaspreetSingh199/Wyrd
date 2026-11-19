@@ -17,7 +17,7 @@ from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
 )
 
 STYLE = """
@@ -139,9 +139,12 @@ class MainWindow(QMainWindow):
         self.launch_game_button = QPushButton("Launch Skyrim")
         self.launch_game_button.clicked.connect(self.start_skyrim)
         self.launch_game_button.setEnabled(False)
+        self.diagnostics_button = QPushButton("View launch log")
+        self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
         action_row.addWidget(self.launch_game_button)
+        action_row.addWidget(self.diagnostics_button)
         action_row.addStretch(1)
         layout.addLayout(action_row)
 
@@ -440,9 +443,20 @@ class MainWindow(QMainWindow):
         result = launch_skyrim_via_mo2(target["title"], instance["name"])
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
-            self.progress_label.setText("MO2 launch request submitted.")
+            self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
+            self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
+            QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
         else:
             QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
+
+    def show_launch_diagnostics(self) -> None:
+        path = managed_paths()["data"] / "logs" / "skyrim-launch.log"
+        result = read_launch_diagnostics(path)
+        if not result.get("ok"):
+            QMessageBox.information(self, "Launch diagnostics", result.get("message", "No diagnostics available."))
+            return
+        self._log("Launch diagnostics opened: " + result["path"])
+        QMessageBox.information(self, "Launch diagnostics", result["content"][-5000:])
 
     def closeEvent(self, event) -> None:
         if self.worker and self.worker.isRunning():
