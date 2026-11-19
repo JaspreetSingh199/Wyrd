@@ -270,6 +270,11 @@ class MainWindow(QMainWindow):
                 instance_summary += "\nSkyrim SE instance: " + ", ".join(
                     instance["name"] for instance in skyrim_instances
                 )
+                profiles = [
+                    f"{instance['name']}: {instance.get('selected_profile') or 'No profile selected'}"
+                    for instance in skyrim_instances
+                ]
+                instance_summary += "\nSelected MO2 profile: " + " | ".join(profiles)
                 if executable_names:
                     instance_summary += "\nConfigured executables: " + ", ".join(executable_names)
             elif self.instance_state.get("ok"):
@@ -487,7 +492,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Launch process status", result["message"])
 
     def show_launch_diagnostics(self) -> None:
-        path = managed_paths()["data"] / "logs" / "skyrim-launch.log"
+        path = managed_paths()["root"] / "logs" / "skyrim-launch.log"
         result = read_launch_diagnostics(path)
         if not result.get("ok"):
             QMessageBox.information(self, "Launch diagnostics", result.get("message", "No diagnostics available."))
