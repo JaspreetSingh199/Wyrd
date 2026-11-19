@@ -435,3 +435,21 @@ def write_settings(home: Path | None, proton_path: Path, game_path: Path) -> Non
         "updated": datetime.now(timezone.utc).isoformat(),
     }, indent=2), encoding="utf-8")
     os.replace(temporary, paths["settings"])
+
+def read_settings(home: Path | None = None) -> dict:
+    """Read persisted GUI selections without making or changing any files."""
+    settings = managed_paths(home)["settings"]
+    try:
+        payload = json.loads(settings.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    result = {}
+    for key in ("proton", "game_path"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            result[key] = value
+    return result
