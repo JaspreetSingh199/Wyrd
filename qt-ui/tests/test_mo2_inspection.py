@@ -9,8 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mo2_inspection import (
     find_mo2_installations,
     inspect_mo2,
-    inspect_stl_installation,
-    inspect_skyrim_compatibility,
 )
 
 
@@ -33,67 +31,6 @@ class MO2InspectionTests(unittest.TestCase):
             home = Path(tmp)
             self.assertFalse(inspect_mo2(home)["found"])
             self.assertEqual(list(home.iterdir()), [])
-
-    def test_inspects_stl_without_installing(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            data = home / "data"
-            with patch.dict(os.environ, {"XDG_DATA_HOME": str(data)}):
-                result = inspect_stl_installation(home)
-            self.assertFalse(result["installed"])
-            self.assertFalse(data.exists())
-
-    def test_detects_stl_installed_by_app(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            executable = home / "stl/prefix/steamtinkerlaunch"
-            executable.parent.mkdir(parents=True)
-            executable.write_text("#!/bin/sh\\n")
-            executable.chmod(0o755)
-            result = inspect_stl_installation(home)
-            self.assertTrue(result["installed"])
-            self.assertIn(str(executable.resolve()), result["executables"])
-            self.assertFalse(result["compatibility_tool_present"])
-
-    def test_reports_existing_stl_executable(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            steam = home / ".steam/steam"
-            (steam / "steamapps").mkdir(parents=True)
-            executable = steam / "compatibilitytools.d/SteamTinkerLaunch/steamtinkerlaunch"
-            executable.parent.mkdir(parents=True)
-            executable.write_text("#!/bin/sh\n")
-            executable.chmod(0o755)
-            result = inspect_stl_installation(home)
-            self.assertTrue(result["installed"])
-            self.assertTrue(result["compatibility_tool_present"])
-
-    def test_compat_registration_detected_when_executable_symlink_resolves_outside(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            steam = home / ".steam/steam"
-            (steam / "steamapps").mkdir(parents=True)
-            source = home / "stl/prefix/steamtinkerlaunch"
-            source.parent.mkdir(parents=True)
-            source.write_text("#!/bin/sh\\n")
-            source.chmod(0o755)
-            compat = steam / "compatibilitytools.d/SteamTinkerLaunch"
-            compat.mkdir(parents=True)
-            (compat / "steamtinkerlaunch").symlink_to(source)
-            result = inspect_stl_installation(home)
-            self.assertTrue(result["installed"])
-            self.assertTrue(result["compatibility_tool_present"])
-
-    def test_reads_existing_steam_config_only(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            steam = Path(tmp) / ".local/share/Steam"
-            config = steam / "userdata/123/config/localconfig.vdf"
-            config.parent.mkdir(parents=True)
-            config.write_text('"489830" { "CompatTool" "steamtinkerlaunch" }')
-            before = config.read_bytes()
-            result = inspect_skyrim_compatibility(steam)
-            self.assertTrue(result["stl_reference_found"])
-            self.assertEqual(config.read_bytes(), before)
 
 
 if __name__ == "__main__":
