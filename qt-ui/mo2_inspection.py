@@ -1,14 +1,11 @@
-"""Read-only inspection for Mod Organizer 2 and STL compatibility setup.
+"""Read-only discovery of existing Mod Organizer 2 installations.
 
-This module deliberately does not create directories, edit Steam VDF files, alter
-prefixes, or modify existing MO2 instances. It only reports discovered paths.
+This module deliberately does not create directories or modify any installation.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
-import re
-import shutil
 
 APP_ID = "489830"
 STEAM_CANDIDATES = (
@@ -57,96 +54,10 @@ def find_mo2_installations(home: Path | None = None) -> list[Path]:
     return found
 
 
-def inspect_stl_installation(home: Path | None = None) -> dict:
-    """Inspect STL executable and compatibility registration without following away the Steam link."""
-    home = home or Path.home()
-    data_home = Path(os.environ.get("XDG_DATA_HOME", home / ".local/share"))
-    local_install = data_home / "stl-steam"
-    steam_roots = find_steam_roots(home)
-    compat_dirs = [root / "compatibilitytools.d/SteamTinkerLaunch" for root in steam_roots]
-    candidates = [
-        home / "stl/prefix/steamtinkerlaunch",
-        local_install / "bin/steamtinkerlaunch",
-        local_install / "steamtinkerlaunch",
-        *(directory / "steamtinkerlaunch" for directory in compat_dirs),
-    ]
-    path_executable = shutil.which("steamtinkerlaunch")
-    if path_executable:
-        candidates.append(Path(path_executable))
-    existing = []
-    for candidate in candidates:
-        try:
-            if candidate.is_file() and os.access(candidate, os.X_OK):
-                resolved = candidate.resolve()
-                if resolved not in existing:
-                    existing.append(resolved)
-        except OSError:
-            continue
-    compat_present = False
-    for directory in compat_dirs:
-        try:
-            if directory.exists() or directory.is_symlink():
-                compat_present = True
-                break
-        except OSError:
-            continue
-    return {
-        "installed": bool(existing),
-        "executables": [str(path) for path in existing],
-        "local_install": str(local_install),
-        "compatibility_tool_present": compat_present,
-    }
-
-
 def inspect_mo2(home: Path | None = None) -> dict:
     installations = find_mo2_installations(home)
     return {
         "found": bool(installations),
         "installations": [str(path) for path in installations],
         "note": "Detection only. Existing MO2 instances and prefixes are not modified.",
-    }
-
-
-def inspect_skyrim_compatibility(steam_root: Path, app_id: str = APP_ID) -> dict:
-    """Read the app's localconfig.vdf and report whether it mentions STL.
-
-    This is intentionally a conservative textual inspection, not a VDF writer.
-    It never changes the file and does not claim that a mention proves a valid
-    compatibility-tool installation.
-    """
-    candidates = [
-        steam_root / "userdata",
-        steam_root.parent / "userdata",
-    ]
-    files: list[Path] = []
-    for userdata in candidates:
-        if not userdata.is_dir():
-            continue
-        try:
-            files.extend(userdata.glob(f"*/config/localconfig.vdf"))
-        except OSError:
-            pass
-    seen: set[str] = set()
-    matches = []
-    for path in files:
-        try:
-            text = path.read_text(errors="replace")
-        except OSError:
-            continue
-        # Scope the approximate match to app id block to avoid unrelated games.
-        app_match = re.search(rf'"{re.escape(app_id)}"\s*\{{', text)
-        if not app_match:
-            continue
-        chunk = text[app_match.end():app_match.end() + 12000]
-        stl = re.search(r"steamtinkerlaunch|stl-steam", chunk, re.IGNORECASE)
-        if stl:
-            resolved = str(path.resolve())
-            if resolved not in seen:
-                seen.add(resolved)
-                matches.append(resolved)
-    return {
-        "files_checked": [str(path) for path in files],
-        "stl_reference_found": bool(matches),
-        "matching_configs": matches,
-        "note": "Steam's compatibility selection is only inspected; no VDF file is edited.",
     }
