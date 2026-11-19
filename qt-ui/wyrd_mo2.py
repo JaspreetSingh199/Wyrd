@@ -815,3 +815,20 @@ def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
     except OSError as error:
         return {"ok": False, "message": f"Could not read launch diagnostics: {error}", "content": ""}
     return {"ok": True, "path": str(path), "content": content, "truncated": size > max_bytes}
+
+def launch_process_status(pid: int) -> dict:
+    """Report the state of a local Proton wrapper process without signaling it."""
+    if not isinstance(pid, int) or pid <= 0:
+        return {"state": "invalid", "message": "Invalid launch process ID."}
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return {"state": "exited", "message": "The Proton wrapper process has exited."}
+    except PermissionError:
+        return {"state": "unknown", "message": "The Proton wrapper exists but its status cannot be read."}
+    except OSError as error:
+        return {"state": "unknown", "message": f"Could not inspect Proton wrapper process: {error}"}
+    return {
+        "state": "running",
+        "message": "The Proton wrapper process is still running. Skyrim startup is not independently confirmed.",
+    }
