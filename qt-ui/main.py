@@ -18,7 +18,7 @@ from wyrd_mo2 import (
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
-    launch_process_status,
+    launch_process_status, detect_skyrim_processes,
 )
 
 STYLE = """
