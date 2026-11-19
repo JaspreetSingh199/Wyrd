@@ -37,11 +37,38 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.detect_skyrim", return_value=game),
             patch("main.discover_proton_builds", return_value=builds),
             patch("main.inspect_wyrd_installation", return_value=state),
+            patch("main.read_settings", return_value={}),
+            patch("main.write_settings"),
         ]
         for item in patches:
             item.start()
             self.addCleanup(item.stop)
         return MainWindow()
+
+
+    def test_saved_proton_is_restored_and_selection_is_persisted(self):
+        build_a = "/home/test/Proton A"
+        build_b = "/home/test/Proton B"
+        with patch("main.read_settings", return_value={
+            "proton": build_b, "game_path": "/games/Skyrim Special Edition"
+        }), patch("main.write_settings") as save:
+            window = self._window(builds=[
+                {"name": "Proton A", "path": build_a, "architecture": "x86_64"},
+                {"name": "Proton B", "path": build_b, "architecture": "x86_64"},
+            ])
+            self.assertEqual(window.proton_combo.currentData(), build_b)
+            window.proton_combo.setCurrentIndex(0)
+            save.assert_called()
+            self.assertEqual(save.call_args.args[1], Path(build_a))
+            window.close()
+
+    def test_missing_saved_game_path_does_not_override_detection(self):
+        with patch("main.read_settings", return_value={
+            "proton": "/missing/Proton", "game_path": "/missing/Skyrim"
+        }):
+            window = self._window()
+            self.assertEqual(window.game_state["game_dir"], "/games/Skyrim Special Edition")
+            window.close()
 
     def test_window_is_branded_wyrd_and_has_only_the_core_setup_flow(self):
         window = self._window()
