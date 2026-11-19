@@ -14,7 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
 )
 
 
@@ -217,6 +217,49 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(command[-1], "SKSE")
             environment = popen.call_args.kwargs["env"]
             self.assertEqual(environment["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
+
+
+    def test_launch_diagnostics_reads_tail_and_handles_missing_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "logs/launch.log"
+            missing = read_launch_diagnostics(path)
+            self.assertFalse(missing["ok"])
+            path.parent.mkdir()
+            path.write_text("launch output\\n" * 20, encoding="utf-8")
+            result = read_launch_diagnostics(path, max_bytes=32)
+            self.assertTrue(result["ok"])
+            self.assertTrue(result["truncated"])
+            self.assertLessEqual(len(result["content"].encode("utf-8")), 32)
+
+    def test_launch_handoff_revalidates_selected_instance_before_spawning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(
+                json.dumps({
+                    "managed_by": "Wyrd", "proton": str(proton),
+                    "game_path": str(game), "steam_root": str(home / ".steam/steam"),
+                }), encoding="utf-8"
+            )
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+                "ok": True, "skyrim_instances": [], "instances": []
+            }), patch("wyrd_mo2.subprocess.Popen") as popen:
+                result = launch_skyrim_via_mo2("SKSE", "Missing", home)
+            self.assertFalse(result["ok"])
+            popen.assert_not_called()
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
