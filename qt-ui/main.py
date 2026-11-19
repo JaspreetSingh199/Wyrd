@@ -16,7 +16,7 @@ from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
-    read_settings, write_settings,
+    read_settings, write_settings, inspect_mo2_instances,
 )
 
 STYLE = """
@@ -80,6 +80,7 @@ class MainWindow(QMainWindow):
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
+        self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -232,13 +233,33 @@ class MainWindow(QMainWindow):
             self._log("No compatible Proton builds found.")
 
         self.mo2_state = inspect_wyrd_installation()
+        if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
+            self.instance_state = inspect_mo2_instances(managed_paths()["prefix"])
+        else:
+            self.instance_state = {"ok": False, "instances": [], "skyrim_instances": []}
         if self.mo2_state.get("installed"):
             version = self.mo2_state.get("metadata", {}).get("version", "unknown version")
             prefix = "ready" if self.mo2_state.get("prefix_ready") else "incomplete"
+            instance_summary = self.instance_state.get("message", "Instance inventory unavailable.")
+            skyrim_instances = self.instance_state.get("skyrim_instances", [])
+            if skyrim_instances:
+                executable_names = sorted({
+                    entry.get("title") or entry.get("binary", "")
+                    for instance in skyrim_instances for entry in instance.get("executables", [])
+                    if entry.get("title") or entry.get("binary")
+                })
+                instance_summary += "\nSkyrim SE instance: " + ", ".join(
+                    instance["name"] for instance in skyrim_instances
+                )
+                if executable_names:
+                    instance_summary += "\nConfigured executables: " + ", ".join(executable_names)
+            elif self.instance_state.get("ok"):
+                instance_summary += "\nCreate a Skyrim Special Edition instance in MO2 to continue."
             self.mo2_panel.detail_label.setText(
                 f"MO2 {version} is installed and verified.\n"
                 f'Executable: {self.mo2_state.get("executable")}\n'
-                f'Wyrd Proton prefix: {prefix}'
+                f'Wyrd Proton prefix: {prefix}\n'
+                f'{instance_summary}'
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready")))
             self.install_button.setText("Recheck MO2" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
@@ -345,11 +366,8 @@ class MainWindow(QMainWindow):
         self.refresh_all()
 
     def _has_instance(self) -> bool:
-        prefix = managed_paths()["prefix"] / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances"
-        try:
-            return any((entry / "ModOrganizer.ini").is_file() for entry in prefix.iterdir() if entry.is_dir())
-        except OSError:
-            return False
+        state = inspect_mo2_instances(managed_paths()["prefix"])
+        return bool(state.get("ok") and state.get("instances"))
 
     def start_mo2(self) -> None:
         first_run = not self._has_instance()
