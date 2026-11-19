@@ -750,7 +750,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         "--instance", instance,
         "run", "--executable", title,
     ]
-    diagnostics = Path(log_path) if log_path else paths["data"] / "logs" / "skyrim-launch.log"
+    diagnostics = Path(log_path) if log_path else paths["root"] / "logs" / "skyrim-launch.log"
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
