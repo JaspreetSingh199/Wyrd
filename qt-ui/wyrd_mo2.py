@@ -595,15 +595,13 @@ def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Pat
     if not raw:
         return None
     normalized = raw.replace("/", "\\")
-    if normalized.casefold().startswith("z:\\"):
-        candidate = Path(normalized[3:].replace("\\", "/"))
+    if normalized[:2].casefold() == "z:":
+        relative = normalized[2:].lstrip("\\").replace("\\", "/")
+        candidate = Path("/") / relative
         try:
             resolved = candidate.resolve(strict=True)
-        except OSError:
-            return None
-        try:
             resolved.relative_to(game_path.resolve())
-        except ValueError:
+        except (OSError, ValueError):
             return None
         return resolved
     if normalized[:2].casefold() == "c:":
@@ -611,11 +609,8 @@ def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Pat
         candidate = prefix_root / "pfx/drive_c" / relative
         try:
             resolved = candidate.resolve(strict=True)
-        except OSError:
-            return None
-        try:
             resolved.relative_to((prefix_root / "pfx/drive_c").resolve())
-        except ValueError:
+        except (OSError, ValueError):
             return None
         return resolved
     return None
