@@ -156,6 +156,29 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual({item["title"] for item in result["targets"]}, {"Skyrim", "SKSE"})
             self.assertEqual(ini.read_bytes(), before)
 
+
+    def test_default_skyrim_target_is_verified_under_detected_root_when_gamepath_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            game = root / "game"
+            game.mkdir()
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim"
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n",
+                encoding="utf-8",
+            )
+            result = inspect_skyrim_launch_targets(prefix, game, instance_name="Skyrim")
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["targets"][0]["title"], "Skyrim")
+            self.assertEqual(Path(result["targets"][0]["binary"]), game / "SkyrimSE.exe")
+
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
