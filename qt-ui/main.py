@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
         self._saved_settings = read_settings()
+        self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
 
         root = QWidget()
@@ -175,6 +176,14 @@ class MainWindow(QMainWindow):
     def refresh_all(self) -> None:
         selected = self.proton_combo.currentData()
         self.game_state = detect_skyrim()
+        saved_game = self._saved_settings.get("game_path")
+        if saved_game and Path(saved_game).is_dir():
+            detected_game = self.game_state.get("game_dir")
+            if not self.game_state.get("found") or detected_game != saved_game:
+                self.game_state = {
+                    **self.game_state, "found": True,
+                    "game_dir": saved_game, "library": "saved Wyrd selection",
+                }
         if self.game_state.get("found"):
             game_path = self.game_state["game_dir"]
             self.game_panel.detail_label.setText(
