@@ -818,6 +818,59 @@ def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
         return {"ok": False, "message": f"Could not read launch diagnostics: {error}", "content": ""}
     return {"ok": True, "path": str(path), "content": content, "truncated": size > max_bytes}
 
+
+
+def detect_skyrim_processes(prefix_root: Path | None = None,
+                           proc_root: Path = Path("/proc")) -> dict:
+    """Read /proc and detect Skyrim/SKSE binaries, with prefix attribution when possible.
+
+    This is deliberately read-only and testable against a fixture proc_root. A
+    process is considered Wyrd-attributed only when its environment or command
+    line explicitly contains the managed prefix; executable-name matches alone
+    are reported as unassociated to avoid claiming a user's unrelated game.
+    """
+    expected = {"skyrimse.exe", "skyrimse", "skse64_loader.exe", "skse64.exe"}
+    prefix = str(Path(prefix_root).expanduser().resolve()) if prefix_root else None
+    detected = []
+    try:
+        entries = list(Path(proc_root).iterdir())
+    except OSError as error:
+        return {"ok": False, "processes": [], "message": f"Could not inspect process table: {error}"}
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        try:
+            raw_cmdline = (entry / "cmdline").read_bytes()
+            argv = [part.decode("utf-8", errors="replace") for part in raw_cmdline.split(b"\\0") if part]
+            comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip().lower()
+            exe_path = os.readlink(entry / "exe")
+            env_data = (entry / "environ").read_bytes()
+        except (OSError, PermissionError):
+            continue
+        names = {Path(arg.replace("\\\\", "/")).name.lower() for arg in argv}
+        names.add(Path(exe_path.replace("\\\\", "/")).name.lower())
+        names.add(comm)
+        matches = sorted(names.intersection(expected))
+        if not matches:
+            continue
+        env_text = env_data.decode("utf-8", errors="replace").replace("\\0", "\\n")
+        command_text = " ".join(argv)
+        attributed = bool(prefix and (prefix in env_text or prefix in command_text))
+        detected.append({
+            "pid": pid, "binary": matches[0], "argv": argv,
+            "attributed_to_wyrd": attributed,
+            "prefix": prefix if attributed else None,
+        })
+    attributed_items = [item for item in detected if item["attributed_to_wyrd"]]
+    if attributed_items:
+        message = f"Detected {len(attributed_items)} Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
+    elif detected:
+        message = "Skyrim/SKSE process(es) detected, but none could be attributed to Wyrd's managed prefix."
+    else:
+        message = "No Skyrim/SKSE process was detected."
+    return {"ok": True, "processes": detected, "wyrd_processes": attributed_items, "message": message}
+
 def launch_process_status(pid: int) -> dict:
     """Report the state of a local Proton wrapper process without signaling it."""
     if not isinstance(pid, int) or pid <= 0:
