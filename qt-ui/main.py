@@ -16,6 +16,7 @@ from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
+    read_settings, write_settings,
 )
 
 STYLE = """
@@ -79,6 +80,8 @@ class MainWindow(QMainWindow):
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
+        self._saved_settings = read_settings()
+        self._restoring_selection = True
 
         root = QWidget()
         layout = QVBoxLayout(root)
@@ -111,6 +114,7 @@ class MainWindow(QMainWindow):
         self.proton_combo.setMinimumWidth(420)
         self.refresh_button = QPushButton("Refresh detection")
         self.refresh_button.clicked.connect(self.refresh_all)
+        self.proton_combo.currentIndexChanged.connect(self._save_selection)
         runtime_row.addWidget(self.proton_combo, 1)
         runtime_row.addWidget(self.refresh_button)
         runtime_layout.addLayout(runtime_row)
@@ -161,6 +165,9 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(root)
         self.refresh_all()
+        self._restoring_selection = False
+        self._restore_saved_selection()
+        self._save_selection(self.proton_combo.currentIndex())
 
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
@@ -193,6 +200,14 @@ class MainWindow(QMainWindow):
             self.proton_combo.setItemData(self.proton_combo.count() - 1, build["path"], 3)
             if selected and selected == build["path"]:
                 selected_index = self.proton_combo.count() - 1
+        saved_proton = self._saved_settings.get("proton")
+        preferred_proton = selected or saved_proton
+        if preferred_proton:
+            selected_index = next(
+                (index for index, build in enumerate(self.proton_builds)
+                 if str(Path(build["path"]).expanduser()) == str(Path(preferred_proton).expanduser())),
+                -1,
+            )
         if selected_index >= 0:
             self.proton_combo.setCurrentIndex(selected_index)
         if self.proton_builds:
@@ -233,6 +248,34 @@ class MainWindow(QMainWindow):
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(ready and not (self.worker and self.worker.isRunning()))
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
+
+    def _restore_saved_selection(self) -> None:
+        """Restore the last selected Proton when it is still discoverable."""
+        saved = self._saved_settings.get("proton")
+        if not saved:
+            return
+        for index in range(self.proton_combo.count()):
+            if self.proton_combo.itemData(index) == saved:
+                self.proton_combo.setCurrentIndex(index)
+                self._log("Restored saved Proton selection: " + saved)
+                return
+        self._log("Saved Proton selection is unavailable; keeping the detected default.")
+
+    def _save_selection(self, _index: int = -1) -> None:
+        if self._restoring_selection:
+            return
+        proton = self.proton_combo.currentData()
+        game = self.game_state.get("game_dir")
+        if not proton or not game:
+            return
+        try:
+            write_settings(None, Path(proton), Path(game))
+            self._saved_settings = {
+                "proton": str(Path(proton).resolve()),
+                "game_path": str(Path(game).resolve()),
+            }
+        except OSError as error:
+            self._log(f"Could not save Wyrd settings: {error}")
 
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
