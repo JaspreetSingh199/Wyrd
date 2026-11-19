@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -12,7 +13,7 @@ from wyrd_mo2 import (
     inspect_wyrd_installation,
     install_mo2_environment,
     managed_paths,
-    _validate_archive_members, read_settings, write_settings,
+    _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
 )
 
 
@@ -54,6 +55,65 @@ class WyrdMO2Tests(unittest.TestCase):
                 settings_path = managed_paths(home)["settings"]
                 settings_path.write_text("{invalid", encoding="utf-8")
                 self.assertEqual(read_settings(home), {})
+
+
+    def test_read_only_instance_inspection_finds_skyrim_and_executables(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefix"
+            instances = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances"
+            skyrim = instances / "Skyrim Special Edition"
+            other = instances / "Fallout"
+            skyrim.mkdir(parents=True)
+            other.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            ini = skyrim / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\\ngameName=Skyrim Special Edition\\ngamePath=Z:\\\\games\\\\Skyrim Special Edition\\\\SkyrimSE.exe\\n"
+                "selected_profile=Default\\n\\n"
+                "[customExecutables]\\ncustomExecutable_1_title=SKSE\\n"
+                "customExecutable_1_binary=Z:\\\\games\\\\Skyrim Special Edition\\\\skse64_loader.exe\\n",
+                encoding="utf-8",
+            )
+            (other / "ModOrganizer.ini").write_text(
+                "[General]\\ngameName=Fallout 4\\n", encoding="utf-8"
+            )
+            before = ini.read_bytes()
+            result = inspect_mo2_instances(prefix)
+            self.assertTrue(result["ok"])
+            self.assertEqual(len(result["instances"]), 2)
+            self.assertEqual([item["name"] for item in result["skyrim_instances"]],
+                             ["Skyrim Special Edition"])
+            skyrim_state = result["skyrim_instances"][0]
+            self.assertEqual(skyrim_state["selected_profile"], "Default")
+            self.assertEqual(skyrim_state["executables"][0]["title"], "SKSE")
+            self.assertEqual(ini.read_bytes(), before)
+
+    def test_instance_inspection_refuses_unowned_or_unreadable_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp)
+            self.assertFalse(inspect_mo2_instances(prefix)["ok"])
+            marker = prefix / ".wyrd-managed.json"
+            marker.write_text("not json", encoding="utf-8")
+            self.assertFalse(inspect_mo2_instances(prefix)["ok"])
+
+    def test_instance_inspection_reports_malformed_instance_ini_without_mutating_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp)
+            root = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances"
+            instance = root / "Broken"
+            instance.mkdir(parents=True)
+            marker = prefix / ".wyrd-managed.json"
+            marker.write_text(json.dumps({"managed_by": "Wyrd"}), encoding="utf-8")
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text("[General\\ninvalid", encoding="utf-8")
+            before = ini.read_bytes()
+            result = inspect_mo2_instances(prefix)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["instances"], [])
+            self.assertTrue(result["errors"])
+            self.assertEqual(ini.read_bytes(), before)
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
