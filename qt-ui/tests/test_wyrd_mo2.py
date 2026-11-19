@@ -12,7 +12,7 @@ from wyrd_mo2 import (
     inspect_wyrd_installation,
     install_mo2_environment,
     managed_paths,
-    _validate_archive_members,
+    _validate_archive_members, read_settings, write_settings,
 )
 
 
@@ -33,6 +33,27 @@ def make_proton(path: Path, machine: int = 62) -> Path:
 
 
 class WyrdMO2Tests(unittest.TestCase):
+
+    def test_settings_round_trip_and_missing_or_invalid_settings_are_safe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            self.assertEqual(read_settings(home), {})
+            proton = home / "Proton"
+            game = home / "Skyrim"
+            proton.mkdir()
+            game.mkdir()
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }):
+                write_settings(home, proton, game)
+                saved = read_settings(home)
+                self.assertEqual(saved["proton"], str(proton.resolve()))
+                self.assertEqual(saved["game_path"], str(game.resolve()))
+                paths["settings"].write_text("{invalid", encoding="utf-8")
+                self.assertEqual(read_settings(home), {})
+
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
             proton = make_proton(Path(tmp) / "Proton Test", machine=62)
