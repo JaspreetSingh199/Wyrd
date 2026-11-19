@@ -18,6 +18,7 @@ from wyrd_mo2 import (
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
+    launch_process_status,
 )
 
 STYLE = """
@@ -83,6 +84,7 @@ class MainWindow(QMainWindow):
         self.mo2_state: dict = {"installed": False}
         self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
         self.launch_target_state: dict = {"ok": False, "targets": []}
+        self._last_launch_pid: int | None = None
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -141,10 +143,14 @@ class MainWindow(QMainWindow):
         self.launch_game_button.setEnabled(False)
         self.diagnostics_button = QPushButton("View launch log")
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
+        self.launch_status_button = QPushButton("Check launch status")
+        self.launch_status_button.clicked.connect(self.check_launch_status)
+        self.launch_status_button.setEnabled(False)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.diagnostics_button)
+        action_row.addWidget(self.launch_status_button)
         action_row.addStretch(1)
         layout.addLayout(action_row)
 
@@ -460,11 +466,25 @@ class MainWindow(QMainWindow):
         result = launch_skyrim_via_mo2(selected, instance_name)
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
+            self._last_launch_pid = result.get("pid")
+            self.launch_status_button.setEnabled(bool(self._last_launch_pid))
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
         else:
             QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
+
+    def check_launch_status(self) -> None:
+        if not self._last_launch_pid:
+            QMessageBox.information(self, "Launch status", "No Wyrd launch handoff has been recorded in this session.")
+            return
+        result = launch_process_status(self._last_launch_pid)
+        self._log(f"Launch PID {self._last_launch_pid}: {result['state']} — {result['message']}")
+        if result["state"] == "exited":
+            self.progress_label.setText("Proton wrapper exited. Check launch diagnostics; this does not confirm Skyrim startup.")
+        elif result["state"] == "running":
+            self.progress_label.setText("Proton wrapper is running; Skyrim startup is not independently confirmed.")
+        QMessageBox.information(self, "Launch process status", result["message"])
 
     def show_launch_diagnostics(self) -> None:
         path = managed_paths()["data"] / "logs" / "skyrim-launch.log"
