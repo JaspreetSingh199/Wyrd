@@ -39,6 +39,10 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.inspect_wyrd_installation", return_value=state),
             patch("main.read_settings", return_value={}),
             patch("main.write_settings"),
+            patch("main.inspect_mo2_instances", return_value={
+                "ok": True, "instances": [], "skyrim_instances": [],
+                "message": "No MO2 instances were found in the known prefix locations."
+            }),
         ]
         for item in patches:
             item.start()
@@ -68,6 +72,39 @@ class MainWindowSmokeTests(unittest.TestCase):
         }):
             window = self._window()
             self.assertEqual(window.game_state["game_dir"], "/games/Skyrim Special Edition")
+            window.close()
+
+
+    def test_launch_is_disabled_when_instance_inspection_is_unavailable(self):
+        state = {
+            "installed": True, "prefix_ready": True,
+            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
+            "metadata": {"version": "v2.5.2"},
+            "external_installations": [],
+        }
+        with patch("main.inspect_mo2_instances", return_value={
+            "ok": False, "instances": [], "skyrim_instances": [],
+            "message": "Ownership marker is unreadable."
+        }):
+            window = self._window(state=state)
+            self.assertFalse(window.launch_button.isEnabled())
+            window.close()
+
+    def test_start_mo2_refuses_when_instance_inspection_is_unsafe(self):
+        state = {
+            "installed": True, "prefix_ready": True,
+            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
+            "metadata": {"version": "v2.5.2"},
+            "external_installations": [],
+        }
+        with patch("main.inspect_mo2_instances", return_value={
+            "ok": False, "instances": [], "skyrim_instances": [],
+            "message": "The prefix is not marked as Wyrd-managed."
+        }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2") as launch:
+            window = self._window(state=state)
+            window.start_mo2()
+            warning.assert_called_once()
+            launch.assert_not_called()
             window.close()
 
     def test_window_is_branded_wyrd_and_has_only_the_core_setup_flow(self):
