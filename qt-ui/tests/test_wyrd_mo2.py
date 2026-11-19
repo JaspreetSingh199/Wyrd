@@ -36,6 +36,35 @@ def make_proton(path: Path, machine: int = 62) -> Path:
 
 class WyrdMO2Tests(unittest.TestCase):
 
+    def test_procfs_detection_distinguishes_unattributed_and_wyrd_processes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            prefix = Path(tmp) / "managed-prefix"
+            proc.mkdir()
+            for pid, argv, env, comm in [
+                ("100", ["SkyrimSE.exe"], [], "SkyrimSE.exe"),
+                ("101", ["skse64_loader.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}"], "skse64_loader.exe"),
+                ("102", ["python"], [], "python"),
+            ]:
+                entry = proc / pid
+                entry.mkdir()
+                (entry / "cmdline").write_bytes(bytes([0]).join(arg.encode() for arg in argv) + bytes([0]))
+                (entry / "environ").write_bytes(bytes([0]).join(item.encode() for item in env) + bytes([0]))
+                (entry / "comm").write_text(comm, encoding="utf-8")
+            def fake_readlink(path):
+                return {"100": "/fake/SkyrimSE.exe", "101": "/fake/skse64_loader.exe", "102": "/usr/bin/python"}[Path(path).parent.name]
+            with patch("wyrd_mo2.os.readlink", side_effect=fake_readlink):
+                result = detect_skyrim_processes(prefix, proc_root=proc)
+            self.assertTrue(result["ok"])
+            self.assertEqual([item["pid"] for item in result["processes"]], [100, 101])
+            self.assertEqual([item["pid"] for item in result["wyrd_processes"]], [101])
+            self.assertFalse(result["processes"][0]["attributed_to_wyrd"])
+
+    def test_procfs_detection_handles_unreadable_proc_root(self):
+        result = detect_skyrim_processes(proc_root=Path("/missing/wyrd-proc"))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["processes"], [])
+
     def test_settings_round_trip_and_missing_or_invalid_settings_are_safe(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
