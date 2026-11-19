@@ -70,14 +70,18 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             ini = skyrim / "ModOrganizer.ini"
             ini.write_text(
-                "[General]\\ngameName=Skyrim Special Edition\\ngamePath=Z:\\\\games\\\\Skyrim Special Edition\\\\SkyrimSE.exe\\n"
-                "selected_profile=Default\\n\\n"
-                "[customExecutables]\\ncustomExecutable_1_title=SKSE\\n"
-                "customExecutable_1_binary=Z:\\\\games\\\\Skyrim Special Edition\\\\skse64_loader.exe\\n",
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                "gamePath=Z:\\\\games\\\\Skyrim Special Edition\\\\SkyrimSE.exe\n"
+                "selected_profile=Default\n\n"
+                "[customExecutables]\n"
+                "customExecutable_1_title=SKSE\n"
+                "customExecutable_1_binary=Z:\\\\games\\\\Skyrim Special Edition\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             (other / "ModOrganizer.ini").write_text(
-                "[General]\\ngameName=Fallout 4\\n", encoding="utf-8"
+                "[General]\n"
+                "gameName=Fallout 4\n", encoding="utf-8"
             )
             before = ini.read_bytes()
             result = inspect_mo2_instances(prefix)
