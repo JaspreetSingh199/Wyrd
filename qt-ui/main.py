@@ -414,33 +414,37 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
 
     def start_skyrim(self) -> None:
-        targets = self.launch_target_state.get("targets", [])
         instances = self.instance_state.get("skyrim_instances", [])
-        if not self.launch_target_state.get("ok") or not targets or not instances:
+        if not self.launch_target_state.get("ok") or not self.launch_target_state.get("targets") or not instances:
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
                 self.launch_target_state.get("message", "No verified Skyrim/SKSE target is available."),
             )
             return
-        titles = [target["title"] for target in targets]
+        instance_names = [item["name"] for item in instances]
+        instance_name, accepted = QInputDialog.getItem(
+            self, "Select MO2 instance", "Skyrim Special Edition instance:",
+            instance_names, 0, False,
+        )
+        if not accepted or not instance_name:
+            return
+        titles = [target["title"] for target in self.launch_target_state["targets"]]
         selected, accepted = QInputDialog.getItem(
             self, "Launch Skyrim through MO2", "Configured Skyrim executable:",
             titles, 0, False,
         )
         if not accepted or not selected:
             return
-        target = next(item for item in targets if item["title"] == selected)
-        instance = instances[0]
         answer = QMessageBox.question(
             self, "Confirm Skyrim launch",
-            f"MO2 will launch '{target['title']}' in instance '{instance['name']}' "
+            f"MO2 will launch '{selected}' in instance '{instance_name}' "
             "using its virtual filesystem. Wyrd will not edit the instance configuration.\\n\\nContinue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        result = launch_skyrim_via_mo2(target["title"], instance["name"])
+        result = launch_skyrim_via_mo2(selected, instance_name)
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
