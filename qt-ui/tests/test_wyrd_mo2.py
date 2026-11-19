@@ -142,13 +142,16 @@ class WyrdMO2Tests(unittest.TestCase):
                 "[General]\\n"
                 "gameName=Skyrim Special Edition\\n"
                 f"gamePath=Z:{win_game}\\n"
-                "[customExecutables]\\nsize=1\\n"
+                "[customExecutables]\\n"
+                "size=1\\n"
                 "[customExecutables/1]\\n"
                 "title=SKSE\\n"
                 f"binary=Z:{win_game}\\\\skse64_loader.exe\\n",
                 encoding="utf-8",
             )
             before = ini.read_bytes()
+            inventory = inspect_mo2_instances(prefix)
+            self.assertTrue(inventory["skyrim_instances"], inventory)
             result = inspect_skyrim_launch_targets(prefix, game)
             self.assertTrue(result["ok"], result)
             self.assertEqual({item["title"] for item in result["targets"]}, {"Skyrim", "SKSE"})
@@ -200,7 +203,20 @@ class WyrdMO2Tests(unittest.TestCase):
             (paths["prefix"] / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
-            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            instance = paths["prefix"] / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
+            instance.mkdir(parents=True)
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                "gamePath=Z:\\\\" + str(game).replace("/", "\\\\") + "\\\\n"
+                "[customExecutables]\\nsize=1\\n"
+                "[customExecutables/1]\\n"
+                "title=SKSE\\n"
+                "binary=Z:\\\\" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\\n",
+                encoding="utf-8",
+            )
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            (game / "skse64_loader.exe").write_bytes(b"skse")
             with patch.dict(os.environ, {
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
