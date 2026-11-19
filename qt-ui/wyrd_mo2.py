@@ -657,32 +657,38 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
         # SkyrimSE.exe itself. The registered path is authoritative only
         # after it resolves beneath the detected Steam game directory.
         raw_game_path = instance.get("game_path", "").strip()
-        game_location = _resolve_windows_path(raw_game_path, prefix_root, game_path)
-        game_binary = None
-        if game_location:
-            if game_location.is_dir():
-                game_binary = game_location / "SkyrimSE.exe"
-            elif game_location.is_file() and game_location.name.casefold() == "skyrimse.exe":
-                game_binary = game_location
-        elif not raw_game_path:
-            # Some MO2 game plugins leave General.gamePath empty while the game
-            # plugin supplies the detected game root. Verify the known binary.
-            game_binary = (game_path / "SkyrimSE.exe").resolve()
-            try:
-                game_binary.relative_to(game_path.resolve())
-            except ValueError:
-                game_binary = None
+        game_root = Path(game_path).resolve()
+        game_binary = (game_root / "SkyrimSE.exe").resolve()
+        try:
+            game_binary.relative_to(game_root)
+        except ValueError:
+            game_binary = None
+        if raw_game_path:
+            game_location = _resolve_windows_path(raw_game_path, prefix_root, game_root)
+            if game_location:
+                if game_location.is_dir():
+                    candidate_binary = game_location / "SkyrimSE.exe"
+                elif game_location.is_file() and game_location.name.casefold() == "skyrimse.exe":
+                    candidate_binary = game_location
+                else:
+                    candidate_binary = None
+                if candidate_binary and candidate_binary.is_file():
+                    game_binary = candidate_binary.resolve()
+                    try:
+                        game_binary.relative_to(game_root)
+                    except ValueError:
+                        game_binary = None
+            elif game_binary is None:
+                warnings.append(f"{instance['name']}: MO2 gamePath could not be resolved safely.")
         if game_binary and game_binary.is_file() and game_binary.name.casefold() == "skyrimse.exe":
             candidates.append({
                 "title": "Skyrim",
                 "binary": str(game_binary),
                 "arguments": "",
                 "working_directory": str(game_binary.parent),
-                "source": "MO2 General.gamePath" if raw_game_path else "detected Skyrim installation",
+                "source": "MO2 gamePath" if raw_game_path else "detected Skyrim installation",
                 "verified": True,
             })
-        elif raw_game_path:
-            warnings.append(f"{instance['name']}: MO2 gamePath did not resolve to SkyrimSE.exe inside the detected game folder.")
 
         for entry in instance.get("executables", []):
             title = entry.get("title", "").strip()
