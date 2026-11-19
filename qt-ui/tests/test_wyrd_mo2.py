@@ -128,23 +128,24 @@ class WyrdMO2Tests(unittest.TestCase):
             root = Path(tmp)
             prefix = root / "prefix"
             game = root / "game"
+            game.mkdir()
             instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
             instance.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
-            (game / "SkyrimSE.exe").parent.mkdir(parents=True)
             (game / "SkyrimSE.exe").write_bytes(b"skyrim")
             (game / "skse64_loader.exe").write_bytes(b"skse")
+            win_game = str(game).replace("/", "\\\\")
             ini = instance / "ModOrganizer.ini"
             ini.write_text(
                 "[General]\\n"
                 "gameName=Skyrim Special Edition\\n"
-                f"gamePath=Z:{str(game).replace('/', chr(92) * 2)}\\\\SkyrimSE.exe\\n"
+                f"gamePath=Z:{win_game}\\n"
                 "[customExecutables]\\nsize=1\\n"
-                "[customExecutables\\\\1]\\n"
+                "[customExecutables/1]\\n"
                 "title=SKSE\\n"
-                f"binary=Z:{str(game).replace('/', chr(92) * 2)}\\\\skse64_loader.exe\\n",
+                f"binary=Z:{win_game}\\\\skse64_loader.exe\\n",
                 encoding="utf-8",
             )
             before = ini.read_bytes()
