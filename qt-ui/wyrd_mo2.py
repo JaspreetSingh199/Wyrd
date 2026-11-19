@@ -534,13 +534,20 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
             # customExecutables\size=N
             # customExecutables\1\title=...
             # customExecutables\1\binary=...
-            array_size = parser.getint("customExecutables", "size", fallback=0)
+            array_size = 0
+            if parser.has_section("customExecutables"):
+                array_size = parser.getint("customExecutables", "size", fallback=0)
+            normalized_sections = {
+                name.replace("\\\\", "/").replace("\\\\", "/").casefold(): name
+                for name in parser.sections()
+            }
             if array_size < 0 or array_size > 512:
                 errors.append(f"{ini}: invalid customExecutables array size {array_size}")
                 array_size = 0
             for index in range(1, array_size + 1):
-                section_name = f"customExecutables\\{index}"
-                if not parser.has_section(section_name):
+                normalized_name = f"customexecutables/{index}".casefold()
+                section_name = normalized_sections.get(normalized_name)
+                if not section_name:
                     continue
                 item = parser[section_name]
                 executable = {
