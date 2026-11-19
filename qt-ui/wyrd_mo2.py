@@ -535,12 +535,16 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
                 executable_titles = {}
                 executable_binaries = {}
                 for key, value in section.items():
-                    title_match = re.fullmatch(r"customExecutable_(\\d+)_title", key, re.IGNORECASE)
-                    binary_match = re.fullmatch(r"customExecutable_(\\d+)_binary", key, re.IGNORECASE)
-                    if title_match:
-                        executable_titles[title_match.group(1)] = value.strip()
-                    elif binary_match:
-                        executable_binaries[binary_match.group(1)] = value.strip()
+                    normalized_key = key.casefold()
+                    for suffix, target in (
+                        ("_title", executable_titles),
+                        ("_binary", executable_binaries),
+                    ):
+                        prefix = "customexecutable_"
+                        if normalized_key.startswith(prefix) and normalized_key.endswith(suffix):
+                            index = normalized_key[len(prefix):-len(suffix)]
+                            if index.isdigit():
+                                target[index] = value.strip()
                 for index in sorted(set(executable_titles) | set(executable_binaries), key=int):
                     title = executable_titles.get(index, "")
                     binary = executable_binaries.get(index, "")
