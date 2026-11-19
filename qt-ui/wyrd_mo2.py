@@ -5,6 +5,7 @@ adopted or overwritten automatically.
 """
 from __future__ import annotations
 
+import configparser
 import json
 import os
 import shutil
@@ -453,3 +454,125 @@ def read_settings(home: Path | None = None) -> dict:
         if isinstance(value, str) and value.strip():
             result[key] = value
     return result
+
+def _instance_roots(prefix_root: Path) -> list[Path]:
+    """Return known MO2 instance roots inside this managed Proton prefix."""
+    users = prefix_root / "pfx/drive_c/users"
+    roots: list[Path] = []
+    if not users.is_dir():
+        return roots
+    try:
+        user_dirs = [entry for entry in users.iterdir() if entry.is_dir()]
+    except OSError:
+        return roots
+    for user_dir in user_dirs:
+        candidates = (
+            user_dir / "AppData/Local/ModOrganizer/instances",
+            user_dir / "AppData/Roaming/ModOrganizer/instances",
+            user_dir / "Documents/Modding/ModOrganizer/instances",
+        )
+        roots.extend(path for path in candidates if path.is_dir())
+    return roots
+
+
+def inspect_mo2_instances(prefix_root: Path) -> dict:
+    """Read-only inventory of MO2 instances stored in Wyrd's managed prefix.
+
+    It deliberately does not follow MO2 custom paths or scan arbitrary disks.
+    A directory is reported only when it contains a parseable ModOrganizer.ini.
+    """
+    prefix_root = Path(prefix_root).expanduser()
+    marker = prefix_root / ".wyrd-managed.json"
+    if not marker.is_file():
+        return {
+            "ok": False, "managed": False, "instances": [],
+            "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
+        }
+    try:
+        ownership = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {
+            "ok": False, "managed": False, "instances": [],
+            "message": "The Wyrd prefix ownership marker is unreadable; it was not inspected.",
+        }
+    if ownership.get("managed_by") != "Wyrd":
+        return {
+            "ok": False, "managed": False, "instances": [],
+            "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
+        }
+
+    discovered = []
+    errors = []
+    for root in _instance_roots(prefix_root):
+        try:
+            entries = sorted(root.iterdir(), key=lambda item: item.name.casefold())
+        except OSError as error:
+            errors.append(f"{root}: {error}")
+            continue
+        for directory in entries:
+            if not directory.is_dir():
+                continue
+            ini = directory / "ModOrganizer.ini"
+            if not ini.is_file():
+                continue
+            parser = configparser.ConfigParser(interpolation=None)
+            try:
+                with ini.open("r", encoding="utf-8-sig", errors="replace") as handle:
+                    parser.read_file(handle)
+            except (OSError, configparser.Error) as error:
+                errors.append(f"{ini}: {error}")
+                continue
+
+            game_path = ""
+            if parser.has_section("General"):
+                game_path = parser.get("General", "gamePath", fallback="").strip()
+            profile = ""
+            if parser.has_section("General"):
+                profile = parser.get("General", "selected_profile", fallback="").strip()
+
+            executables = []
+            if parser.has_section("customExecutables"):
+                section = parser["customExecutables"]
+                indexes = sorted(
+                    {match.group(1) for key in section
+                     if (match := __import__("re").fullmatch(r"customExecutable_(\\d+)_title", key))},
+                    key=lambda value: int(value),
+                )
+                for index in indexes:
+                    title = section.get(f"customExecutable_{index}_title", "").strip()
+                    binary = section.get(f"customExecutable_{index}_binary", "").strip()
+                    if title or binary:
+                        executables.append({"title": title, "binary": binary})
+
+            game_name = ""
+            if parser.has_section("General"):
+                game_name = parser.get("General", "gameName", fallback="").strip()
+            is_skyrim = (
+                "skyrim special edition" in game_name.casefold()
+                or "skyrim special edition" in game_path.casefold()
+                or "skyrimse.exe" in game_path.casefold()
+            )
+            discovered.append({
+                "name": directory.name,
+                "path": str(directory),
+                "config": str(ini),
+                "game_name": game_name,
+                "game_path": game_path,
+                "selected_profile": profile,
+                "is_skyrim_se": is_skyrim,
+                "executables": executables,
+            })
+
+    instances = sorted(discovered, key=lambda item: item["name"].casefold())
+    skyrim_instances = [item for item in instances if item["is_skyrim_se"]]
+    return {
+        "ok": True, "managed": True,
+        "instances": instances,
+        "skyrim_instances": skyrim_instances,
+        "errors": errors,
+        "message": (
+            f"Found {len(instances)} MO2 instance(s), including "
+            f"{len(skyrim_instances)} identified Skyrim SE instance(s)."
+            if instances else "No MO2 instances were found in the known prefix locations."
+        ),
+    }
