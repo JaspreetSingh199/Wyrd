@@ -206,13 +206,14 @@ class WyrdMO2Tests(unittest.TestCase):
             instance = paths["prefix"] / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
             instance.mkdir(parents=True)
             (instance / "ModOrganizer.ini").write_text(
-                "[General]\\n"
-                "gameName=Skyrim Special Edition\\n"
-                "gamePath=Z:\\\\" + str(game).replace("/", "\\\\") + "\\\\n"
-                "[customExecutables]\\nsize=1\\n"
-                "[customExecutables/1]\\n"
-                "title=SKSE\\n"
-                "binary=Z:\\\\" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\\n",
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                "gamePath=Z:" + str(game).replace("/", "\\\\") + "\n"
+                "[customExecutables]\n"
+                "size=1\n"
+                "[customExecutables/1]\n"
+                "title=SKSE\n"
+                "binary=Z:" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             (game / "SkyrimSE.exe").write_bytes(b"skyrim")
