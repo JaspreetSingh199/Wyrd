@@ -689,7 +689,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     instance = instance_name.strip()
     if not title or not instance:
         return {"ok": False, "message": "An MO2 instance and configured executable title are required."}
-    if any(char in title + instance for char in "\\x00\\r\\n"):
+    if any(char in title + instance for char in ("\\x00", "\\r", "\\n")):
         return {"ok": False, "message": "The selected MO2 instance or executable title is invalid."}
     state = inspect_wyrd_installation(home)
     if not state.get("installed") or not state.get("prefix_ready"):
