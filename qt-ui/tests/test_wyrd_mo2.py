@@ -144,9 +144,8 @@ class WyrdMO2Tests(unittest.TestCase):
                 f"gamePath=Z:{win_game}\n"
                 "[customExecutables]\n"
                 "size=1\n"
-                "[customExecutables/1]\n"
-                "title=SKSE\n"
-                f"binary=Z:{win_game}\\\\skse64_loader.exe\n",
+                "1\\\\title=SKSE\n"
+                f"1\\\\binary=Z:{win_game}\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             before = ini.read_bytes()
@@ -211,9 +210,8 @@ class WyrdMO2Tests(unittest.TestCase):
                 "gamePath=Z:" + str(game).replace("/", "\\\\") + "\n"
                 "[customExecutables]\n"
                 "size=1\n"
-                "[customExecutables/1]\n"
-                "title=SKSE\n"
-                "binary=Z:" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\n",
+                "1\\\\title=SKSE\n"
+                "1\\\\binary=Z:" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             (game / "SkyrimSE.exe").write_bytes(b"skyrim")
