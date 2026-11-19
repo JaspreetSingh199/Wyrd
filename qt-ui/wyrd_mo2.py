@@ -849,7 +849,7 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         if not matches:
             continue
         env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
-        attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv))
+        attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
         detected.append({
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
