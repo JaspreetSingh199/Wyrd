@@ -8,6 +8,7 @@ from __future__ import annotations
 import configparser
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -525,17 +526,19 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
 
             game_path = ""
             if parser.has_section("General"):
-                game_path = parser.get("General", "gamePath", fallback="").strip()
+                general = parser["General"]
+                game_path = general.get("gamePath", "").strip()
             profile = ""
             if parser.has_section("General"):
-                profile = parser.get("General", "selected_profile", fallback="").strip()
+                general = parser["General"]
+                profile = general.get("selected_profile", "").strip()
 
             executables = []
             if parser.has_section("customExecutables"):
                 section = parser["customExecutables"]
                 indexes = sorted(
                     {match.group(1) for key in section
-                     if (match := __import__("re").fullmatch(r"customExecutable_(\\d+)_title", key))},
+                     if (match := re.fullmatch(r"customExecutable_(\\d+)_title", key, re.IGNORECASE))},
                     key=lambda value: int(value),
                 )
                 for index in indexes:
@@ -546,7 +549,8 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
 
             game_name = ""
             if parser.has_section("General"):
-                game_name = parser.get("General", "gameName", fallback="").strip()
+                general = parser["General"]
+                game_name = general.get("gameName", "").strip()
             is_skyrim = (
                 "skyrim special edition" in game_name.casefold()
                 or "skyrim special edition" in game_path.casefold()
