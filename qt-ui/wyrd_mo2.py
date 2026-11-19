@@ -590,30 +590,28 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
     }
 
 def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Path | None:
-    """Resolve a Windows path only when it maps inside known Wyrd/Skyrim roots."""
+    """Resolve Wine DOS paths conservatively beneath the supplied known root."""
     raw = value.strip().strip('"')
     if not raw:
         return None
     normalized = raw.replace("/", "\\")
-    if normalized[:2].casefold() == "z:":
-        relative = normalized[2:].lstrip("\\").replace("\\", "/")
-        candidate = Path("/") / relative
-        try:
-            resolved = candidate.resolve(strict=True)
-            resolved.relative_to(game_path.resolve())
-        except (OSError, ValueError):
-            return None
-        return resolved
-    if normalized[:2].casefold() == "c:":
-        relative = normalized[2:].lstrip("\\").replace("\\", "/")
-        candidate = prefix_root / "pfx/drive_c" / relative
-        try:
-            resolved = candidate.resolve(strict=True)
-            resolved.relative_to((prefix_root / "pfx/drive_c").resolve())
-        except (OSError, ValueError):
-            return None
-        return resolved
-    return None
+    drive = normalized[:2].casefold()
+    if drive == "z:":
+        relative = normalized[2:].lstrip("\\")
+        candidate = Path("/") / relative.replace("\\", "/")
+        allowed_root = game_path
+    elif drive == "c:":
+        relative = normalized[2:].lstrip("\\")
+        allowed_root = prefix_root / "pfx/drive_c"
+        candidate = allowed_root / relative.replace("\\", "/")
+    else:
+        return None
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(allowed_root.resolve(strict=True))
+    except (OSError, ValueError):
+        return None
+    return resolved
 
 
 def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
@@ -628,18 +626,26 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
     warnings = []
     for instance in inventory["skyrim_instances"]:
         candidates = []
-        game_binary = _resolve_windows_path(instance.get("game_path", ""), prefix_root, game_path)
-        if game_binary and game_binary.name.casefold() == "skyrimse.exe" and game_binary.is_file():
-            candidates.append({
-                "title": "Skyrim",
-                "binary": str(game_binary),
-                "arguments": "",
-                "working_directory": str(game_binary.parent),
-                "source": "MO2 General.gamePath",
-                "verified": True,
-            })
+        game_location = _resolve_windows_path(instance.get("game_path", ""), prefix_root, game_path)
+        if game_location:
+            game_binary = (
+                game_location if game_location.is_file()
+                else game_location / "SkyrimSE.exe" if game_location.is_dir()
+                else None
+            )
+            if game_binary and game_binary.is_file() and game_binary.name.casefold() == "skyrimse.exe":
+                candidates.append({
+                    "title": "Skyrim",
+                    "binary": str(game_binary),
+                    "arguments": "",
+                    "working_directory": str(game_binary.parent),
+                    "source": "MO2 General.gamePath",
+                    "verified": True,
+                })
+            else:
+                warnings.append(f"{instance['name']}: MO2 gamePath exists but SkyrimSE.exe was not found there.")
         elif instance.get("game_path"):
-            warnings.append(f"{instance['name']}: gamePath did not resolve to SkyrimSE.exe inside the detected game folder.")
+            warnings.append(f"{instance['name']}: gamePath does not resolve inside the detected Skyrim folder.")
 
         for entry in instance.get("executables", []):
             title = entry.get("title", "").strip()
