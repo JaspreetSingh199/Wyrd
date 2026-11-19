@@ -524,38 +524,34 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
                 errors.append(f"{ini}: {error}")
                 continue
 
-            game_path = ""
-            if parser.has_section("General"):
-                general = parser["General"]
-                game_path = general.get("gamePath", "").strip()
-            profile = ""
-            if parser.has_section("General"):
-                general = parser["General"]
-                profile = general.get("selected_profile", "").strip()
+            general = parser["General"] if parser.has_section("General") else {}
+            game_path = general.get("gamePath", "").strip()
+            profile = general.get("selected_profile", "").strip()
+            game_name = general.get("gameName", "").strip()
 
             executables = []
             if parser.has_section("customExecutables"):
                 section = parser["customExecutables"]
-                indexes = sorted(
-                    {match.group(1) for key in section
-                     if (match := re.fullmatch(r"customExecutable_(\\d+)_title", key, re.IGNORECASE))},
-                    key=lambda value: int(value),
-                )
-                for index in indexes:
-                    title = section.get(f"customExecutable_{index}_title", "").strip()
-                    binary = section.get(f"customExecutable_{index}_binary", "").strip()
+                executable_titles = {}
+                executable_binaries = {}
+                for key, value in section.items():
+                    title_match = re.fullmatch(r"customExecutable_(\\d+)_title", key, re.IGNORECASE)
+                    binary_match = re.fullmatch(r"customExecutable_(\\d+)_binary", key, re.IGNORECASE)
+                    if title_match:
+                        executable_titles[title_match.group(1)] = value.strip()
+                    elif binary_match:
+                        executable_binaries[binary_match.group(1)] = value.strip()
+                for index in sorted(set(executable_titles) | set(executable_binaries), key=int):
+                    title = executable_titles.get(index, "")
+                    binary = executable_binaries.get(index, "")
                     if title or binary:
                         executables.append({"title": title, "binary": binary})
 
-            game_name = ""
-            if parser.has_section("General"):
-                general = parser["General"]
-                game_name = general.get("gameName", "").strip()
-            is_skyrim = (
-                "skyrim special edition" in game_name.casefold()
-                or "skyrim special edition" in game_path.casefold()
-                or "skyrimse.exe" in game_path.casefold()
-            )
+            skyrim_markers = ("skyrim special edition", "skyrimse.exe", "skyrim se")
+            searchable = " ".join([game_name, game_path] + [
+                value for entry in executables for value in entry.values()
+            ]).casefold()
+            is_skyrim = any(marker in searchable for marker in skyrim_markers)
             discovered.append({
                 "name": directory.name,
                 "path": str(directory),
