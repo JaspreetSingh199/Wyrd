@@ -822,13 +822,7 @@ def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
 
 def detect_skyrim_processes(prefix_root: Path | None = None,
                            proc_root: Path = Path("/proc")) -> dict:
-    """Read /proc and detect Skyrim/SKSE binaries, with prefix attribution when possible.
-
-    This is deliberately read-only and testable against a fixture proc_root. A
-    process is considered Wyrd-attributed only when its environment or command
-    line explicitly contains the managed prefix; executable-name matches alone
-    are reported as unassociated to avoid claiming a user's unrelated game.
-    """
+    """Read /proc for Skyrim/SKSE and attribute processes to Wyrd when possible."""
     expected = {"skyrimse.exe", "skyrimse", "skse64_loader.exe", "skse64.exe"}
     prefix = str(Path(prefix_root).expanduser().resolve()) if prefix_root else None
     detected = []
@@ -839,37 +833,33 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
     for entry in entries:
         if not entry.name.isdigit():
             continue
-        pid = int(entry.name)
         try:
-            raw_cmdline = (entry / "cmdline").read_bytes()
-            argv = [part.decode("utf-8", errors="replace") for part in raw_cmdline.split(b"\\0") if part]
+            argv = [part.decode("utf-8", errors="replace") for part in
+                    (entry / "cmdline").read_bytes().split(bytes([0])) if part]
             comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip().lower()
             exe_path = os.readlink(entry / "exe")
             env_data = (entry / "environ").read_bytes()
-        except (OSError, PermissionError):
+        except OSError:
             continue
-        names = {Path(arg.replace("\\\\", "/")).name.lower() for arg in argv}
-        names.add(Path(exe_path.replace("\\\\", "/")).name.lower())
+        normalize = lambda value: value.replace(chr(92), "/")
+        names = {Path(normalize(arg)).name.lower() for arg in argv}
+        names.add(Path(normalize(exe_path)).name.lower())
         names.add(comm)
         matches = sorted(names.intersection(expected))
         if not matches:
             continue
-        env_text = env_data.decode("utf-8", errors="replace").replace("\\0", "\\n")
-        command_text = " ".join(argv)
-        attributed = bool(prefix and (prefix in env_text or prefix in command_text))
+        env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
+        attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv))
         detected.append({
-            "pid": pid, "binary": matches[0], "argv": argv,
-            "attributed_to_wyrd": attributed,
-            "prefix": prefix if attributed else None,
+            "pid": int(entry.name), "binary": matches[0], "argv": argv,
+            "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
         })
-    attributed_items = [item for item in detected if item["attributed_to_wyrd"]]
-    if attributed_items:
-        message = f"Detected {len(attributed_items)} Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
-    elif detected:
-        message = "Skyrim/SKSE process(es) detected, but none could be attributed to Wyrd's managed prefix."
-    else:
-        message = "No Skyrim/SKSE process was detected."
-    return {"ok": True, "processes": detected, "wyrd_processes": attributed_items, "message": message}
+    associated = [item for item in detected if item["attributed_to_wyrd"]]
+    message = (f"Detected {len(associated)} Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
+               if associated else
+               "Skyrim/SKSE process(es) detected, but none could be attributed to Wyrd's managed prefix."
+               if detected else "No Skyrim/SKSE process was detected.")
+    return {"ok": True, "processes": detected, "wyrd_processes": associated, "message": message}
 
 def launch_process_status(pid: int) -> dict:
     """Report the state of a local Proton wrapper process without signaling it."""
