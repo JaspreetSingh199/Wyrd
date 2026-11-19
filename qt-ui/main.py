@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
                 f'Wyrd Proton prefix: {prefix}\n'
                 f'{instance_summary}'
             )
-            self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready")))
+            self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
             self.install_button.setText("Recheck MO2" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
         else:
@@ -365,12 +365,25 @@ class MainWindow(QMainWindow):
         self.refresh_button.setEnabled(True)
         self.refresh_all()
 
+    def _instance_inspection(self) -> dict:
+        """Return a fresh read-only inventory for the current managed prefix."""
+        return inspect_mo2_instances(managed_paths()["prefix"])
+
     def _has_instance(self) -> bool:
-        state = inspect_mo2_instances(managed_paths()["prefix"])
+        state = self._instance_inspection()
         return bool(state.get("ok") and state.get("instances"))
 
     def start_mo2(self) -> None:
-        first_run = not self._has_instance()
+        state = self._instance_inspection()
+        if not state.get("ok"):
+            QMessageBox.warning(
+                self, "MO2 instance status unavailable",
+                state.get("message", "Wyrd could not safely inspect its managed MO2 prefix."),
+            )
+            self._log("MO2 instance inspection blocked launch: " +
+                      state.get("message", "unknown inspection error"))
+            return
+        first_run = not state.get("instances")
         result = launch_mo2(pick_instance=first_run)
         self._log(result.get("message", "MO2 launch failed."))
         if result.get("ok"):
