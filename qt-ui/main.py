@@ -415,10 +415,10 @@ class MainWindow(QMainWindow):
 
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
-        if not self.launch_target_state.get("ok") or not self.launch_target_state.get("targets") or not instances:
+        if not instances:
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
-                self.launch_target_state.get("message", "No verified Skyrim/SKSE target is available."),
+                self.instance_state.get("message", "No Skyrim Special Edition MO2 instance is available."),
             )
             return
         instance_names = [item["name"] for item in instances]
@@ -428,7 +428,20 @@ class MainWindow(QMainWindow):
         )
         if not accepted or not instance_name:
             return
-        titles = [target["title"] for target in self.launch_target_state["targets"]]
+        target_state = inspect_skyrim_launch_targets(
+            managed_paths()["prefix"],
+            Path(self.mo2_state.get("metadata", {}).get("game_path", "")),
+            instance_name=instance_name,
+        )
+        if not target_state.get("ok") or not target_state.get("targets"):
+            QMessageBox.warning(
+                self, "Skyrim launch unavailable",
+                target_state.get("message", "No verified Skyrim/SKSE executable is available in this instance."),
+            )
+            self._log(target_state.get("message", "No valid targets found."))
+            return
+        targets = target_state["targets"]
+        titles = [target["title"] for target in targets]
         selected, accepted = QInputDialog.getItem(
             self, "Launch Skyrim through MO2", "Configured Skyrim executable:",
             titles, 0, False,
