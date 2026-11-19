@@ -14,7 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status,
 )
 
 
@@ -298,6 +298,17 @@ class WyrdMO2Tests(unittest.TestCase):
                 result = launch_skyrim_via_mo2("SKSE", "Missing", home)
             self.assertFalse(result["ok"])
             popen.assert_not_called()
+
+
+    def test_launch_process_status_reports_running_exited_and_unknown(self):
+        with patch("wyrd_mo2.os.kill") as kill:
+            kill.return_value = None
+            self.assertEqual(launch_process_status(123)["state"], "running")
+            kill.side_effect = ProcessLookupError()
+            self.assertEqual(launch_process_status(123)["state"], "exited")
+            kill.side_effect = PermissionError()
+            self.assertEqual(launch_process_status(123)["state"], "unknown")
+        self.assertEqual(launch_process_status(-1)["state"], "invalid")
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
