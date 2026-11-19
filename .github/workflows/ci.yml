@@ -1,0 +1,44 @@
+name: Wyrd tests and release bundle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Qt dependencies
+        run: python -m pip install -r qt-ui/requirements.txt
+      - name: Python compile checks
+        run: python3 -m compileall -q qt-ui
+      - name: Python unit tests
+        run: python3 -m unittest discover -s qt-ui/tests -p 'test_*.py'
+      - name: Qt offscreen smoke tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python3 -m unittest discover -s qt-ui/tests -p 'test_main_window.py'
+      - name: Shell syntax checks
+        run: |
+          bash -n qt-ui/run.sh
+          bash -n qt-ui/install-desktop-launcher.sh
+
+  release-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build source release bundle
+        run: |
+          bundle="$RUNNER_TEMP/wyrd-qt6-source.tar.gz"
+          tar --exclude=.git --exclude=qt-ui/.venv --exclude='*/__pycache__' --exclude=./dist --exclude=./dist/ -czf "$bundle" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wyrd-qt6-source
+          path: ${{ runner.temp }}/wyrd-qt6-source.tar.gz
+          if-no-files-found: error
