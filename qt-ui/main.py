@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
     QWidget,
 )
 
@@ -17,6 +17,7 @@ from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
 )
 
 STYLE = """
@@ -81,6 +82,7 @@ class MainWindow(QMainWindow):
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
         self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
+        self.launch_target_state: dict = {"ok": False, "targets": []}
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -134,8 +136,12 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
+        self.launch_game_button = QPushButton("Launch Skyrim")
+        self.launch_game_button.clicked.connect(self.start_skyrim)
+        self.launch_game_button.setEnabled(False)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
+        action_row.addWidget(self.launch_game_button)
         action_row.addStretch(1)
         layout.addLayout(action_row)
 
@@ -235,8 +241,12 @@ class MainWindow(QMainWindow):
         self.mo2_state = inspect_wyrd_installation()
         if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
             self.instance_state = inspect_mo2_instances(managed_paths()["prefix"])
+            self.launch_target_state = inspect_skyrim_launch_targets(
+                managed_paths()["prefix"], Path(self.mo2_state["metadata"].get("game_path", ""))
+            )
         else:
             self.instance_state = {"ok": False, "instances": [], "skyrim_instances": []}
+            self.launch_target_state = {"ok": False, "targets": []}
         if self.mo2_state.get("installed"):
             version = self.mo2_state.get("metadata", {}).get("version", "unknown version")
             prefix = "ready" if self.mo2_state.get("prefix_ready") else "incomplete"
@@ -262,6 +272,7 @@ class MainWindow(QMainWindow):
                 f'{instance_summary}'
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
+            self.launch_game_button.setEnabled(bool(self.launch_target_state.get("ok")))
             self.install_button.setText("Recheck MO2" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
         else:
@@ -272,6 +283,7 @@ class MainWindow(QMainWindow):
                 description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
             self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
+            self.launch_game_button.setEnabled(False)
             self.install_button.setText("Install MO2")
             self._log("Wyrd MO2 inspection: " + description)
 
@@ -397,6 +409,40 @@ class MainWindow(QMainWindow):
                 )
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
+
+    def start_skyrim(self) -> None:
+        targets = self.launch_target_state.get("targets", [])
+        instances = self.instance_state.get("skyrim_instances", [])
+        if not self.launch_target_state.get("ok") or not targets or not instances:
+            QMessageBox.warning(
+                self, "Skyrim launch unavailable",
+                self.launch_target_state.get("message", "No verified Skyrim/SKSE target is available."),
+            )
+            return
+        titles = [target["title"] for target in targets]
+        selected, accepted = QInputDialog.getItem(
+            self, "Launch Skyrim through MO2", "Configured Skyrim executable:",
+            titles, 0, False,
+        )
+        if not accepted or not selected:
+            return
+        target = next(item for item in targets if item["title"] == selected)
+        instance = instances[0]
+        answer = QMessageBox.question(
+            self, "Confirm Skyrim launch",
+            f"MO2 will launch '{target['title']}' in instance '{instance['name']}' "
+            "using its virtual filesystem. Wyrd will not edit the instance configuration.\\n\\nContinue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = launch_skyrim_via_mo2(target["title"], instance["name"])
+        self._log(result.get("message", "Skyrim launch handoff failed."))
+        if result.get("ok"):
+            self.progress_label.setText("MO2 launch request submitted.")
+        else:
+            QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
 
     def closeEvent(self, event) -> None:
         if self.worker and self.worker.isRunning():
