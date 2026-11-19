@@ -14,6 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
 )
 
 
@@ -120,6 +121,97 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(result["instances"], [])
             self.assertTrue(result["errors"])
             self.assertEqual(ini.read_bytes(), before)
+
+
+    def test_launch_target_inspection_validates_skyrim_and_skse_without_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefix"
+            game = Path(tmp) / "game"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
+            instance.mkdir(parents=True)
+            game.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            (game / "skse64_loader.exe").write_bytes(b"skse")
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                "gamePath=Z:\\\\game\\\\SkyrimSE.exe\n"
+                "[customExecutables]\nsize=1\n"
+                "[customExecutables\\\\1]\n"
+                "title=SKSE\n"
+                "binary=Z:\\\\game\\\\skse64_loader.exe\n",
+                encoding="utf-8",
+            )
+            before = ini.read_bytes()
+            result = inspect_skyrim_launch_targets(prefix, game)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual({item["title"] for item in result["targets"]}, {"Skyrim", "SKSE"})
+            self.assertEqual(ini.read_bytes(), before)
+
+    def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefix"
+            game = Path(tmp) / "game"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim"
+            instance.mkdir(parents=True)
+            game.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            outside = Path(tmp) / "outside"
+            outside.mkdir()
+            (outside / "skse64_loader.exe").write_bytes(b"unsafe")
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                "[customExecutables]\nsize=1\n"
+                "[customExecutables\\\\1]\n"
+                "title=SKSE\n"
+                f"binary=Z:\\\\{outside.as_posix().lstrip('/').replace('/', '\\\\')}\\\\skse64_loader.exe\n",
+                encoding="utf-8",
+            )
+            result = inspect_skyrim_launch_targets(prefix, game)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["targets"], [])
+
+    def test_launch_handoff_uses_mo2_run_executable_and_prefix_environment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(
+                json.dumps({
+                    "managed_by": "Wyrd", "proton": str(proton),
+                    "game_path": str(game), "steam_root": str(home / ".steam/steam"),
+                }), encoding="utf-8"
+            )
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }):
+                with patch("wyrd_mo2.subprocess.Popen") as popen:
+                    popen.return_value.pid = 1234
+                    with patch("wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]):
+                        result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
+            self.assertTrue(result["ok"], result)
+            command = popen.call_args.args[0]
+            self.assertIn("--instance", command)
+            self.assertIn("--executable", command)
+            self.assertEqual(command[-1], "SKSE")
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
