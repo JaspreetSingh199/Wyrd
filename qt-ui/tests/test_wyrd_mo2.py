@@ -125,8 +125,9 @@ class WyrdMO2Tests(unittest.TestCase):
 
     def test_launch_target_inspection_validates_skyrim_and_skse_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
-            prefix = Path(tmp) / "prefix"
-            game = Path(tmp) / "game"
+            root = Path(tmp)
+            prefix = root / "prefix"
+            game = root / "game"
             instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
             instance.mkdir(parents=True)
             game.mkdir()
@@ -135,15 +136,16 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             (game / "SkyrimSE.exe").write_bytes(b"skyrim")
             (game / "skse64_loader.exe").write_bytes(b"skse")
+            z_game = str(game).replace("/", "\\\\")
             ini = instance / "ModOrganizer.ini"
             ini.write_text(
-                "[General]\n"
-                "gameName=Skyrim Special Edition\n"
-                "gamePath=Z:\\\\game\\\\SkyrimSE.exe\n"
-                "[customExecutables]\nsize=1\n"
-                "[customExecutables\\\\1]\n"
-                "title=SKSE\n"
-                "binary=Z:\\\\game\\\\skse64_loader.exe\n",
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                f"gamePath=Z:\\\\{z_game.lstrip(chr(92))}\\\\SkyrimSE.exe\\n"
+                "[customExecutables]\\nsize=1\\n"
+                "[customExecutables\\\\1]\\n"
+                "title=SKSE\\n"
+                f"binary=Z:\\\\{z_game.lstrip(chr(92))}\\\\skse64_loader.exe\\n",
                 encoding="utf-8",
             )
             before = ini.read_bytes()
