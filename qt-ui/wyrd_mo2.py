@@ -588,3 +588,137 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
             if instances else "No MO2 instances were found in the known prefix locations."
         ),
     }
+
+def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Path | None:
+    """Resolve a Windows path only when it maps inside known Wyrd/Skyrim roots."""
+    raw = value.strip().strip('"')
+    if not raw:
+        return None
+    normalized = raw.replace("/", "\\")
+    if normalized.casefold().startswith("z:\\"):
+        candidate = Path(normalized[3:].replace("\\", "/"))
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            return None
+        try:
+            resolved.relative_to(game_path.resolve())
+        except ValueError:
+            return None
+        return resolved
+    if normalized[:2].casefold() == "c:":
+        relative = normalized[2:].lstrip("\\").replace("\\", "/")
+        candidate = prefix_root / "pfx/drive_c" / relative
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            return None
+        try:
+            resolved.relative_to((prefix_root / "pfx/drive_c").resolve())
+        except ValueError:
+            return None
+        return resolved
+    return None
+
+
+def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
+    """Validate Skyrim/SKSE executable targets from the first detected Skyrim instance."""
+    inventory = inspect_mo2_instances(prefix_root)
+    if not inventory.get("ok"):
+        return {"ok": False, "targets": [], "message": inventory.get("message", "MO2 inspection failed.")}
+    if not inventory.get("skyrim_instances"):
+        return {"ok": False, "targets": [], "message": "No Skyrim Special Edition MO2 instance was identified."}
+
+    targets = []
+    warnings = []
+    for instance in inventory["skyrim_instances"]:
+        candidates = []
+        game_binary = _resolve_windows_path(instance.get("game_path", ""), prefix_root, game_path)
+        if game_binary and game_binary.name.casefold() == "skyrimse.exe" and game_binary.is_file():
+            candidates.append({
+                "title": "Skyrim",
+                "binary": str(game_binary),
+                "arguments": "",
+                "working_directory": str(game_binary.parent),
+                "source": "MO2 General.gamePath",
+                "verified": True,
+            })
+        elif instance.get("game_path"):
+            warnings.append(f"{instance['name']}: gamePath did not resolve to SkyrimSE.exe inside the detected game folder.")
+
+        for entry in instance.get("executables", []):
+            title = entry.get("title", "").strip()
+            binary = _resolve_windows_path(entry.get("binary", ""), prefix_root, game_path)
+            if not title or not binary or not binary.is_file():
+                continue
+            name = binary.name.casefold()
+            is_skse = name in {"skse64_loader.exe", "skse_loader.exe"} or "skse" in title.casefold()
+            is_skyrim = name == "skyrimse.exe"
+            if not (is_skse or is_skyrim):
+                continue
+            targets.append({
+                "title": title,
+                "binary": str(binary),
+                "arguments": entry.get("arguments", ""),
+                "working_directory": entry.get("working_directory") or str(binary.parent),
+                "source": "MO2 custom executable",
+                "verified": True,
+            })
+
+    unique = {}
+    for target in targets:
+        key = (target["title"].casefold(), target["binary"].casefold())
+        unique[key] = target
+    return {
+        "ok": bool(unique),
+        "targets": list(unique.values()),
+        "warnings": warnings,
+        "message": (
+            f"Verified {len(unique)} Skyrim/SKSE launch target(s) from MO2."
+            if unique else "No configured SkyrimSE.exe or SKSE executable could be verified. "
+                          "Check the MO2 instance's game path and executable entries."
+        ),
+    }
+
+
+def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
+                          home: Path | None = None) -> dict:
+    """Ask MO2 to launch a configured executable through ProcessRunner/USVFS."""
+    home = (home or Path.home()).expanduser()
+    title = executable_title.strip()
+    instance = instance_name.strip()
+    if not title or not instance:
+        return {"ok": False, "message": "An MO2 instance and configured executable title are required."}
+    if any(char in title + instance for char in "\\x00\\r\\n"):
+        return {"ok": False, "message": "The selected MO2 instance or executable title is invalid."}
+    state = inspect_wyrd_installation(home)
+    if not state.get("installed") or not state.get("prefix_ready"):
+        return {"ok": False, "message": "Wyrd-managed MO2 and its dedicated prefix must be ready before launching Skyrim."}
+    metadata = state.get("metadata", {})
+    proton_path = Path(metadata.get("proton", ""))
+    game_path = Path(metadata.get("game_path", ""))
+    paths = managed_paths(home)
+    if not proton_path.is_dir() or not game_path.is_dir():
+        return {"ok": False, "message": "The saved Proton runtime or Skyrim directory is missing."}
+    validation = inspect_proton_build(proton_path)
+    if not validation.get("ok"):
+        return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+    env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
+    command = [
+        str(proton_path / "proton"), "run",
+        str(paths["install"] / "ModOrganizer.exe"),
+        "--instance", instance,
+        "run", "--executable", title,
+    ]
+    try:
+        process = subprocess.Popen(
+            command, cwd=str(paths["install"]), env=env,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True,
+        )
+    except OSError as error:
+        return {"ok": False, "message": f"Could not start MO2 executable handoff: {error}"}
+    return {
+        "ok": True, "pid": process.pid, "command": command,
+        "message": f"Asked MO2 to run '{title}' in instance '{instance}' through its virtual filesystem.",
+    }
