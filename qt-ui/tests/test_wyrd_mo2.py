@@ -150,6 +150,7 @@ class WyrdMO2Tests(unittest.TestCase):
             result = inspect_skyrim_launch_targets(prefix, game)
             self.assertTrue(result["ok"], result)
             self.assertEqual({item["title"] for item in result["targets"]}, {"Skyrim", "SKSE"})
+            self.assertTrue(all(Path(item["binary"]).is_file() for item in result["targets"]))
             self.assertEqual(ini.read_bytes(), before)
 
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
@@ -210,8 +211,11 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(result["ok"], result)
             command = popen.call_args.args[0]
             self.assertIn("--instance", command)
+            self.assertIn("Skyrim SE", command)
             self.assertIn("--executable", command)
             self.assertEqual(command[-1], "SKSE")
+            environment = popen.call_args.kwargs["env"]
+            self.assertEqual(environment["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
