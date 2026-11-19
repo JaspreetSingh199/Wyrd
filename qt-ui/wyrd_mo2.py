@@ -530,26 +530,27 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
             game_name = general.get("gameName", "").strip()
 
             executables = []
-            if parser.has_section("customExecutables"):
-                section = parser["customExecutables"]
-                executable_titles = {}
-                executable_binaries = {}
-                for key, value in section.items():
-                    normalized_key = key.casefold()
-                    for suffix, target in (
-                        ("_title", executable_titles),
-                        ("_binary", executable_binaries),
-                    ):
-                        prefix = "customexecutable_"
-                        if normalized_key.startswith(prefix) and normalized_key.endswith(suffix):
-                            index = normalized_key[len(prefix):-len(suffix)]
-                            if index.isdigit():
-                                target[index] = value.strip()
-                for index in sorted(set(executable_titles) | set(executable_binaries), key=int):
-                    title = executable_titles.get(index, "")
-                    binary = executable_binaries.get(index, "")
-                    if title or binary:
-                        executables.append({"title": title, "binary": binary})
+            # MO2 stores this as a QSettings array:
+            # customExecutables\size=N
+            # customExecutables\1\title=...
+            # customExecutables\1\binary=...
+            array_size = parser.getint("customExecutables", "size", fallback=0)
+            if array_size < 0 or array_size > 512:
+                errors.append(f"{ini}: invalid customExecutables array size {array_size}")
+                array_size = 0
+            for index in range(1, array_size + 1):
+                section_name = f"customExecutables\\{index}"
+                if not parser.has_section(section_name):
+                    continue
+                item = parser[section_name]
+                executable = {
+                    "title": item.get("title", "").strip(),
+                    "binary": item.get("binary", "").strip(),
+                    "arguments": item.get("arguments", "").strip(),
+                    "working_directory": item.get("workingDirectory", "").strip(),
+                }
+                if executable["title"] or executable["binary"]:
+                    executables.append(executable)
 
             skyrim_markers = ("skyrim special edition", "skyrimse.exe", "skyrim se")
             searchable = " ".join([game_name, game_path] + [
