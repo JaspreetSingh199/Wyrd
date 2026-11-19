@@ -12,6 +12,7 @@ import re
 import shutil
 import struct
 import subprocess
+import time
 import tempfile
 import urllib.request
 from datetime import datetime, timezone
@@ -683,8 +684,12 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path) -> dict:
 
 
 def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
-                          home: Path | None = None) -> dict:
-    """Ask MO2 to launch a configured executable through ProcessRunner/USVFS."""
+                          home: Path | None = None, log_path: Path | None = None) -> dict:
+    """Start MO2's configured-executable handoff and retain a diagnostic log.
+
+    A successful return means only that the Proton wrapper process was spawned.
+    It does not assert that MO2 accepted the executable or that Skyrim started.
+    """
     home = (home or Path.home()).expanduser()
     title = executable_title.strip()
     instance = instance_name.strip()
@@ -704,6 +709,19 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     validation = inspect_proton_build(proton_path)
     if not validation.get("ok"):
         return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+    prefix_check = inspect_mo2_instances(paths["prefix"])
+    instance_match = next(
+        (item for item in prefix_check.get("skyrim_instances", [])
+         if item["name"] == instance), None
+    ) if prefix_check.get("ok") else None
+    if not instance_match:
+        return {"ok": False, "message": "The selected Skyrim instance is no longer present in Wyrd's managed prefix."}
+    target_match = next(
+        (item for item in inspect_skyrim_launch_targets(paths["prefix"], game_path).get("targets", [])
+         if item["title"] == title), None
+    )
+    if not target_match:
+        return {"ok": False, "message": "The selected Skyrim executable is no longer verified in this MO2 instance."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
     command = [
         str(proton_path / "proton"), "run",
@@ -711,15 +729,47 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         "--instance", instance,
         "run", "--executable", title,
     ]
+    diagnostics = Path(log_path) if log_path else paths["data"] / "logs" / "skyrim-launch.log"
     try:
-        process = subprocess.Popen(
-            command, cwd=str(paths["install"]), env=env,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, start_new_session=True,
-        )
+        diagnostics.parent.mkdir(parents=True, exist_ok=True)
+        with diagnostics.open("a", encoding="utf-8") as log:
+            log.write("\\n=== Wyrd Skyrim launch handoff ===\\n")
+            log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
+            log.write(f"instance: {instance}\\nexecutable: {title}\\npid: pending\\n")
+            log.write("command: " + json.dumps(command) + "\\n")
+            log.write("stdout/stderr are redirected to this diagnostic log.\\n")
+            log.flush()
+            process = subprocess.Popen(
+                command, cwd=str(paths["install"]), env=env,
+                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.flush()
     except OSError as error:
         return {"ok": False, "message": f"Could not start MO2 executable handoff: {error}"}
     return {
         "ok": True, "pid": process.pid, "command": command,
-        "message": f"Asked MO2 to run '{title}' in instance '{instance}' through its virtual filesystem.",
+        "log_path": str(diagnostics),
+        "message": (
+            f"Started the Proton wrapper for MO2 executable '{title}' "
+            f"in instance '{instance}'. This does not yet confirm that MO2 or Skyrim started. "
+            f"Diagnostics: {diagnostics}"
+        ),
     }
+
+
+def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
+    """Read the tail of Wyrd's launch diagnostics without changing the log."""
+    path = Path(log_path)
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - max_bytes))
+            content = handle.read().decode("utf-8", errors="replace")
+    except FileNotFoundError:
+        return {"ok": False, "message": "No launch diagnostic log exists yet.", "content": ""}
+    except OSError as error:
+        return {"ok": False, "message": f"Could not read launch diagnostics: {error}", "content": ""}
+    return {"ok": True, "path": str(path), "content": content, "truncated": size > max_bytes}
