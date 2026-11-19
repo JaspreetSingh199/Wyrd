@@ -490,16 +490,16 @@ class MainWindow(QMainWindow):
         if process_scan.get("ok") and process_scan.get("wyrd_processes"):
             detected = ", ".join(f"{item['binary']} (PID {item['pid']})" for item in process_scan["wyrd_processes"])
             self.progress_label.setText("Skyrim/SKSE detected in Wyrd's managed prefix.")
-            detail = result["message"] + "\\n\\n" + process_scan["message"] + "\\n" + detected
+            detail = result["message"] + "\n\n" + process_scan["message"] + "\n" + detected
         elif process_scan.get("ok") and process_scan.get("processes"):
             self.progress_label.setText("Skyrim detected, but prefix ownership could not be confirmed.")
-            detail = result["message"] + "\\n\\n" + process_scan["message"]
+            detail = result["message"] + "\n\n" + process_scan["message"]
         else:
             if result["state"] == "exited":
                 self.progress_label.setText("Proton wrapper exited. Skyrim process not detected; review diagnostics.")
             elif result["state"] == "running":
                 self.progress_label.setText("Proton wrapper is running; Skyrim process not detected yet.")
-            detail = result["message"] + "\\n\\n" + process_scan.get("message", "Process detection unavailable.")
+            detail = result["message"] + "\n\n" + process_scan.get("message", "Process detection unavailable.")
         QMessageBox.information(self, "Launch process status", detail)
 
     def show_launch_diagnostics(self) -> None:
