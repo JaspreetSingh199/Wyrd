@@ -51,7 +51,8 @@ class WyrdMO2Tests(unittest.TestCase):
                 saved = read_settings(home)
                 self.assertEqual(saved["proton"], str(proton.resolve()))
                 self.assertEqual(saved["game_path"], str(game.resolve()))
-                paths["settings"].write_text("{invalid", encoding="utf-8")
+                settings_path = managed_paths(home)["settings"]
+                settings_path.write_text("{invalid", encoding="utf-8")
                 self.assertEqual(read_settings(home), {})
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
