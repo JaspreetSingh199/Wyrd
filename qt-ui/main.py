@@ -394,7 +394,8 @@ class MainWindow(QMainWindow):
         report = inspect_audio_compatibility()
         self.audio_report = report
         self.audio_repair_button.setEnabled(
-            bool(report.get("safe") and report.get("repair_recommended"))
+            bool(report.get("safe") and report.get("repair_recommended")
+                 and report.get("repair_available"))
         )
         if not report.get("safe"):
             self.audio_detail.setText(
@@ -409,6 +410,8 @@ class MainWindow(QMainWindow):
             "XACT (64-bit): " + components.get("xact_x64", {}).get("state", "unknown"),
             "XAudio2 7 (32-bit): " + components.get("xaudio2", {}).get("state", "unknown"),
             "XAudio2 7 (64-bit): " + components.get("xaudio2_x64", {}).get("state", "unknown"),
+            "FAudio / FFmpeg support: UNKNOWN — requires runtime verification.",
+            "XACT repair payload cache: " + ("available" if report.get("repair_available") else "not available"),
             "FAudio / FFmpeg support: UNKNOWN — requires runtime verification.",
             "Runtime dialogue audio: NOT VERIFIED — test dialogue in Skyrim.",
         ]
@@ -426,10 +429,17 @@ class MainWindow(QMainWindow):
         if not report.get("repair_recommended"):
             QMessageBox.information(self, "Audio compatibility", "Both XACT targets are already present. No repair is recommended.")
             return
+        if not report.get("repair_available"):
+            QMessageBox.warning(
+                self, "XACT repair unavailable",
+                "No verified Microsoft XACT payload cache is available. Wyrd will not download or substitute unverified DLLs. No files were changed.",
+            )
+            self.check_audio_compatibility()
+            return
         answer = QMessageBox.question(
             self, "Repair Wyrd audio components",
-            "Wyrd will extract Microsoft XACT DLLs from the SHA-256-verified DirectX June 2010 package and copy them into ONLY Wyrd's managed MO2 prefix. "
-            "Existing target files will be backed up and the resulting file hashes verified. "
+            "Wyrd will copy only pre-validated Microsoft XACT payloads from its local cache into ONLY Wyrd's managed MO2 prefix. "
+            "Existing DLLs are never overwritten; new files are hash-verified and journaled. "
             "Steam's Skyrim prefix, Skyrim files, MO2 instances, profiles and mods will not be changed.\\n\\n"
             "This does not guarantee that Skyrim dialogue audio will work. You must test dialogue in-game.\\n\\nContinue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
