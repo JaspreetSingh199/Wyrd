@@ -447,38 +447,6 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
 
-    @property
-    def _last_launch_pid(self) -> int | None:
-        return self.launch_session.wrapper_pid
-
-    @_last_launch_pid.setter
-    def _last_launch_pid(self, value: int | None) -> None:
-        self.launch_session.wrapper_pid = value
-
-    @property
-    def _last_launch_start_time(self) -> int | None:
-        return self.launch_session.wrapper_start_time
-
-    @_last_launch_start_time.setter
-    def _last_launch_start_time(self, value: int | None) -> None:
-        self.launch_session.wrapper_start_time = value
-
-    @property
-    def _last_launch_log_path(self) -> str | None:
-        return self.launch_session.log_path
-
-    @_last_launch_log_path.setter
-    def _last_launch_log_path(self, value: str | None) -> None:
-        self.launch_session.log_path = value
-
-    @property
-    def _launch_poll_count(self) -> int:
-        return self.launch_session.poll_count
-
-    @_launch_poll_count.setter
-    def _launch_poll_count(self, value: int) -> None:
-        self.launch_session.poll_count = value
-
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
         if not instances:
@@ -526,19 +494,19 @@ class MainWindow(QMainWindow):
         result = launch_skyrim_via_mo2(selected, instance_name)
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
-            self._last_launch_pid = result.get("pid")
-            self._last_launch_start_time = _proc_start_time(self._last_launch_pid) if self._last_launch_pid else None
-            self._last_launch_log_path = result.get("log_path")
+            self.launch_session.wrapper_pid = result.get("pid")
+            self.launch_session.wrapper_start_time = _proc_start_time(self.launch_session.wrapper_pid) if self.launch_session.wrapper_pid else None
+            self.launch_session.log_path = result.get("log_path")
             self.launch_session.instance_name = instance_name
             self.launch_session.executable_title = selected
             self.launch_session.started_at = time.time()
             self.launch_session.detected_processes = []
             self.launch_session.process_identities = {}
             self.launch_session.state = "handoff"
-            self._launch_poll_count = 0
-            if self._last_launch_pid:
+            self.launch_session.poll_count = 0
+            if self.launch_session.wrapper_pid:
                 self._launch_monitor.start()
-            self.launch_status_button.setEnabled(bool(self._last_launch_pid))
+            self.launch_status_button.setEnabled(bool(self.launch_session.wrapper_pid))
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
@@ -553,30 +521,30 @@ class MainWindow(QMainWindow):
 
     def _poll_launch_status(self) -> None:
         """Refresh launch status without modal dialogs until a terminal state is reached."""
-        if not self._last_launch_pid:
+        if not self.launch_session.wrapper_pid:
             self._stop_launch_monitor("no launch session is active")
             return
-        self._launch_poll_count += 1
-        if self._launch_poll_count > self._launch_poll_limit:
+        self.launch_session.poll_count += 1
+        if self.launch_session.poll_count > self._launch_poll_limit:
             self.launch_session.state = "timeout"
             self._stop_launch_monitor("monitoring time limit reached")
             self.progress_label.setText(
                 "Launch monitoring timed out; use Check launch status or inspect diagnostics."
             )
             return
-        wrapper_identity = _proc_identity(self._last_launch_pid)
+        wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
         result = launch_process_status(
-            self._last_launch_pid, self._last_launch_start_time
+            self.launch_session.wrapper_pid, self.launch_session.wrapper_start_time
         )
         wrapper_identity_matches = (
-            self._last_launch_start_time is None
-            or wrapper_identity.get("start_time") == self._last_launch_start_time
+            self.launch_session.wrapper_start_time is None
+            or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
-                if _is_descendant_process(item["pid"], self._last_launch_pid):
+                if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
                     session_processes.append(item)
         if session_processes:
             detected = ", ".join(
@@ -616,8 +584,8 @@ class MainWindow(QMainWindow):
                 "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
             )
             self._log("Launch handoff ended without detected Skyrim: " + result["message"])
-            if self._last_launch_log_path:
-                diagnostics = read_launch_diagnostics(Path(self._last_launch_log_path))
+            if self.launch_session.log_path:
+                diagnostics = read_launch_diagnostics(Path(self.launch_session.log_path))
                 if diagnostics.get("ok") and diagnostics.get("content", "").strip():
                     excerpt = diagnostics["content"][-2400:].strip()
                     self._log("Recent MO2/Proton diagnostics:\\n" + excerpt)
@@ -640,26 +608,26 @@ class MainWindow(QMainWindow):
         else:
             self.launch_session.state = "waiting"
             self.progress_label.setText(
-                f"Waiting for Skyrim/SKSE… (check {self._launch_poll_count}/{self._launch_poll_limit})"
+                f"Waiting for Skyrim/SKSE… (check {self.launch_session.poll_count}/{self._launch_poll_limit})"
             )
 
     def check_launch_status(self) -> None:
-        if not self._last_launch_pid:
+        if not self.launch_session.wrapper_pid:
             QMessageBox.information(self, "Launch status", "No Wyrd launch handoff has been recorded in this session.")
             return
-        wrapper_identity = _proc_identity(self._last_launch_pid)
-        result = launch_process_status(self._last_launch_pid, self._last_launch_start_time)
+        wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
+        result = launch_process_status(self.launch_session.wrapper_pid, self.launch_session.wrapper_start_time)
         wrapper_identity_matches = (
-            self._last_launch_start_time is None
-            or wrapper_identity.get("start_time") == self._last_launch_start_time
+            self.launch_session.wrapper_start_time is None
+            or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
-        self._log(f"Launch PID {self._last_launch_pid}: {result['state']} — {result['message']}")
+        self._log(f"Launch PID {self.launch_session.wrapper_pid}: {result['state']} — {result['message']}")
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
-                if _is_descendant_process(item["pid"], self._last_launch_pid):
+                if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
                     session_processes.append(item)
         if session_processes:
             detected = ", ".join(
