@@ -7,10 +7,11 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QMessageBox
     from main import MainWindow, GameProcess
 except ImportError:
     QApplication = None
+    QMessageBox = None
     MainWindow = None
 
 
@@ -452,11 +453,15 @@ class MainWindowSmokeTests(unittest.TestCase):
             "components": {
                 "xact": {"state": "missing"},
                 "xact_x64": {"state": "present"},
-            }, "repair_recommended": True,
+                "xaudio2": {"state": "missing"},
+                "xaudio2_x64": {"state": "present"},
+                "x3daudio": {"state": "present"},
+                "x3daudio_x64": {"state": "present"},
+            }, "repair_recommended": True, "repair_available": True,
         }):
             window = self._window()
         self.assertIn("XACT (32-bit): missing", window.audio_detail.text())
-        self.assertIn("FAudio / FFmpeg support: NOT DETERMINED", window.audio_detail.text())
+        self.assertIn("FAudio / FFmpeg support: UNKNOWN", window.audio_detail.text())
         self.assertIn("NOT VERIFIED", window.audio_detail.text())
         self.assertTrue(window.audio_repair_button.isEnabled())
         window.close()
