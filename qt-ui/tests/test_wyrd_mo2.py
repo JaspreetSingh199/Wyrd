@@ -514,3 +514,115 @@ class WyrdMO2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WyrdAudioCompatibilityTests(unittest.TestCase):
+    def _managed_prefix(self, home: Path):
+        from wyrd_mo2 import managed_paths
+        paths = managed_paths(home)
+        (paths["install"]).mkdir(parents=True)
+        (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+        (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+            "prefix": str(paths["prefix"]),
+        }), encoding="utf-8")
+        (paths["prefix"] / "pfx/drive_c/windows/system32").mkdir(parents=True)
+        (paths["prefix"] / "pfx/drive_c/windows/syswow64").mkdir(parents=True)
+        (paths["prefix"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+        }), encoding="utf-8")
+        return paths
+
+    def test_audio_inspection_reports_both_xact_architectures(self):
+        from wyrd_mo2 import inspect_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._managed_prefix(Path(tmp))
+            system32 = paths["prefix"] / "pfx/drive_c/windows/system32"
+            syswow64 = paths["prefix"] / "pfx/drive_c/windows/syswow64"
+            (system32 / "xactengine3_7.dll").write_bytes(b"64bit")
+            (syswow64 / "xactengine3_7.dll").write_bytes(b"32bit")
+            report = inspect_audio_compatibility(Path(tmp))
+            self.assertTrue(report["safe"])
+            self.assertEqual(report["components"]["xact_x64"]["state"], "present")
+            self.assertEqual(report["components"]["xact"]["state"], "present")
+            self.assertFalse(report["repair_recommended"])
+
+    def test_audio_inspection_fails_closed_when_prefix_is_not_marked(self):
+        from wyrd_mo2 import inspect_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = managed_paths(Path(tmp))
+            prefix = paths["prefix"]
+            (prefix / "pfx/drive_c/windows/system32").mkdir(parents=True)
+            report = inspect_audio_compatibility(Path(tmp))
+            self.assertFalse(report["safe"])
+            self.assertFalse(report["components"])
+
+    def test_audio_inspection_refuses_symlinked_prefix_components(self):
+        from wyrd_mo2 import inspect_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._managed_prefix(Path(tmp))
+            windows = paths["prefix"] / "pfx/drive_c/windows"
+            target = Path(tmp) / "outside"
+            target.mkdir()
+            (windows / "system32").rmdir()
+            (windows / "system32").symlink_to(target, target_is_directory=True)
+            report = inspect_audio_compatibility(Path(tmp))
+            self.assertFalse(report["safe"])
+            self.assertIn("symlink", report["message"].lower())
+
+    def test_repair_requires_explicit_confirmation_and_never_touches_steam_prefix(self):
+        from wyrd_mo2 import inspect_audio_compatibility, repair_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = self._managed_prefix(home)
+            steam_prefix = home / ".steam/steam/steamapps/compatdata/489830/pfx/drive_c/windows/system32"
+            steam_prefix.mkdir(parents=True)
+            sentinel = steam_prefix / "steam-owned.dll"
+            sentinel.write_bytes(b"leave-me-alone")
+            refused = repair_audio_compatibility(home, confirmed=False)
+            self.assertFalse(refused["ok"])
+            self.assertFalse((paths["prefix"] / "pfx/drive_c/windows/system32/xactengine3_7.dll").exists())
+            self.assertEqual(sentinel.read_bytes(), b"leave-me-alone")
+
+            with patch("wyrd_mo2._resolve_xact_dlls", return_value={
+                "xact": {"source": "/runtime/xact.dll", "sha256": "a"*64},
+                "xact_x64": {"source": "/runtime/xact_x64.dll", "sha256": "b"*64},
+            }):
+                result = repair_audio_compatibility(home, confirmed=True)
+            self.assertTrue(result["ok"], result)
+            self.assertTrue(result["verified"])
+            self.assertEqual(sentinel.read_bytes(), b"leave-me-alone")
+            report = inspect_audio_compatibility(home)
+            self.assertTrue(report["safe"])
+            self.assertEqual(report["components"]["xact"]["state"], "override-present")
+            self.assertEqual(report["components"]["xact_x64"]["state"], "override-present")
+            log = Path(result["log_path"])
+            self.assertTrue(log.is_file())
+            self.assertIn("backup", log.read_text(encoding="utf-8").lower())
+
+    def test_repair_refuses_if_xact_dll_sources_cannot_be_resolved(self):
+        from wyrd_mo2 import repair_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            self._managed_prefix(Path(tmp))
+            with patch("wyrd_mo2._resolve_xact_dlls", return_value={}):
+                result = repair_audio_compatibility(Path(tmp), confirmed=True)
+            self.assertFalse(result["ok"])
+            self.assertFalse(result["modified"])
+
+    def test_repair_refuses_symlink_or_path_escape_targets(self):
+        from wyrd_mo2 import repair_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._managed_prefix(Path(tmp))
+            syswow64 = paths["prefix"] / "pfx/drive_c/windows/syswow64"
+            syswow64.rmdir()
+            outside = Path(tmp) / "external-target"
+            outside.mkdir()
+            syswow64.symlink_to(outside, target_is_directory=True)
+            with patch("wyrd_mo2._resolve_xact_dlls", return_value={
+                "xact": {"source": "/runtime/xact.dll"},
+                "xact_x64": {"source": "/runtime/xact_x64.dll"},
+            }):
+                result = repair_audio_compatibility(Path(tmp), confirmed=True)
+            self.assertFalse(result["ok"])
+            self.assertFalse(result["modified"])
+            self.assertFalse(list(outside.iterdir()))
