@@ -301,6 +301,7 @@ class WyrdMO2Tests(unittest.TestCase):
                     popen.return_value.pid = 1234
                     with patch("wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]):
                         result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
+                    test_result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home, native_xaudio2_test=True)
             self.assertTrue(result["ok"], result)
             command = popen.call_args.args[0]
             self.assertEqual(
@@ -309,8 +310,12 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             self.assertEqual(command[5:], ["run", "--executable", "SKSE"])
             self.assertEqual(command[-1], "SKSE")
-            environment = popen.call_args.kwargs["env"]
+            environment = popen.call_args_list[0].kwargs["env"]
             self.assertEqual(environment["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
+            self.assertNotIn("xaudio2_7=", environment.get("WINEDLLOVERRIDES", ""))
+            test_environment = popen.call_args_list[1].kwargs["env"]
+            self.assertEqual(test_environment["WINEDLLOVERRIDES"], "xaudio2_7=n,b")
+            self.assertTrue(test_result["ok"], test_result)
 
 
     def test_launch_diagnostics_reads_tail_and_handles_missing_file(self):
