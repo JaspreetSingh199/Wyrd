@@ -177,6 +177,29 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("diagnostics were added", window.progress_label.text())
         window.close()
 
+    def test_launch_session_records_detected_process_start_times(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        scan = {
+            "ok": True,
+            "processes": [
+                {"pid": 700, "binary": "skyrimse.exe", "start_time": 111},
+                {"pid": 701, "binary": "skse64.exe", "start_time": 222},
+            ],
+            "wyrd_processes": [],
+        }
+        with patch("main._proc_identity", return_value={"ppid": 500, "start_time": 900}), patch(
+            "main.launch_process_status", return_value={"state": "running", "message": "running"}
+        ), patch("main.detect_skyrim_processes", return_value=scan), patch(
+            "main._is_descendant_process", side_effect=lambda pid, ancestor: True
+        ):
+            window._poll_launch_status()
+        self.assertEqual(window.launch_session.detected_processes, scan["processes"])
+        self.assertEqual(window.launch_session.process_identities, {700: 111, 701: 222})
+        self.assertEqual(window.launch_session.state, "detected")
+        window.close()
+
     def test_launch_monitor_stops_when_session_game_process_is_detected(self):
         window = self._window()
         window._last_launch_pid = 500
