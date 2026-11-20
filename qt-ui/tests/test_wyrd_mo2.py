@@ -512,10 +512,6 @@ class WyrdMO2Tests(unittest.TestCase):
             _validate_archive_members(["C:/Windows/evil.dll"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_xact_payload_cache_is_fail_closed_and_checks_pe_headers(self):
         from wyrd_mo2 import _resolve_xact_dlls, managed_paths
         with tempfile.TemporaryDirectory() as tmp:
@@ -681,3 +677,7 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertFalse(result["modified"])
             self.assertFalse(list(outside.iterdir()))
+
+
+if __name__ == "__main__":
+    unittest.main()
