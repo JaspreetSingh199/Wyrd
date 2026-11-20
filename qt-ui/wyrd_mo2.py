@@ -397,6 +397,238 @@ def install_mo2_environment(proton_path: Path, game_path: Path,
     }
 
 
+
+
+def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
+    """Resolve only Wyrd's canonical prefix after validating both ownership records."""
+    home = (home or Path.home()).expanduser().resolve()
+    paths = managed_paths(home)
+    prefix = paths["prefix"]
+    expected = (paths["root"] / PREFIX_DIR_NAME).resolve()
+    if prefix.resolve(strict=False) != expected:
+        raise RuntimeError("The configured Wyrd prefix path is not canonical; refusing audio inspection.")
+    install_marker = paths["install"] / ".wyrd-managed.json"
+    prefix_marker = prefix / ".wyrd-managed.json"
+    exe = paths["install"] / "ModOrganizer.exe"
+    if not exe.is_file() or exe.is_symlink() or not install_marker.is_file() or install_marker.is_symlink():
+        raise RuntimeError("Wyrd MO2 ownership cannot be established; refusing audio inspection.")
+    try:
+        install_data = json.loads(install_marker.read_text(encoding="utf-8"))
+        prefix_data = json.loads(prefix_marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("A Wyrd ownership marker is missing or unreadable; refusing audio inspection.") from error
+    if install_data.get("managed_by") != "Wyrd" or prefix_data.get("managed_by") != "Wyrd":
+        raise RuntimeError("Both MO2 and Proton prefix ownership markers must identify Wyrd.")
+    if str(Path(install_data.get("prefix", prefix)).resolve()) != str(expected):
+        raise RuntimeError("The MO2 ownership marker does not point to Wyrd's canonical prefix.")
+    if install_data.get("game_app_id") not in (None, APP_ID) or prefix_data.get("game_app_id") not in (None, APP_ID):
+        raise RuntimeError("The ownership marker does not identify Skyrim Special Edition.")
+    if not (prefix / "pfx/drive_c").is_dir():
+        raise RuntimeError("Wyrd's Proton prefix is not initialized.")
+    # Refuse links at each component below the ownership root. The checks are
+    # intentionally repeated before mutation to guard against path substitution.
+    for candidate in (prefix, prefix / "pfx", prefix / "pfx/drive_c",
+                      prefix / "pfx/drive_c/windows",
+                      prefix / "pfx/drive_c/windows/system32",
+                      prefix / "pfx/drive_c/windows/syswow64"):
+        if candidate.is_symlink():
+            raise RuntimeError(f"Symlink detected in managed prefix path: {candidate}")
+    return prefix, {"install": install_data, "prefix": prefix_data}
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _resolve_xact_dlls() -> dict:
+    """Resolve Wine builtin XACT DLLs from the selected Proton distribution.
+
+    This deliberately does not download DLLs or source binaries from arbitrary
+    third-party mirrors. Proton's own Wine tree is the provenance boundary.
+    """
+    home = Path.home()
+    state = inspect_wyrd_installation(home)
+    metadata = state.get("metadata", {})
+    proton = Path(metadata.get("proton", "")).expanduser()
+    if not proton.is_dir():
+        return {}
+    roots = [proton / "files/share/wine", proton / "dist/share/wine"]
+    result = {}
+    names = {"xact": "xact.dll", "xact_x64": "xact_x64.dll"}
+    for key, filename in names.items():
+        candidates = []
+        for root in roots:
+            if root.is_dir():
+                candidates.extend(root.glob(f"**/{filename}"))
+        # Wine's PE DLLs may live in architecture-specific directories. Only
+        # accept regular files and require a unique architecture-specific hit.
+        candidates = [item for item in candidates if item.is_file() and not item.is_symlink()]
+        if len(candidates) == 1:
+            item = candidates[0]
+            result[key] = {"source": str(item.resolve()), "sha256": _sha256_file(item)}
+    return result
+
+
+def inspect_audio_compatibility(home: Path | None = None) -> dict:
+    """Read-only XACT inspection scoped to Wyrd's positively owned prefix."""
+    try:
+        prefix, ownership = _validated_wyrd_audio_prefix(home)
+        windows = prefix / "pfx/drive_c/windows"
+        locations = {
+            "xact": windows / "syswow64" / "xactengine3_7.dll",
+            "xact_x64": windows / "system32" / "xactengine3_7.dll",
+        }
+        components = {}
+        for key, target in locations.items():
+            if target.is_symlink():
+                raise RuntimeError(f"Symlink detected at XACT target: {target}")
+            if target.exists() and not target.is_file():
+                raise RuntimeError(f"XACT target is not a regular file: {target}")
+            components[key] = {
+                "path": str(target),
+                "state": "present" if target.is_file() else "missing",
+                "sha256": _sha256_file(target) if target.is_file() else None,
+            }
+        overrides = prefix / "pfx/user.reg"
+        override_text = ""
+        if overrides.is_file() and not overrides.is_symlink():
+            try:
+                override_text = overrides.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                pass
+        for key in components:
+            # This is a diagnostic hint only; registry state is not inferred
+            # from files being present.
+            components[key]["wine_override_recorded"] = (
+                f'"{key}"=' in override_text.casefold()
+                or f'"{key}"=' in override_text
+            )
+        missing = [key for key, value in components.items() if value["state"] == "missing"]
+        return {
+            "ok": True, "safe": True, "prefix": str(prefix),
+            "components": components,
+            "repair_recommended": bool(missing),
+            "runtime_verified": False,
+            "runtime_note": "Only an in-game dialogue test can verify Skyrim audio.",
+            "message": "Wyrd prefix ownership verified; XACT state inspected.",
+        }
+    except (OSError, RuntimeError, ValueError) as error:
+        return {
+            "ok": False, "safe": False, "prefix": None, "components": {},
+            "repair_recommended": False, "runtime_verified": False,
+            "message": str(error),
+        }
+
+
+def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False) -> dict:
+    """Install Wyrd's Proton-provided XACT builtins into Wyrd's prefix only.
+
+    Existing targets are backed up before replacement. No Steam compatdata
+    location is read as a target or modified. Caller must obtain explicit
+    user confirmation before invoking with confirmed=True.
+    """
+    if not confirmed:
+        return {"ok": False, "modified": False,
+                "message": "Repair requires explicit user confirmation."}
+    try:
+        prefix, _ownership = _validated_wyrd_audio_prefix(home)
+        report = inspect_audio_compatibility(home)
+        if not report.get("safe"):
+            raise RuntimeError(report.get("message", "Wyrd prefix ownership check failed."))
+        sources = _resolve_xact_dlls()
+        if set(sources) != {"xact", "xact_x64"}:
+            raise RuntimeError(
+                "Could not uniquely resolve both XACT DLLs from the selected Proton runtime. "
+                "No files were changed."
+            )
+        windows = prefix / "pfx/drive_c/windows"
+        targets = {
+            "xact": windows / "syswow64" / "xactengine3_7.dll",
+            "xact_x64": windows / "system32" / "xactengine3_7.dll",
+        }
+        for target in targets.values():
+            if target.is_symlink() or not target.parent.is_dir() or target.parent.is_symlink():
+                raise RuntimeError(f"Unsafe XACT target path; no files were changed: {target}")
+            if target.exists() and not target.is_file():
+                raise RuntimeError(f"XACT target is not a regular file: {target}")
+        # Stage both source DLLs and backups before changing either target.
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup_root = prefix / "audio-repair-backups" / timestamp
+        staged_root = prefix / ".audio-repair-staging"
+        staged_root.mkdir(mode=0o700, exist_ok=True)
+        backup_root.mkdir(parents=True, mode=0o700, exist_ok=True)
+        staged = {}
+        backups = {}
+        for key, target in targets.items():
+            source = Path(sources[key]["source"]).resolve(strict=True)
+            if not source.is_file() or source.is_symlink():
+                raise RuntimeError(f"Unsafe or missing Proton XACT source: {source}")
+            stage_file = staged_root / f"{key}.dll"
+            shutil.copy2(source, stage_file)
+            if _sha256_file(stage_file) != sources[key]["sha256"]:
+                raise RuntimeError(f"Staged XACT DLL hash mismatch for {key}.")
+            staged[key] = stage_file
+            if target.is_file():
+                backup = backup_root / target.name
+                shutil.copy2(target, backup)
+                if _sha256_file(backup) != _sha256_file(target):
+                    raise RuntimeError(f"Backup verification failed for {target}.")
+                backups[key] = str(backup)
+        log_path = prefix / "audio-repair.log"
+        journal = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "managed_prefix": str(prefix),
+            "changes": [],
+            "backups": backups,
+            "sources": {key: {"path": sources[key]["source"], "sha256": sources[key]["sha256"]}
+                        for key in sources},
+            "runtime_verified": False,
+        }
+        modified = []
+        try:
+            for key, target in targets.items():
+                os.replace(staged[key], target)
+                modified.append(key)
+                journal["changes"].append({
+                    "component": key, "target": str(target),
+                    "sha256": _sha256_file(target),
+                    "backup": backups.get(key),
+                })
+            verification = inspect_audio_compatibility(home)
+            if not verification.get("safe") or any(
+                verification["components"][key]["sha256"] != sources[key]["sha256"]
+                for key in targets
+            ):
+                raise RuntimeError("Post-repair XACT verification failed.")
+        except Exception:
+            # Restore only files whose previous contents were safely backed up.
+            # A previously absent target is removed only if it is still the
+            # exact file installed by this operation.
+            for key in reversed(modified):
+                target = targets[key]
+                backup = backups.get(key)
+                if backup:
+                    shutil.copy2(backup, target)
+                elif target.is_file() and _sha256_file(target) == sources[key]["sha256"]:
+                    target.unlink()
+            raise
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(journal, indent=2) + "\\n")
+        shutil.rmtree(staged_root, ignore_errors=True)
+        return {
+            "ok": True, "modified": bool(modified), "verified": True,
+            "runtime_verified": False, "log_path": str(log_path),
+            "message": "XACT DLLs were installed and file hashes verified in Wyrd's prefix only. Skyrim dialogue audio is NOT runtime-verified.",
+        }
+    except (OSError, RuntimeError, ValueError) as error:
+        return {"ok": False, "modified": False, "verified": False,
+                "runtime_verified": False, "message": str(error)}
+
 def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
     """Launch MO2 visibly through its configured Proton build."""
     home = (home or Path.home()).expanduser()
