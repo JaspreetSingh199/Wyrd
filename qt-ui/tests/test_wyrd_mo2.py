@@ -9,6 +9,9 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from wyrd_mo2 import (
     discover_proton_builds,
+    inspect_audio_compatibility,
+    repair_audio_compatibility,
+    _resolve_xact_dlls,
     inspect_proton_build,
     inspect_wyrd_installation,
     install_mo2_environment,
