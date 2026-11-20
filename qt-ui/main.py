@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, QTimer
@@ -20,6 +21,21 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
     launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process, read_launch_diagnostics,
 )
+
+@dataclass
+class LaunchSession:
+    """Metadata for one MO2-mediated launch handoff and monitoring session."""
+
+    wrapper_pid: int | None = None
+    wrapper_start_time: int | None = None
+    log_path: str | None = None
+    instance_name: str | None = None
+    executable_title: str | None = None
+    started_at: float | None = None
+    poll_count: int = 0
+    detected_processes: list[dict] = field(default_factory=list)
+    state: str = "idle"
+
 
 STYLE = """
 QWidget { background: #15171b; color: #e5e7eb; font-size: 14px; }
@@ -84,10 +100,7 @@ class MainWindow(QMainWindow):
         self.mo2_state: dict = {"installed": False}
         self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
         self.launch_target_state: dict = {"ok": False, "targets": []}
-        self._last_launch_pid: int | None = None
-        self._last_launch_start_time: int | None = None
-        self._last_launch_log_path: str | None = None
-        self._launch_poll_count = 0
+        self.launch_session = LaunchSession()
         self._launch_poll_interval_ms = 2000
         self._launch_poll_limit = 150
         self._launch_monitor = QTimer(self)
@@ -432,6 +445,38 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
 
+    @property
+    def _last_launch_pid(self) -> int | None:
+        return self.launch_session.wrapper_pid
+
+    @_last_launch_pid.setter
+    def _last_launch_pid(self, value: int | None) -> None:
+        self.launch_session.wrapper_pid = value
+
+    @property
+    def _last_launch_start_time(self) -> int | None:
+        return self.launch_session.wrapper_start_time
+
+    @_last_launch_start_time.setter
+    def _last_launch_start_time(self, value: int | None) -> None:
+        self.launch_session.wrapper_start_time = value
+
+    @property
+    def _last_launch_log_path(self) -> str | None:
+        return self.launch_session.log_path
+
+    @_last_launch_log_path.setter
+    def _last_launch_log_path(self, value: str | None) -> None:
+        self.launch_session.log_path = value
+
+    @property
+    def _launch_poll_count(self) -> int:
+        return self.launch_session.poll_count
+
+    @_launch_poll_count.setter
+    def _launch_poll_count(self, value: int) -> None:
+        self.launch_session.poll_count = value
+
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
         if not instances:
@@ -482,6 +527,11 @@ class MainWindow(QMainWindow):
             self._last_launch_pid = result.get("pid")
             self._last_launch_start_time = _proc_start_time(self._last_launch_pid) if self._last_launch_pid else None
             self._last_launch_log_path = result.get("log_path")
+            self.launch_session.instance_name = instance_name
+            self.launch_session.executable_title = selected
+            self.launch_session.started_at = __import__("time").time()
+            self.launch_session.detected_processes = []
+            self.launch_session.state = "handoff"
             self._launch_poll_count = 0
             if self._last_launch_pid:
                 self._launch_monitor.start()
@@ -505,6 +555,7 @@ class MainWindow(QMainWindow):
             return
         self._launch_poll_count += 1
         if self._launch_poll_count > self._launch_poll_limit:
+            self.launch_session.state = "timeout"
             self._stop_launch_monitor("monitoring time limit reached")
             self.progress_label.setText(
                 "Launch monitoring timed out; use Check launch status or inspect diagnostics."
@@ -531,6 +582,8 @@ class MainWindow(QMainWindow):
             self.progress_label.setText(
                 "Skyrim/SKSE detected in this Wyrd launch process tree."
             )
+            self.launch_session.detected_processes = list(session_processes)
+            self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
             self._stop_launch_monitor("Skyrim/SKSE process detected")
             return
@@ -545,6 +598,8 @@ class MainWindow(QMainWindow):
             self._log(
                 "Prefix-attributed Skyrim process(es), ancestry unconfirmed: " + detected
             )
+            self.launch_session.detected_processes = list(process_scan["wyrd_processes"])
+            self.launch_session.state = "detected-unconfirmed"
             self._stop_launch_monitor("managed-prefix Skyrim process detected")
             return
         if result["state"] in {"exited", "invalid"}:
@@ -562,14 +617,17 @@ class MainWindow(QMainWindow):
                     )
                 elif not diagnostics.get("ok"):
                     self._log("Launch diagnostics: " + diagnostics.get("message", "Unavailable."))
+            self.launch_session.state = "failed"
             self._stop_launch_monitor("wrapper exited without detected game process")
             return
         if result["state"] == "unknown":
             self.progress_label.setText(
                 "Launch status is unknown; automatic monitoring will continue briefly."
             )
+            self.launch_session.state = "unknown"
             self._log("Launch status unknown: " + result["message"])
         else:
+            self.launch_session.state = "waiting"
             self.progress_label.setText(
                 f"Waiting for Skyrim/SKSE… (check {self._launch_poll_count}/{self._launch_poll_limit})"
             )
