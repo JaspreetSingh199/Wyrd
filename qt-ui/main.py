@@ -60,17 +60,20 @@ class GameProcess:
 
 STYLE = """
 QWidget { background: #15171b; color: #e5e7eb; font-size: 14px; }
+QLabel { background: transparent; border: none; }
 QFrame#panel { background: #20232a; border: 1px solid #343943; border-radius: 12px; }
-QLabel#heading { font-size: 27px; font-weight: 650; }
-QLabel#section { font-size: 17px; font-weight: 600; }
+QLabel#heading { font-size: 28px; font-weight: 700; padding: 2px 0; }
+QLabel#section { font-size: 16px; font-weight: 650; color: #f0f2f5; }
 QLabel#muted { color: #a2aab6; }
-QPushButton { background: #354255; border: 1px solid #526176; border-radius: 8px; padding: 11px 17px; }
-QPushButton:hover { background: #40516a; }
-QPushButton:disabled { color: #818995; background: #262a31; }
-QComboBox { background: #252a33; border: 1px solid #414a58; border-radius: 7px; padding: 9px; }
-QProgressBar { background: #252a33; border: 0; border-radius: 5px; height: 12px; text-align: center; }
+QPushButton { background: #354255; border: 1px solid #526176; border-radius: 8px; padding: 10px 14px; min-height: 20px; }
+QPushButton:hover { background: #40516a; border-color: #71849c; }
+QPushButton:pressed { background: #2c394b; }
+QPushButton:disabled { color: #818995; background: #262a31; border-color: #353b45; }
+QComboBox { background: #252a33; border: 1px solid #414a58; border-radius: 7px; padding: 8px 10px; min-height: 20px; }
+QProgressBar { background: #252a33; border: 1px solid #343943; border-radius: 6px; height: 14px; text-align: center; }
 QProgressBar::chunk { background: #5b8def; border-radius: 5px; }
-QPlainTextEdit { background: #111318; border: 1px solid #303641; border-radius: 8px; }
+QPlainTextEdit { background: #111318; border: 1px solid #303641; border-radius: 8px; padding: 6px; }
+QScrollArea { border: none; background: transparent; }
 """
 
 
@@ -114,7 +117,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
-        self.resize(980, 700)
+        self.resize(1040, 780)
+        self.setMinimumSize(820, 640)
         self.worker: InstallWorker | None = None
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
@@ -136,8 +140,8 @@ class MainWindow(QMainWindow):
 
         root = QWidget()
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(25, 22, 25, 22)
-        layout.setSpacing(14)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(12)
 
         heading = QLabel("Wyrd")
         heading.setObjectName("heading")
@@ -178,6 +182,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.mo2_panel)
 
         action_row = QHBoxLayout()
+        action_row.setSpacing(8)
         self.install_button = QPushButton("Install MO2")
         self.install_button.clicked.connect(self.install_mo2)
         self.launch_button = QPushButton("Launch MO2")
@@ -223,9 +228,16 @@ class MainWindow(QMainWindow):
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(400)
         self.log_view.setPlaceholderText("Detection and installation progress will appear here.")
-        layout.addWidget(self.log_view, 1)
+        self.log_view.setMinimumHeight(130)
+        self.log_view.setMaximumHeight(190)
+        layout.addWidget(self.log_view)
 
-        self.setCentralWidget(root)
+        from PySide6.QtWidgets import QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(root)
+        self.setCentralWidget(scroll)
         self.refresh_all()
         self._restoring_selection = False
         self._restore_saved_selection()
