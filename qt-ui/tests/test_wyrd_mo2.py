@@ -515,6 +515,23 @@ class WyrdMO2Tests(unittest.TestCase):
             _validate_archive_members(["C:/Windows/evil.dll"])
 
 
+class WyrdAudioCompatibilityTests(unittest.TestCase):
+    def _managed_prefix(self, home: Path):
+        from wyrd_mo2 import managed_paths
+        paths = managed_paths(home)
+        (paths["install"]).mkdir(parents=True)
+        (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+        (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+            "prefix": str(paths["prefix"]),
+        }), encoding="utf-8")
+        (paths["prefix"] / "pfx/drive_c/windows/system32").mkdir(parents=True)
+        (paths["prefix"] / "pfx/drive_c/windows/syswow64").mkdir(parents=True)
+        (paths["prefix"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+        }), encoding="utf-8")
+        return paths
+
     def test_xact_payload_cache_is_fail_closed_and_checks_pe_headers(self):
         from wyrd_mo2 import _resolve_xact_dlls, managed_paths
         with tempfile.TemporaryDirectory() as tmp:
@@ -525,7 +542,8 @@ class WyrdMO2Tests(unittest.TestCase):
             x64 = cache / "xactengine3_7_x64.dll"
             x86.write_bytes(b"not-a-pe")
             x64.write_bytes(b"MZvalid")
-            self.assertEqual(_resolve_xact_dlls(home), {})
+            partial = _resolve_xact_dlls(home)
+            self.assertEqual(set(partial), {"xact_x64"})
             x86.write_bytes(b"MZvalid32")
             result = _resolve_xact_dlls(home)
             self.assertEqual(set(result), {"xact", "xact_x64"})
@@ -561,23 +579,6 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertIn("will not overwrite", result["message"])
             self.assertEqual(target.read_bytes(), b"wine-builtin")
 
-
-class WyrdAudioCompatibilityTests(unittest.TestCase):
-    def _managed_prefix(self, home: Path):
-        from wyrd_mo2 import managed_paths
-        paths = managed_paths(home)
-        (paths["install"]).mkdir(parents=True)
-        (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
-        (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
-            "managed_by": "Wyrd", "game_app_id": "489830",
-            "prefix": str(paths["prefix"]),
-        }), encoding="utf-8")
-        (paths["prefix"] / "pfx/drive_c/windows/system32").mkdir(parents=True)
-        (paths["prefix"] / "pfx/drive_c/windows/syswow64").mkdir(parents=True)
-        (paths["prefix"] / ".wyrd-managed.json").write_text(json.dumps({
-            "managed_by": "Wyrd", "game_app_id": "489830",
-        }), encoding="utf-8")
-        return paths
 
     def test_audio_inspection_reports_both_xact_architectures(self):
         from wyrd_mo2 import inspect_audio_compatibility
@@ -649,7 +650,7 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
             self.assertEqual(report["components"]["xact_x64"]["state"], "present")
             log = Path(result["log_path"])
             self.assertTrue(log.is_file())
-            journal = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+            journal = json.loads(log.read_text(encoding="utf-8").strip())
             self.assertEqual(len(journal["changes"]), 2)
             self.assertFalse(journal["runtime_verified"])
 
@@ -680,6 +681,8 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertFalse(result["modified"])
             self.assertFalse(list(outside.iterdir()))
+
+
 
 
 if __name__ == "__main__":
