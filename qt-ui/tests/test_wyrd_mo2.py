@@ -584,10 +584,15 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
             self.assertFalse((paths["prefix"] / "pfx/drive_c/windows/system32/xactengine3_7.dll").exists())
             self.assertEqual(sentinel.read_bytes(), b"leave-me-alone")
 
-            with patch("wyrd_mo2._resolve_xact_dlls", return_value={
-                "xact": {"source": "/runtime/xact.dll", "sha256": "a"*64},
-                "xact_x64": {"source": "/runtime/xact_x64.dll", "sha256": "b"*64},
-            }):
+            sources = {}
+            for key in ("xact", "xact_x64"):
+                source = home / f"{key}.dll"
+                source.write_bytes(b"MZ" + key.encode("ascii"))
+                sources[key] = {
+                    "source": str(source),
+                    "sha256": __import__("hashlib").sha256(source.read_bytes()).hexdigest(),
+                }
+            with patch("wyrd_mo2._resolve_xact_dlls", return_value=sources):
                 result = repair_audio_compatibility(home, confirmed=True)
             self.assertTrue(result["ok"], result)
             self.assertTrue(result["verified"])
@@ -598,7 +603,9 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
             self.assertEqual(report["components"]["xact_x64"]["state"], "present")
             log = Path(result["log_path"])
             self.assertTrue(log.is_file())
-            self.assertIn("backup", log.read_text(encoding="utf-8").lower())
+            journal = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+            self.assertEqual(len(journal["changes"]), 2)
+            self.assertFalse(journal["runtime_verified"])
 
     def test_repair_refuses_if_xact_dll_sources_cannot_be_resolved(self):
         from wyrd_mo2 import repair_audio_compatibility
@@ -608,6 +615,7 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
                 result = repair_audio_compatibility(Path(tmp), confirmed=True)
             self.assertFalse(result["ok"])
             self.assertFalse(result["modified"])
+            self.assertFalse(result.get("verified", False))
 
     def test_repair_refuses_symlink_or_path_escape_targets(self):
         from wyrd_mo2 import repair_audio_compatibility
