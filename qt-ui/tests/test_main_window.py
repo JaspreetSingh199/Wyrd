@@ -262,6 +262,23 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("detected in this Wyrd launch process tree", window.progress_label.text())
         window.close()
 
+    def test_post_detection_watch_revalidates_and_records_game_exit(self):
+        window = self._window()
+        window.launch_session.game_processes = [
+            GameProcess(pid=700, binary="skyrimse.exe", start_time=111,
+                       detection_source="launch_process_tree",
+                       attribution_confidence="confirmed")
+        ]
+        window._start_game_process_watch()
+        self.assertTrue(window._game_watch_timer.isActive())
+        with patch.object(window.launch_session.game_processes[0],
+                         "matches_current_process", return_value=False):
+            window._revalidate_detected_game_processes()
+        self.assertFalse(window._game_watch_timer.isActive())
+        self.assertEqual(window.launch_session.state, "game-exited")
+        self.assertIn("process identities are no longer present", window.log_view.toPlainText())
+        window.close()
+
     def test_launch_monitor_stops_when_wrapper_exits_without_game(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
