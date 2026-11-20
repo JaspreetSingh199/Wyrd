@@ -107,6 +107,76 @@ class MainWindowSmokeTests(unittest.TestCase):
             launch.assert_not_called()
             window.close()
 
+    def test_launch_monitor_starts_after_successful_handoff(self):
+        window = self._window()
+        with patch("main.QInputDialog.getItem", side_effect=[
+            ("Skyrim", True), ("Skyrim", True)
+        ]), patch("main.QMessageBox.question", return_value=1), patch(
+            "main.inspect_skyrim_launch_targets", return_value={
+                "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
+            }
+        ), patch("main.launch_skyrim_via_mo2", return_value={
+            "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log",
+            "message": "handoff",
+        }), patch("main._proc_start_time", return_value=123), patch(
+            "main.QMessageBox.information"
+        ):
+            window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
+            window.mo2_state = {"metadata": {"game_path": "/games/Skyrim"}}
+            window.start_skyrim()
+        self.assertEqual(window._last_launch_pid, 501)
+        self.assertEqual(window._last_launch_start_time, 123)
+        self.assertTrue(window._launch_monitor.isActive())
+        window.close()
+        self.assertFalse(window._launch_monitor.isActive())
+
+    def test_launch_monitor_stops_when_session_game_process_is_detected(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        scan = {
+            "ok": True,
+            "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
+            "wyrd_processes": [],
+        }
+        with patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "wrapper exited"
+        }), patch("main.detect_skyrim_processes", return_value=scan), patch(
+            "main._is_descendant_process", return_value=True
+        ):
+            window._poll_launch_status()
+        self.assertFalse(window._launch_monitor.isActive())
+        self.assertIn("detected in this Wyrd launch process tree", window.progress_label.text())
+        window.close()
+
+    def test_launch_monitor_stops_when_wrapper_exits_without_game(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        with patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "wrapper exited"
+        }), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": []
+        }):
+            window._poll_launch_status()
+        self.assertFalse(window._launch_monitor.isActive())
+        self.assertIn("wrapper exited before Skyrim", window.progress_label.text())
+        window.close()
+
+    def test_launch_monitor_times_out_without_spawning_or_claiming_success(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._launch_poll_count = window._launch_poll_limit
+        with patch("main.launch_process_status", return_value={
+            "state": "running", "message": "wrapper alive"
+        }), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": []
+        }):
+            window._poll_launch_status()
+        self.assertFalse(window._launch_monitor.isActive())
+        self.assertIn("timed out", window.progress_label.text().lower())
+        window.close()
+
     def test_launch_status_prefers_process_tree_attribution(self):
         window = self._window()
         window._last_launch_pid = 500
