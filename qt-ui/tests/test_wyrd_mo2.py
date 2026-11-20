@@ -14,7 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process, classify_launch_diagnostics,
 )
 
 
@@ -64,6 +64,28 @@ class WyrdMO2Tests(unittest.TestCase):
         result = detect_skyrim_processes(proc_root=Path("/missing/wyrd-proc"))
         self.assertFalse(result["ok"])
         self.assertEqual(result["processes"], [])
+
+    def test_launch_diagnostics_classify_missing_executable(self):
+        findings = classify_launch_diagnostics("MO2: executable not found")
+        self.assertEqual([item["code"] for item in findings], ["missing_executable"])
+        self.assertIn("selected executable", findings[0]["hint"])
+
+    def test_launch_diagnostics_classify_usvfs_failure_without_bypass_advice(self):
+        findings = classify_launch_diagnostics("USVFS hook failed to inject")
+        self.assertEqual([item["code"] for item in findings], ["mo2_usvfs"])
+        self.assertIn("do not bypass MO2", findings[0]["hint"])
+
+    def test_launch_diagnostics_can_return_multiple_findings(self):
+        findings = classify_launch_diagnostics(
+            "permission denied while loading; Vulkan failed to create device"
+        )
+        self.assertEqual(
+            {item["code"] for item in findings},
+            {"prefix_permission", "graphics_initialization"},
+        )
+
+    def test_launch_diagnostics_are_empty_for_unmatched_logs(self):
+        self.assertEqual(classify_launch_diagnostics("Everything looks normal"), [])
 
     def test_settings_round_trip_and_missing_or_invalid_settings_are_safe(self):
         with tempfile.TemporaryDirectory() as tmp:
