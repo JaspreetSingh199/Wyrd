@@ -404,11 +404,7 @@ def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
     requested_home = (home or Path.home()).expanduser()
     canonical_home = Path.home().expanduser().resolve()
     home = requested_home.resolve()
-    if home != canonical_home and requested_home.exists():
-        # Explicit alternate homes are permitted for isolated tests/tools, but
-        # the caller must pass one deliberately; production defaults remain
-        # anchored to the actual current user's home.
-        pass
+    # Explicit home overrides are used by isolated tests; normal GUI calls use Path.home().
     paths = managed_paths(home)
     prefix = paths["prefix"]
     expected = (paths["root"] / PREFIX_DIR_NAME).resolve()
@@ -463,6 +459,10 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
     avoids ever guessing a Proton/Wine DLL as a Microsoft redistributable.
     """
     cache_root = managed_paths(home)["root"] / "cache" / "xact"
+    paths = managed_paths(home)
+    for candidate in (paths["root"], cache_root.parent, cache_root):
+        if candidate.is_symlink():
+            return {}
     required = {
         "xact": cache_root / "xactengine3_7.dll",
         "xact_x64": cache_root / "xactengine3_7_x64.dll",
@@ -471,9 +471,12 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
     for key, path in required.items():
         if path.is_symlink() or not path.is_file():
             continue
-        if path.read_bytes()[:2] != b"MZ":
+        try:
+            if path.read_bytes()[:2] != b"MZ":
+                continue
+            found[key] = {"source": str(path.resolve(strict=True)), "sha256": _sha256_file(path)}
+        except OSError:
             continue
-        found[key] = {"source": str(path.resolve()), "sha256": _sha256_file(path)}
     return found
 
 def inspect_audio_compatibility(home: Path | None = None) -> dict:
