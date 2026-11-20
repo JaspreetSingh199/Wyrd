@@ -22,6 +22,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
+    inspect_audio_compatibility, repair_audio_compatibility,
 )
 @dataclass
 class LaunchSession:
