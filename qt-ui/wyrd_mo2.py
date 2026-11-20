@@ -830,7 +830,7 @@ def classify_launch_diagnostics(content: str) -> list[dict]:
          "The selected Proton/Wine runtime appears unavailable. Re-detect Proton builds and select an installed runtime."),
         ("prefix_permission", ("permission denied", "access denied", "read-only file system"),
          "A launch path or managed prefix is inaccessible. Check ownership and filesystem permissions; Wyrd will not take ownership or overwrite it."),
-        ("graphics_initialization", ("vulkan", "dxvk", "d3d11", "failed to create device", "gpu")),
+        ("graphics_initialization", ("vulkan", "dxvk", "d3d11", "failed to create device", "gpu"),
          "Graphics/runtime initialization may have failed. Review Vulkan drivers and Proton runtime logs before changing game files."),
         ("mo2_usvfs", ("usvfs", "virtual filesystem", "hook failed", "failed to inject"),
          "MO2/USVFS initialization may have failed. Confirm MO2 is launching the game through its configured instance; do not bypass MO2."),
