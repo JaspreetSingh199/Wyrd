@@ -186,11 +186,11 @@ class MainWindow(QMainWindow):
         audio_panel.setObjectName("panel")
         audio_layout = QVBoxLayout(audio_panel)
         audio_layout.setContentsMargins(17, 15, 17, 15)
-        audio_heading = QLabel("4. Audio compatibility (XACT)")
+        audio_heading = QLabel("4. Audio compatibility (XACT / XAudio2)")
         audio_heading.setObjectName("section")
         self.audio_detail = QLabel(
-            "Inspect XACT components in Wyrd's managed Proton prefix. "
-            "A file-level repair does not prove in-game dialogue audio works."
+            "Inspect XACT and XAudio2 components in Wyrd's managed Proton prefix. "
+            "Proton's FAudio/FFmpeg capabilities cannot be established by filename alone; dialogue must be tested in-game."
         )
         self.audio_detail.setObjectName("muted")
         self.audio_detail.setWordWrap(True)
@@ -407,6 +407,9 @@ class MainWindow(QMainWindow):
             "Managed prefix: " + str(report.get("prefix")),
             "XACT (32-bit): " + components.get("xact", {}).get("state", "unknown"),
             "XACT (64-bit): " + components.get("xact_x64", {}).get("state", "unknown"),
+            "XAudio2 7 (32-bit): " + components.get("xaudio2", {}).get("state", "unknown"),
+            "XAudio2 7 (64-bit): " + components.get("xaudio2_x64", {}).get("state", "unknown"),
+            "FAudio / FFmpeg support: NOT DETERMINED by static inspection.",
             "Runtime dialogue audio: NOT VERIFIED — test dialogue in Skyrim.",
         ]
         self.audio_detail.setText("\\n".join(lines))
@@ -425,7 +428,7 @@ class MainWindow(QMainWindow):
             return
         answer = QMessageBox.question(
             self, "Repair Wyrd audio components",
-            "Wyrd will copy its selected Proton runtime's XACT DLLs into ONLY Wyrd's managed MO2 prefix. "
+            "Wyrd will extract Microsoft XACT DLLs from the SHA-256-verified DirectX June 2010 package and copy them into ONLY Wyrd's managed MO2 prefix. "
             "Existing target files will be backed up and the resulting file hashes verified. "
             "Steam's Skyrim prefix, Skyrim files, MO2 instances, profiles and mods will not be changed.\\n\\n"
             "This does not guarantee that Skyrim dialogue audio will work. You must test dialogue in-game.\\n\\nContinue?",
