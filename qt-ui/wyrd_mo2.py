@@ -479,21 +479,15 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
     try:
         import cabarchive
     except ImportError as error:
-        raise RuntimeError("The cabarchive Python package is required to extract the verified DirectX installer.") from error
-
+        raise RuntimeError("The cabarchive Python package is required to extract the DirectX installer.") from error
     # The DirectX redistributable is a self-extracting archive. Never execute it.
     extract_root = cache_root / "directx_Jun2010_extracted"
     extract_root.mkdir(parents=True, exist_ok=True)
-    extractor_candidates = []
-    for candidate in extract_root.rglob("*.cab"):
-        if candidate.is_file() and not candidate.is_symlink():
-            extractor_candidates.append(candidate)
-    # The outer EXE is not a CAB readable by cabarchive; use the system 7z
-    # utility to extract the cabinet payloads into a private cache directory.
-    if not extractor_candidates:
+    cabinets = [p for p in extract_root.rglob("*.cab") if p.is_file() and not p.is_symlink()]
+    if not cabinets:
         seven_zip = shutil.which("7z") or shutil.which("7zz")
         if not seven_zip:
-            raise RuntimeError("7z/7zz is required to extract the DirectX redistributable safely.")
+            raise RuntimeError("7z/7zz is required to extract the verified DirectX redistributable safely.")
         result = subprocess.run(
             [seven_zip, "x", "-y", f"-o{extract_root}", str(installer)],
             capture_output=True, text=True, timeout=180, check=False,
@@ -501,13 +495,10 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
         if result.returncode not in (0, 1):
             raise RuntimeError("Could not safely extract the verified DirectX redistributable: " +
                                (result.stderr or result.stdout)[-2000:])
-        extractor_candidates = [
-            candidate for candidate in extract_root.rglob("*.cab")
-            if candidate.is_file() and not candidate.is_symlink()
-        ]
-    if not extractor_candidates:
+        cabinets = [p for p in extract_root.rglob("*.cab") if p.is_file() and not p.is_symlink()]
+    if not cabinets:
         raise RuntimeError("No CAB payloads were found in the verified DirectX redistributable.")
-
+    import fnmatch
     result = {}
     patterns = {
         "xact": ("*_xact_*x86*.cab", "xactengine*.dll"),
@@ -515,31 +506,28 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
     }
     for key, (cab_pattern, dll_pattern) in patterns.items():
         matches = []
-        for cabinet in extractor_candidates:
-            if not re.fullmatch(cab_pattern.replace("*", ".*").replace("?", "."), cabinet.name, re.IGNORECASE):
+        for cabinet in cabinets:
+            if not fnmatch.fnmatch(cabinet.name.lower(), cab_pattern.lower()):
                 continue
             try:
                 archive = cabarchive.CabArchive(cabinet.read_bytes())
                 for member_name, member in archive.items():
-                    if re.fullmatch(dll_pattern.replace("*", ".*"), Path(member_name).name, re.IGNORECASE):
+                    if fnmatch.fnmatch(Path(member_name).name.lower(), dll_pattern.lower()):
                         matches.append((cabinet, Path(member_name).name, member.buf))
             except Exception:
                 continue
-        if matches:
-            unique = {hashlib.sha256(item[2]).hexdigest(): item for item in matches}
-            if len(unique) == 1:
-                cabinet, filename, payload = next(iter(unique.values()))
-                destination = cache_root / key / filename
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                if not destination.exists() or _sha256_file(destination) != hashlib.sha256(payload).hexdigest():
-                    temporary = destination.with_suffix(destination.suffix + ".tmp")
-                    temporary.write_bytes(payload)
-                    os.replace(temporary, destination)
-                result[key] = {
-                    "source": str(destination.resolve()),
-                    "sha256": hashlib.sha256(payload).hexdigest(),
-                    "source_archive": str(cabinet),
-                }
+        unique = {__import__("hashlib").sha256(item[2]).hexdigest(): item for item in matches}
+        if len(unique) == 1:
+            cabinet, filename, payload = next(iter(unique.values()))
+            digest = __import__("hashlib").sha256(payload).hexdigest()
+            destination = cache_root / key / filename
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if not destination.exists() or _sha256_file(destination) != digest:
+                temporary = destination.with_suffix(destination.suffix + ".tmp")
+                temporary.write_bytes(payload)
+                os.replace(temporary, destination)
+            result[key] = {"source": str(destination.resolve()), "sha256": digest,
+                           "source_archive": str(cabinet)}
     return result
 
 def inspect_audio_compatibility(home: Path | None = None) -> dict:
