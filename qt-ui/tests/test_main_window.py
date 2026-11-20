@@ -461,6 +461,8 @@ class MainWindowSmokeTests(unittest.TestCase):
         }):
             window = self._window()
         self.assertIn("XACT (32-bit): missing", window.audio_detail.text())
+        self.assertIn("X3DAudio 1.7 (32-bit): present", window.audio_detail.text())
+        self.assertIn("XAPOFX 1.5 (64-bit): unknown", window.audio_detail.text())
         self.assertIn("FAudio / FFmpeg support: UNKNOWN", window.audio_detail.text())
         self.assertIn("NOT VERIFIED", window.audio_detail.text())
         self.assertTrue(window.audio_repair_button.isEnabled())
