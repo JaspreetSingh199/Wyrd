@@ -598,7 +598,7 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
         }
 
 def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False) -> dict:
-    """Install Wyrd's Proton-provided XACT builtins into Wyrd's prefix only.
+    """Install verified Microsoft XACT components into Wyrd's prefix only.
 
     Existing targets are backed up before replacement. No Steam compatdata
     location is read as a target or modified. Caller must obtain explicit
@@ -612,7 +612,7 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
         report = inspect_audio_compatibility(home)
         if not report.get("safe"):
             raise RuntimeError(report.get("message", "Wyrd prefix ownership check failed."))
-        sources = _resolve_xact_dlls()
+        sources = _resolve_xact_dlls(home)
         if set(sources) != {"xact", "xact_x64"}:
             raise RuntimeError(
                 "Could not uniquely resolve both XACT DLLs from the selected Proton runtime. "
@@ -626,8 +626,10 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
         for target in targets.values():
             if target.is_symlink() or not target.parent.is_dir() or target.parent.is_symlink():
                 raise RuntimeError(f"Unsafe XACT target path; no files were changed: {target}")
-            if target.exists() and not target.is_file():
-                raise RuntimeError(f"XACT target is not a regular file: {target}")
+            if target.exists():
+                raise RuntimeError(
+                    f"XACT target already exists; Wyrd will not overwrite a Wine or user DLL: {target}"
+                )
         # Stage both source DLLs and backups before changing either target.
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         backup_root = prefix / "audio-repair-backups" / timestamp
@@ -642,15 +644,11 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
                 raise RuntimeError(f"Unsafe or missing Proton XACT source: {source}")
             stage_file = staged_root / f"{key}.dll"
             shutil.copy2(source, stage_file)
+            if stage_file.read_bytes()[:2] != b"MZ":
+                raise RuntimeError(f"Extracted XACT payload is not a PE DLL: {source}")
             if _sha256_file(stage_file) != sources[key]["sha256"]:
                 raise RuntimeError(f"Staged XACT DLL hash mismatch for {key}.")
             staged[key] = stage_file
-            if target.is_file():
-                backup = backup_root / target.name
-                shutil.copy2(target, backup)
-                if _sha256_file(backup) != _sha256_file(target):
-                    raise RuntimeError(f"Backup verification failed for {target}.")
-                backups[key] = str(backup)
         log_path = prefix / "audio-repair.log"
         journal = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -683,10 +681,7 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
             # exact file installed by this operation.
             for key in reversed(modified):
                 target = targets[key]
-                backup = backups.get(key)
-                if backup:
-                    shutil.copy2(backup, target)
-                elif target.is_file() and _sha256_file(target) == sources[key]["sha256"]:
+                if target.is_file() and _sha256_file(target) == sources[key]["sha256"]:
                     target.unlink()
             raise
         with log_path.open("a", encoding="utf-8") as handle:
@@ -695,7 +690,7 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
         return {
             "ok": True, "modified": bool(modified), "verified": True,
             "runtime_verified": False, "log_path": str(log_path),
-            "message": "XACT DLLs were installed and file hashes verified in Wyrd's prefix only. Skyrim dialogue audio is NOT runtime-verified.",
+            "message": "Microsoft XACT DLLs were installed and file hashes verified in Wyrd's prefix only. Skyrim dialogue audio is NOT runtime-verified.",
         }
     except (OSError, RuntimeError, ValueError) as error:
         return {"ok": False, "modified": False, "verified": False,
