@@ -340,7 +340,7 @@ class WyrdMO2Tests(unittest.TestCase):
         with patch("wyrd_mo2.os.kill", return_value=None), patch(
             "wyrd_mo2._proc_start_time", return_value=None
         ):
-            self.assertEqual(launch_process_status(123)["state"], "unknown")
+            self.assertEqual(launch_process_status(123, start_time=500)["state"], "unknown")
         with patch("wyrd_mo2.os.kill") as kill:
             kill.side_effect = ProcessLookupError()
             self.assertEqual(launch_process_status(123)["state"], "exited")
@@ -353,10 +353,11 @@ class WyrdMO2Tests(unittest.TestCase):
             proc = Path(tmp)
             (proc / "123").mkdir()
             fields = ["S"] + [str(index) for index in range(4, 22)]
+            fields[19] = "9876"
             (proc / "123/stat").write_text(
                 "123 (name with ) chars) " + " ".join(fields), encoding="utf-8"
             )
-            self.assertEqual(_proc_start_time(123, proc), 21)
+            self.assertEqual(_proc_start_time(123, proc), 9876)
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
