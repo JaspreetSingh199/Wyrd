@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
     from PySide6.QtWidgets import QApplication
-    from main import MainWindow
+    from main import MainWindow, GameProcess
 except ImportError:
     QApplication = None
     MainWindow = None
@@ -106,6 +106,33 @@ class MainWindowSmokeTests(unittest.TestCase):
             warning.assert_called_once()
             launch.assert_not_called()
             window.close()
+
+    def test_game_process_identity_rejects_pid_reuse(self):
+        process = GameProcess(
+            pid=4242, binary="skyrimse.exe", start_time=100,
+            detection_source="launch_process_tree",
+            attribution_confidence="confirmed",
+        )
+        with patch("main._proc_identity", return_value={"start_time": 101}):
+            self.assertFalse(process.matches_current_process())
+
+    def test_game_process_identity_accepts_matching_start_time(self):
+        process = GameProcess(
+            pid=4242, binary="skse64.exe", start_time=100,
+            detection_source="managed_prefix",
+            attribution_confidence="prefix",
+        )
+        with patch("main._proc_identity", return_value={"start_time": 100}):
+            self.assertTrue(process.matches_current_process())
+
+    def test_game_process_identity_rejects_missing_pid(self):
+        process = GameProcess(
+            pid=4242, binary="skyrimse.exe", start_time=100,
+            detection_source="launch_process_tree",
+            attribution_confidence="confirmed",
+        )
+        with patch("main._proc_identity", return_value={}):
+            self.assertFalse(process.matches_current_process())
 
     def test_launch_session_model_has_safe_idle_defaults(self):
         from main import LaunchSession
