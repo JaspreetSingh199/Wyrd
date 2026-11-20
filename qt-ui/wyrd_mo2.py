@@ -875,15 +875,40 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
                if detected else "No Skyrim/SKSE process was detected.")
     return {"ok": True, "processes": detected, "wyrd_processes": associated, "message": message}
 
-def _proc_start_time(pid: int, proc_root: Path = Path("/proc")) -> int | None:
-    """Return Linux process start time (clock ticks since boot), if readable."""
+def _proc_identity(pid: int, proc_root: Path = Path("/proc")) -> dict:
+    """Return stable Linux process identity fields from /proc/<pid>/stat."""
     try:
         stat = (Path(proc_root) / str(pid) / "stat").read_text(encoding="utf-8")
+        # comm is parenthesized and may itself contain spaces or ')' characters.
         fields = stat[stat.rfind(")") + 2:].split()
-        return int(fields[19])
+        return {"ppid": int(fields[1]), "start_time": int(fields[19])}
     except (OSError, ValueError, IndexError):
-        return None
+        return {"ppid": None, "start_time": None}
 
+
+def _proc_start_time(pid: int, proc_root: Path = Path("/proc")) -> int | None:
+    """Return Linux process start time (clock ticks since boot), if readable."""
+    return _proc_identity(pid, proc_root)["start_time"]
+
+
+def _is_descendant_process(pid: int, ancestor_pid: int,
+                           proc_root: Path = Path("/proc"),
+                           max_depth: int = 64) -> bool:
+    """Return whether pid currently descends from ancestor_pid using procfs PPIDs."""
+    current = pid
+    seen: set[int] = set()
+    for _ in range(max_depth):
+        if current == ancestor_pid:
+            return True
+        if current <= 1 or current in seen:
+            return False
+        seen.add(current)
+        identity = _proc_identity(current, proc_root)
+        parent = identity["ppid"]
+        if parent is None:
+            return False
+        current = parent
+    return False
 
 def launch_process_status(pid: int, start_time: int | None = None,
                           proc_root: Path = Path("/proc")) -> dict:
