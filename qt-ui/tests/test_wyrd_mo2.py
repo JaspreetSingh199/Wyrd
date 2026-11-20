@@ -329,15 +329,34 @@ class WyrdMO2Tests(unittest.TestCase):
             popen.assert_not_called()
 
 
-    def test_launch_process_status_reports_running_exited_and_unknown(self):
+    def test_launch_process_status_validates_process_start_time(self):
+        with patch("wyrd_mo2.os.kill", return_value=None), patch(
+            "wyrd_mo2._proc_start_time", return_value=500
+        ):
+            self.assertEqual(launch_process_status(123, start_time=500)["state"], "running")
+            reused = launch_process_status(123, start_time=499)
+            self.assertEqual(reused["state"], "exited")
+            self.assertIn("reused", reused["message"])
+        with patch("wyrd_mo2.os.kill", return_value=None), patch(
+            "wyrd_mo2._proc_start_time", return_value=None
+        ):
+            self.assertEqual(launch_process_status(123)["state"], "unknown")
         with patch("wyrd_mo2.os.kill") as kill:
-            kill.return_value = None
-            self.assertEqual(launch_process_status(123)["state"], "running")
             kill.side_effect = ProcessLookupError()
             self.assertEqual(launch_process_status(123)["state"], "exited")
             kill.side_effect = PermissionError()
             self.assertEqual(launch_process_status(123)["state"], "unknown")
         self.assertEqual(launch_process_status(-1)["state"], "invalid")
+
+    def test_proc_start_time_handles_parentheses_in_command_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp)
+            (proc / "123").mkdir()
+            fields = ["S"] + [str(index) for index in range(4, 22)]
+            (proc / "123/stat").write_text(
+                "123 (name with ) chars) " + " ".join(fields), encoding="utf-8"
+            )
+            self.assertEqual(_proc_start_time(123, proc), 21)
 
     def test_proton_runtime_requires_wrapper_and_matching_wine_architecture(self):
         with tempfile.TemporaryDirectory() as tmp:
