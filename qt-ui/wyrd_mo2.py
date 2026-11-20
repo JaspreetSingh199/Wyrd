@@ -834,12 +834,24 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         if not entry.name.isdigit():
             continue
         try:
-            argv = [part.decode("utf-8", errors="replace") for part in
-                    (entry / "cmdline").read_bytes().split(bytes([0])) if part]
+            argv_data = (entry / "cmdline").read_bytes()
+        except OSError:
+            argv_data = b""
+        try:
             comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip().lower()
+        except OSError:
+            comm = ""
+        try:
             exe_path = os.readlink(entry / "exe")
+        except OSError:
+            exe_path = ""
+        try:
             env_data = (entry / "environ").read_bytes()
         except OSError:
+            env_data = b""
+        argv = [part.decode("utf-8", errors="replace") for part in
+                argv_data.split(bytes([0])) if part]
+        if not argv and not comm and not exe_path:
             continue
         normalize = lambda value: value.replace(chr(92), "/")
         names = {Path(normalize(arg)).name.lower() for arg in argv}
@@ -852,6 +864,7 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
         detected.append({
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
+            "start_time": _proc_start_time(int(entry.name), Path(proc_root)),
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
         })
     detected.sort(key=lambda item: item["pid"])
@@ -862,8 +875,19 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
                if detected else "No Skyrim/SKSE process was detected.")
     return {"ok": True, "processes": detected, "wyrd_processes": associated, "message": message}
 
-def launch_process_status(pid: int) -> dict:
-    """Report the state of a local Proton wrapper process without signaling it."""
+def _proc_start_time(pid: int, proc_root: Path = Path("/proc")) -> int | None:
+    """Return Linux process start time (clock ticks since boot), if readable."""
+    try:
+        stat = (Path(proc_root) / str(pid) / "stat").read_text(encoding="utf-8")
+        fields = stat[stat.rfind(")") + 2:].split()
+        return int(fields[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def launch_process_status(pid: int, start_time: int | None = None,
+                          proc_root: Path = Path("/proc")) -> dict:
+    """Report wrapper state and optionally verify its original process identity."""
     if not isinstance(pid, int) or pid <= 0:
         return {"state": "invalid", "message": "Invalid launch process ID."}
     try:
@@ -874,6 +898,11 @@ def launch_process_status(pid: int) -> dict:
         return {"state": "unknown", "message": "The Proton wrapper exists but its status cannot be read."}
     except OSError as error:
         return {"state": "unknown", "message": f"Could not inspect Proton wrapper process: {error}"}
+    actual_start = _proc_start_time(pid, proc_root)
+    if actual_start is None:
+        return {"state": "unknown", "message": "The Proton wrapper exists, but its process identity cannot be verified from /proc."}
+    if start_time is not None and actual_start != start_time:
+        return {"state": "exited", "message": "The original Proton wrapper exited; its PID has since been reused by another process."}
     return {
         "state": "running",
         "message": "The Proton wrapper process is still running. Skyrim startup is not independently confirmed.",
