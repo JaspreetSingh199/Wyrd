@@ -14,7 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time,
 )
 
 
