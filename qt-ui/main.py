@@ -21,7 +21,7 @@ from wyrd_mo2 import (
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
-    _proc_identity, _is_descendant_process, read_launch_diagnostics,
+    _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
 )
 @dataclass
 class LaunchSession:
@@ -621,6 +621,8 @@ class MainWindow(QMainWindow):
                 if diagnostics.get("ok") and diagnostics.get("content", "").strip():
                     excerpt = diagnostics["content"][-2400:].strip()
                     self._log("Recent MO2/Proton diagnostics:\\n" + excerpt)
+                    for finding in classify_launch_diagnostics(excerpt):
+                        self._log("Launch diagnosis [" + finding["code"] + "]: " + finding["hint"])
                     self.progress_label.setText(
                         "Launch handoff exited. Recent diagnostics were added to the setup log."
                     )
