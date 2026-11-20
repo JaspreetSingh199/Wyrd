@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
             "XACT (64-bit): " + components.get("xact_x64", {}).get("state", "unknown"),
             "XAudio2 7 (32-bit): " + components.get("xaudio2", {}).get("state", "unknown"),
             "XAudio2 7 (64-bit): " + components.get("xaudio2_x64", {}).get("state", "unknown"),
-            "FAudio / FFmpeg support: NOT DETERMINED by static inspection.",
+            "FAudio / FFmpeg support: UNKNOWN — requires runtime verification.",
             "Runtime dialogue audio: NOT VERIFIED — test dialogue in Skyrim.",
         ]
         self.audio_detail.setText("\\n".join(lines))
