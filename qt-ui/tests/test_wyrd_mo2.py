@@ -357,7 +357,7 @@ class WyrdMO2Tests(unittest.TestCase):
             for pid, (ppid, start_time) in records.items():
                 folder = proc / str(pid)
                 folder.mkdir()
-                fields = ["S", str(ppid)] + [str(i) for i in range(2, 20)] + [str(start_time)]
+                fields = ["S", str(ppid)] + [str(i) for i in range(2, 19)] + [str(start_time)]
                 (folder / "stat").write_text(
                     f"{pid} (process {pid} with ) char) " + " ".join(fields),
                     encoding="utf-8",
