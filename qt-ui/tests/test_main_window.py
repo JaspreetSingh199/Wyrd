@@ -130,6 +130,43 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
         self.assertFalse(window._launch_monitor.isActive())
 
+    def test_launch_monitor_rejects_reused_wrapper_pid_for_tree_attribution(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+            "main.launch_process_status", return_value={
+                "state": "exited", "message": "original wrapper was replaced"
+            }
+        ), patch("main.detect_skyrim_processes", return_value={
+            "ok": True,
+            "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
+            "wyrd_processes": [],
+        }), patch("main._is_descendant_process") as ancestry:
+            window._poll_launch_status()
+        ancestry.assert_not_called()
+        self.assertFalse(window._launch_monitor.isActive())
+        self.assertIn("wrapper exited before Skyrim", window.progress_label.text())
+        window.close()
+
+    def test_launch_monitor_includes_recent_diagnostics_on_early_exit(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_log_path = "/tmp/wyrd-launch.log"
+        with patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "wrapper exited"
+        }), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": []
+        }), patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "main.read_launch_diagnostics", return_value={
+                "ok": True, "content": "MO2 could not resolve executable title",
+            }
+        ):
+            window._poll_launch_status()
+        self.assertIn("MO2 could not resolve executable title", window.log_view.toPlainText())
+        self.assertIn("diagnostics were added", window.progress_label.text())
+        window.close()
+
     def test_launch_monitor_stops_when_session_game_process_is_detected(self):
         window = self._window()
         window._last_launch_pid = 500
