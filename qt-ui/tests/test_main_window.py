@@ -200,6 +200,22 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.launch_session.state, "detected")
         window.close()
 
+    def test_launch_monitor_logs_actionable_diagnostic_classification(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_log_path = "/tmp/wyrd-launch.log"
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "main.launch_process_status", return_value={"state": "exited", "message": "wrapper exited"}
+        ), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": []
+        }), patch("main.read_launch_diagnostics", return_value={
+            "ok": True, "content": "USVFS hook failed to inject"
+        }):
+            window._poll_launch_status()
+        self.assertIn("Launch diagnosis [mo2_usvfs]", window.log_view.toPlainText())
+        self.assertIn("do not bypass MO2", window.log_view.toPlainText())
+        window.close()
+
     def test_launch_monitor_stops_when_session_game_process_is_detected(self):
         window = self._window()
         window._last_launch_pid = 500
