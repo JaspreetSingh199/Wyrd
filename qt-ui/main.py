@@ -18,7 +18,7 @@ from wyrd_mo2 import (
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
-    launch_process_status, detect_skyrim_processes,
+    launch_process_status, detect_skyrim_processes, _proc_start_time,
 )
 
 STYLE = """
@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
         self.launch_target_state: dict = {"ok": False, "targets": []}
         self._last_launch_pid: int | None = None
+        self._last_launch_start_time: int | None = None
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -472,6 +473,7 @@ class MainWindow(QMainWindow):
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
             self._last_launch_pid = result.get("pid")
+            self._last_launch_start_time = _proc_start_time(self._last_launch_pid) if self._last_launch_pid else None
             self.launch_status_button.setEnabled(bool(self._last_launch_pid))
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
@@ -483,7 +485,7 @@ class MainWindow(QMainWindow):
         if not self._last_launch_pid:
             QMessageBox.information(self, "Launch status", "No Wyrd launch handoff has been recorded in this session.")
             return
-        result = launch_process_status(self._last_launch_pid)
+        result = launch_process_status(self._last_launch_pid, self._last_launch_start_time)
         self._log(f"Launch PID {self._last_launch_pid}: {result['state']} — {result['message']}")
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
