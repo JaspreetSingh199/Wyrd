@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
@@ -86,6 +86,12 @@ class MainWindow(QMainWindow):
         self.launch_target_state: dict = {"ok": False, "targets": []}
         self._last_launch_pid: int | None = None
         self._last_launch_start_time: int | None = None
+        self._launch_poll_count = 0
+        self._launch_poll_interval_ms = 2000
+        self._launch_poll_limit = 150
+        self._launch_monitor = QTimer(self)
+        self._launch_monitor.setInterval(self._launch_poll_interval_ms)
+        self._launch_monitor.timeout.connect(self._poll_launch_status)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -474,12 +480,82 @@ class MainWindow(QMainWindow):
         if result.get("ok"):
             self._last_launch_pid = result.get("pid")
             self._last_launch_start_time = _proc_start_time(self._last_launch_pid) if self._last_launch_pid else None
+            self._launch_poll_count = 0
+            if self._last_launch_pid:
+                self._launch_monitor.start()
             self.launch_status_button.setEnabled(bool(self._last_launch_pid))
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
         else:
             QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
+
+    def _stop_launch_monitor(self, reason: str | None = None) -> None:
+        if self._launch_monitor.isActive():
+            self._launch_monitor.stop()
+            if reason:
+                self._log("Launch monitoring stopped: " + reason)
+
+    def _poll_launch_status(self) -> None:
+        """Refresh launch status without modal dialogs until a terminal state is reached."""
+        if not self._last_launch_pid:
+            self._stop_launch_monitor("no launch session is active")
+            return
+        self._launch_poll_count += 1
+        if self._launch_poll_count > self._launch_poll_limit:
+            self._stop_launch_monitor("monitoring time limit reached")
+            self.progress_label.setText(
+                "Launch monitoring timed out; use Check launch status or inspect diagnostics."
+            )
+            return
+        result = launch_process_status(
+            self._last_launch_pid, self._last_launch_start_time
+        )
+        process_scan = detect_skyrim_processes(managed_paths()["prefix"])
+        session_processes = []
+        if process_scan.get("ok"):
+            for item in process_scan.get("processes", []):
+                if _is_descendant_process(item["pid"], self._last_launch_pid):
+                    session_processes.append(item)
+        if session_processes:
+            detected = ", ".join(
+                f"{item['binary']} (PID {item['pid']})" for item in session_processes
+            )
+            self.progress_label.setText(
+                "Skyrim/SKSE detected in this Wyrd launch process tree."
+            )
+            self._log("Launch session detected: " + detected)
+            self._stop_launch_monitor("Skyrim/SKSE process detected")
+            return
+        if process_scan.get("ok") and process_scan.get("wyrd_processes"):
+            detected = ", ".join(
+                f"{item['binary']} (PID {item['pid']})"
+                for item in process_scan["wyrd_processes"]
+            )
+            self.progress_label.setText(
+                "Skyrim detected in Wyrd's prefix; launch-session ancestry is unconfirmed."
+            )
+            self._log(
+                "Prefix-attributed Skyrim process(es), ancestry unconfirmed: " + detected
+            )
+            self._stop_launch_monitor("managed-prefix Skyrim process detected")
+            return
+        if result["state"] in {"exited", "invalid"}:
+            self.progress_label.setText(
+                "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
+            )
+            self._log("Launch handoff ended without detected Skyrim: " + result["message"])
+            self._stop_launch_monitor("wrapper exited without detected game process")
+            return
+        if result["state"] == "unknown":
+            self.progress_label.setText(
+                "Launch status is unknown; automatic monitoring will continue briefly."
+            )
+            self._log("Launch status unknown: " + result["message"])
+        else:
+            self.progress_label.setText(
+                f"Waiting for Skyrim/SKSE… (check {self._launch_poll_count}/{self._launch_poll_limit})"
+            )
 
     def check_launch_status(self) -> None:
         if not self._last_launch_pid:
@@ -550,6 +626,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Launch diagnostics", result["content"][-5000:])
 
     def closeEvent(self, event) -> None:
+        self._stop_launch_monitor("application is closing")
         if self.worker and self.worker.isRunning():
             QMessageBox.information(
                 self, "Setup is running",
