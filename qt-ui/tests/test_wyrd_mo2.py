@@ -352,7 +352,7 @@ class WyrdMO2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             proc = Path(tmp)
             (proc / "123").mkdir()
-            fields = ["S"] + [str(index) for index in range(4, 22)]
+            fields = ["S"] + [str(index) for index in range(4, 23)]
             fields[19] = "9876"
             (proc / "123/stat").write_text(
                 "123 (name with ) chars) " + " ".join(fields), encoding="utf-8"
