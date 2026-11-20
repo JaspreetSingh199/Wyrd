@@ -445,34 +445,102 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _resolve_xact_dlls() -> dict:
-    """Resolve Wine builtin XACT DLLs from the selected Proton distribution.
+def _resolve_xact_dlls(home: Path | None = None) -> dict:
+    """Resolve verified Microsoft XACT payloads from a cached DirectX June 2010 installer.
 
-    This deliberately does not download DLLs or source binaries from arbitrary
-    third-party mirrors. Proton's own Wine tree is the provenance boundary.
+    The redistributable is obtained only from Microsoft's official download
+    endpoint and pinned to the SHA-256 used by winetricks. It is extracted
+    without executing its installer.
     """
-    home = Path.home()
-    state = inspect_wyrd_installation(home)
-    metadata = state.get("metadata", {})
-    proton = Path(metadata.get("proton", "")).expanduser()
-    if not proton.is_dir():
-        return {}
-    roots = [proton / "files/share/wine", proton / "dist/share/wine"]
-    result = {}
-    names = {"xact": "xact.dll", "xact_x64": "xact_x64.dll"}
-    for key, filename in names.items():
-        candidates = []
-        for root in roots:
-            if root.is_dir():
-                candidates.extend(root.glob(f"**/{filename}"))
-        # Wine's PE DLLs may live in architecture-specific directories. Only
-        # accept regular files and require a unique architecture-specific hit.
-        candidates = [item for item in candidates if item.is_file() and not item.is_symlink()]
-        if len(candidates) == 1:
-            item = candidates[0]
-            result[key] = {"source": str(item.resolve()), "sha256": _sha256_file(item)}
-    return result
+    import hashlib
+    import urllib.request
 
+    expected_hash = "053f76dcbb28802e23341b6a787e3b0791c0fa5c8d4d011b1044172dbf89c73b"
+    url = (
+        "https://download.microsoft.com/download/8/4/A/"
+        "84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe"
+    )
+    cache_root = managed_paths(home)["root"] / "cache"
+    installer = cache_root / "directx_Jun2010_redist.exe"
+    if not installer.is_file():
+        cache_root.mkdir(parents=True, exist_ok=True)
+        temporary = cache_root / (installer.name + ".download")
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "Wyrd-Audio-Compatibility"})
+            with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
+                shutil.copyfileobj(response, output)
+            if _sha256_file(temporary) != expected_hash:
+                raise RuntimeError("Microsoft DirectX June 2010 installer SHA-256 mismatch.")
+            os.replace(temporary, installer)
+        finally:
+            temporary.unlink(missing_ok=True)
+    if _sha256_file(installer) != expected_hash:
+        raise RuntimeError("Cached DirectX June 2010 installer failed SHA-256 verification.")
+    try:
+        import cabarchive
+    except ImportError as error:
+        raise RuntimeError("The cabarchive Python package is required to extract the verified DirectX installer.") from error
+
+    # The DirectX redistributable is a self-extracting archive. Never execute it.
+    extract_root = cache_root / "directx_Jun2010_extracted"
+    extract_root.mkdir(parents=True, exist_ok=True)
+    extractor_candidates = []
+    for candidate in extract_root.rglob("*.cab"):
+        if candidate.is_file() and not candidate.is_symlink():
+            extractor_candidates.append(candidate)
+    # The outer EXE is not a CAB readable by cabarchive; use the system 7z
+    # utility to extract the cabinet payloads into a private cache directory.
+    if not extractor_candidates:
+        seven_zip = shutil.which("7z") or shutil.which("7zz")
+        if not seven_zip:
+            raise RuntimeError("7z/7zz is required to extract the DirectX redistributable safely.")
+        result = subprocess.run(
+            [seven_zip, "x", "-y", f"-o{extract_root}", str(installer)],
+            capture_output=True, text=True, timeout=180, check=False,
+        )
+        if result.returncode not in (0, 1):
+            raise RuntimeError("Could not safely extract the verified DirectX redistributable: " +
+                               (result.stderr or result.stdout)[-2000:])
+        extractor_candidates = [
+            candidate for candidate in extract_root.rglob("*.cab")
+            if candidate.is_file() and not candidate.is_symlink()
+        ]
+    if not extractor_candidates:
+        raise RuntimeError("No CAB payloads were found in the verified DirectX redistributable.")
+
+    result = {}
+    patterns = {
+        "xact": ("*_xact_*x86*.cab", "xactengine*.dll"),
+        "xact_x64": ("*_xact_*x64*.cab", "xactengine*.dll"),
+    }
+    for key, (cab_pattern, dll_pattern) in patterns.items():
+        matches = []
+        for cabinet in extractor_candidates:
+            if not re.fullmatch(cab_pattern.replace("*", ".*").replace("?", "."), cabinet.name, re.IGNORECASE):
+                continue
+            try:
+                archive = cabarchive.CabArchive(cabinet.read_bytes())
+                for member_name, member in archive.items():
+                    if re.fullmatch(dll_pattern.replace("*", ".*"), Path(member_name).name, re.IGNORECASE):
+                        matches.append((cabinet, Path(member_name).name, member.buf))
+            except Exception:
+                continue
+        if matches:
+            unique = {hashlib.sha256(item[2]).hexdigest(): item for item in matches}
+            if len(unique) == 1:
+                cabinet, filename, payload = next(iter(unique.values()))
+                destination = cache_root / key / filename
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if not destination.exists() or _sha256_file(destination) != hashlib.sha256(payload).hexdigest():
+                    temporary = destination.with_suffix(destination.suffix + ".tmp")
+                    temporary.write_bytes(payload)
+                    os.replace(temporary, destination)
+                result[key] = {
+                    "source": str(destination.resolve()),
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "source_archive": str(cabinet),
+                }
+    return result
 
 def inspect_audio_compatibility(home: Path | None = None) -> dict:
     """Read-only XACT inspection scoped to Wyrd's positively owned prefix."""
