@@ -300,9 +300,11 @@ class WyrdMO2Tests(unittest.TestCase):
                         result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
             self.assertTrue(result["ok"], result)
             command = popen.call_args.args[0]
-            self.assertIn("--instance", command)
-            self.assertIn("Skyrim SE", command)
-            self.assertIn("--executable", command)
+            self.assertEqual(
+                command[2:5],
+                [str(paths["install"] / "ModOrganizer.exe"), "--instance", "Skyrim SE"],
+            )
+            self.assertEqual(command[5:], ["run", "--executable", "SKSE"])
             self.assertEqual(command[-1], "SKSE")
             environment = popen.call_args.kwargs["env"]
             self.assertEqual(environment["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
