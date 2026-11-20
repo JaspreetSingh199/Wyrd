@@ -107,6 +107,52 @@ class MainWindowSmokeTests(unittest.TestCase):
             launch.assert_not_called()
             window.close()
 
+    def test_launch_status_prefers_process_tree_attribution(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        process_scan = {
+            "ok": True,
+            "processes": [
+                {"pid": 700, "binary": "skyrimse.exe", "attributed_to_wyrd": True},
+                {"pid": 701, "binary": "skse64_loader.exe", "attributed_to_wyrd": True},
+            ],
+            "wyrd_processes": [
+                {"pid": 700, "binary": "skyrimse.exe", "attributed_to_wyrd": True},
+                {"pid": 701, "binary": "skse64_loader.exe", "attributed_to_wyrd": True},
+            ],
+            "message": "Detected Skyrim processes in Wyrd prefix.",
+        }
+        with patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "wrapper exited"
+        }), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
+            "main._is_descendant_process", side_effect=lambda pid, ancestor: pid == 701
+        ), patch("main.QMessageBox.information") as info:
+            window.check_launch_status()
+        self.assertIn("this Wyrd launch process tree", window.progress_label.text())
+        self.assertIn("skse64_loader.exe (PID 701)", info.call_args.args[2])
+        self.assertNotIn("skyrimse.exe (PID 700)", info.call_args.args[2])
+        window.close()
+
+    def test_launch_status_falls_back_to_prefix_attribution_when_tree_is_gone(self):
+        window = self._window()
+        window._last_launch_pid = 500
+        window._last_launch_start_time = 900
+        process_scan = {
+            "ok": True,
+            "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
+            "wyrd_processes": [{"pid": 700, "binary": "skyrimse.exe"}],
+            "message": "Detected Skyrim in Wyrd prefix.",
+        }
+        with patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "wrapper exited"
+        }), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
+            "main._is_descendant_process", return_value=False
+        ), patch("main.QMessageBox.information"):
+            window.check_launch_status()
+        self.assertIn("ancestry is unconfirmed", window.progress_label.text())
+        window.close()
+
     def test_window_is_branded_wyrd_and_has_only_the_core_setup_flow(self):
         window = self._window()
         self.assertEqual(window.windowTitle(), "Wyrd — Skyrim Modding Environment")
