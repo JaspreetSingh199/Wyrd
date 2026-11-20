@@ -18,7 +18,7 @@ from wyrd_mo2 import (
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
-    launch_process_status, detect_skyrim_processes, _proc_start_time,
+    launch_process_status, detect_skyrim_processes, _proc_start_time, _is_descendant_process,
 )
 
 STYLE = """
@@ -489,19 +489,55 @@ class MainWindow(QMainWindow):
         self._log(f"Launch PID {self._last_launch_pid}: {result['state']} — {result['message']}")
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
-        if process_scan.get("ok") and process_scan.get("wyrd_processes"):
-            detected = ", ".join(f"{item['binary']} (PID {item['pid']})" for item in process_scan["wyrd_processes"])
-            self.progress_label.setText("Skyrim/SKSE detected in Wyrd's managed prefix.")
-            detail = result["message"] + "\n\n" + process_scan["message"] + "\n" + detected
+        session_processes = []
+        if process_scan.get("ok"):
+            for item in process_scan.get("processes", []):
+                if _is_descendant_process(item["pid"], self._last_launch_pid):
+                    session_processes.append(item)
+        if session_processes:
+            detected = ", ".join(
+                f"{item['binary']} (PID {item['pid']})" for item in session_processes
+            )
+            self.progress_label.setText("Skyrim/SKSE detected in this Wyrd launch process tree.")
+            detail = (
+                result["message"] + "\n\n"
+                "Processes descended from this launch's Proton wrapper:\n" + detected
+            )
+        elif process_scan.get("ok") and process_scan.get("wyrd_processes"):
+            detected = ", ".join(
+                f"{item['binary']} (PID {item['pid']})"
+                for item in process_scan["wyrd_processes"]
+            )
+            self.progress_label.setText(
+                "Skyrim detected in Wyrd's prefix; launch-session ancestry is unconfirmed."
+            )
+            detail = (
+                result["message"] + "\n\n" + process_scan["message"] + "\n" + detected
+            )
         elif process_scan.get("ok") and process_scan.get("processes"):
-            self.progress_label.setText("Skyrim detected, but prefix ownership could not be confirmed.")
+            self.progress_label.setText(
+                "Skyrim detected, but Wyrd ownership could not be confirmed."
+            )
             detail = result["message"] + "\n\n" + process_scan["message"]
+        elif result["state"] == "exited":
+            self.progress_label.setText(
+                "Proton wrapper exited. Skyrim process not detected; review diagnostics."
+            )
+            detail = result["message"] + "\n\n" + process_scan.get(
+                "message", "Process detection unavailable."
+            )
+        elif result["state"] == "running":
+            self.progress_label.setText(
+                "Proton wrapper is running; Skyrim process not detected yet."
+            )
+            detail = result["message"] + "\n\n" + process_scan.get(
+                "message", "Process detection unavailable."
+            )
         else:
-            if result["state"] == "exited":
-                self.progress_label.setText("Proton wrapper exited. Skyrim process not detected; review diagnostics.")
-            elif result["state"] == "running":
-                self.progress_label.setText("Proton wrapper is running; Skyrim process not detected yet.")
-            detail = result["message"] + "\n\n" + process_scan.get("message", "Process detection unavailable.")
+            self.progress_label.setText("Launch status is unknown; inspect diagnostics.")
+            detail = result["message"] + "\n\n" + process_scan.get(
+                "message", "Process detection unavailable."
+            )
         QMessageBox.information(self, "Launch process status", detail)
 
     def show_launch_diagnostics(self) -> None:
