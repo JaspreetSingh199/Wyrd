@@ -107,6 +107,16 @@ class MainWindowSmokeTests(unittest.TestCase):
             launch.assert_not_called()
             window.close()
 
+    def test_launch_session_model_has_safe_idle_defaults(self):
+        from main import LaunchSession
+        session = LaunchSession()
+        self.assertIsNone(session.wrapper_pid)
+        self.assertIsNone(session.wrapper_start_time)
+        self.assertIsNone(session.instance_name)
+        self.assertIsNone(session.executable_title)
+        self.assertEqual(session.detected_processes, [])
+        self.assertEqual(session.state, "idle")
+
     def test_launch_monitor_starts_after_successful_handoff(self):
         window = self._window()
         with patch("main.QInputDialog.getItem", side_effect=[
