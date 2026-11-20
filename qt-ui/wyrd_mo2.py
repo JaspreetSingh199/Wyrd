@@ -432,9 +432,9 @@ def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
         raise RuntimeError("The ownership marker does not identify Skyrim Special Edition.")
     if not (prefix / "pfx/drive_c").is_dir():
         raise RuntimeError("Wyrd's Proton prefix is not initialized.")
-    # Refuse links at each component below the ownership root. The checks are
-    # intentionally repeated before mutation to guard against path substitution.
-    for candidate in (prefix, prefix / "pfx", prefix / "pfx/drive_c",
+    # Refuse symlinks in both ownership roots and their target parents.
+    for candidate in (paths["root"], paths["install"], prefix,
+                      prefix / "pfx", prefix / "pfx/drive_c",
                       prefix / "pfx/drive_c/windows",
                       prefix / "pfx/drive_c/windows/system32",
                       prefix / "pfx/drive_c/windows/syswow64"):
@@ -503,6 +503,7 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
             }
         state = inspect_wyrd_installation(home)
         proton_root = Path(state.get("metadata", {}).get("proton", ""))
+        payloads = _resolve_xact_dlls(home)
         runtime_paths = []
         for path in (proton_root / "files/lib64/wine", proton_root / "files/lib/wine",
                      proton_root / "dist/lib64/wine"):
@@ -518,6 +519,7 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
             "repair_recommended": any(
                 components[name]["state"] == "missing" for name in ("xact", "xact_x64")
             ),
+            "repair_available": set(payloads) == {"xact", "xact_x64"},
             "runtime_verified": False,
             "runtime_note": "File presence is not proof of dialogue audio; test an NPC conversation in Skyrim.",
             "message": "Wyrd prefix ownership verified; XACT and XAudio2 files inspected.",
@@ -562,11 +564,10 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
                 raise RuntimeError(
                     f"XACT target already exists; Wyrd will not overwrite a Wine or user DLL: {target}"
                 )
-        # Stage both source DLLs and backups before changing either target.
+        # Stage and verify both DLLs before changing either target.
         staged_root = prefix / ".audio-repair-staging"
         staged_root.mkdir(mode=0o700, exist_ok=True)
         staged = {}
-        backups = {}
         for key, target in targets.items():
             source = Path(sources[key]["source"]).resolve(strict=True)
             if not source.is_file() or source.is_symlink():
@@ -583,7 +584,6 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "managed_prefix": str(prefix),
             "changes": [],
-            "backups": backups,
             "sources": {key: {"path": sources[key]["source"], "sha256": sources[key]["sha256"]}
                         for key in sources},
             "runtime_verified": False,
@@ -596,7 +596,6 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
                 journal["changes"].append({
                     "component": key, "target": str(target),
                     "sha256": _sha256_file(target),
-                    "backup": backups.get(key),
                 })
             verification = inspect_audio_compatibility(home)
             if not verification.get("safe") or any(
@@ -605,16 +604,14 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
             ):
                 raise RuntimeError("Post-repair XACT verification failed.")
         except Exception:
-            # Restore only files whose previous contents were safely backed up.
-            # A previously absent target is removed only if it is still the
-            # exact file installed by this operation.
+            # Roll back only the exact files installed by this operation.
             for key in reversed(modified):
                 target = targets[key]
                 if target.is_file() and _sha256_file(target) == sources[key]["sha256"]:
                     target.unlink()
             raise
         with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(journal, indent=2) + "\\n")
+            handle.write(json.dumps(journal, indent=2) + "\n")
         return {
             "ok": True, "modified": bool(modified), "verified": True,
             "runtime_verified": False, "log_path": str(log_path),
