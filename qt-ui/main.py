@@ -36,7 +36,26 @@ class LaunchSession:
     poll_count: int = 0
     detected_processes: list[dict] = field(default_factory=list)
     process_identities: dict[int, int | None] = field(default_factory=dict)
+    game_processes: list[GameProcess] = field(default_factory=list)
     state: str = "idle"
+
+
+@dataclass
+class GameProcess:
+    """Stable identity for a detected Skyrim/SKSE process."""
+
+    pid: int
+    binary: str
+    start_time: int | None
+    detection_source: str
+    attribution_confidence: str
+
+    def matches_current_process(self) -> bool:
+        """Return false if the PID vanished or now belongs to a different process."""
+        identity = _proc_identity(self.pid)
+        return bool(identity and (
+            self.start_time is None or identity.get("start_time") == self.start_time
+        ))
 
 
 STYLE = """
@@ -502,6 +521,7 @@ class MainWindow(QMainWindow):
             self.launch_session.started_at = time.time()
             self.launch_session.detected_processes = []
             self.launch_session.process_identities = {}
+            self.launch_session.game_processes = []
             self.launch_session.state = "handoff"
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
@@ -557,6 +577,14 @@ class MainWindow(QMainWindow):
             self.launch_session.process_identities = {
                 item["pid"]: item.get("start_time") for item in session_processes
             }
+            self.launch_session.game_processes = [
+                GameProcess(
+                    pid=item["pid"], binary=item["binary"],
+                    start_time=item.get("start_time"),
+                    detection_source="launch_process_tree",
+                    attribution_confidence="confirmed",
+                ) for item in session_processes
+            ]
             self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
             self._stop_launch_monitor("Skyrim/SKSE process detected")
@@ -576,6 +604,14 @@ class MainWindow(QMainWindow):
             self.launch_session.process_identities = {
                 item["pid"]: item.get("start_time") for item in process_scan["wyrd_processes"]
             }
+            self.launch_session.game_processes = [
+                GameProcess(
+                    pid=item["pid"], binary=item["binary"],
+                    start_time=item.get("start_time"),
+                    detection_source="managed_prefix",
+                    attribution_confidence="prefix",
+                ) for item in process_scan["wyrd_processes"]
+            ]
             self.launch_session.state = "detected-unconfirmed"
             self._stop_launch_monitor("managed-prefix Skyrim process detected")
             return
