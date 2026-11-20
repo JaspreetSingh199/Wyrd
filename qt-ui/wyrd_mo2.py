@@ -401,7 +401,14 @@ def install_mo2_environment(proton_path: Path, game_path: Path,
 
 def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
     """Resolve only Wyrd's canonical prefix after validating both ownership records."""
-    home = (home or Path.home()).expanduser().resolve()
+    requested_home = (home or Path.home()).expanduser()
+    canonical_home = Path.home().expanduser().resolve()
+    home = requested_home.resolve()
+    if home != canonical_home and requested_home.exists():
+        # Explicit alternate homes are permitted for isolated tests/tools, but
+        # the caller must pass one deliberately; production defaults remain
+        # anchored to the actual current user's home.
+        pass
     paths = managed_paths(home)
     prefix = paths["prefix"]
     expected = (paths["root"] / PREFIX_DIR_NAME).resolve()
@@ -434,6 +441,8 @@ def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
         if candidate.is_symlink():
             raise RuntimeError(f"Symlink detected in managed prefix path: {candidate}")
     return prefix, {"install": install_data, "prefix": prefix_data}
+
+
 
 
 def _sha256_file(path: Path) -> str:
@@ -479,6 +488,8 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
             "xaudio2_x64": ("system32", "xaudio2_7.dll"),
             "x3daudio": ("syswow64", "x3daudio1_7.dll"),
             "x3daudio_x64": ("system32", "x3daudio1_7.dll"),
+            "xapofx": ("syswow64", "xapofx1_5.dll"),
+            "xapofx_x64": ("system32", "xapofx1_5.dll"),
         }
         components = {}
         for key, (arch_dir, filename) in dlls.items():
