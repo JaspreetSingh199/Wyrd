@@ -593,8 +593,7 @@ class WyrdAudioCompatibilityTests(unittest.TestCase):
                     "sha256": __import__("hashlib").sha256(source.read_bytes()).hexdigest(),
                 }
             with patch("wyrd_mo2._resolve_xact_dlls", return_value=sources):
-                with patch("wyrd_mo2._validated_wyrd_audio_prefix", side_effect=lambda h=None: __import__("wyrd_mo2")._validated_wyrd_audio_prefix(h)):
-                    result = repair_audio_compatibility(home, confirmed=True)
+                result = repair_audio_compatibility(home, confirmed=True)
             self.assertTrue(result["ok"], result)
             self.assertTrue(result["verified"])
             self.assertEqual(sentinel.read_bytes(), b"leave-me-alone")
