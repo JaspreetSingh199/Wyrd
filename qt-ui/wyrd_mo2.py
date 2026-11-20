@@ -536,10 +536,10 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
 
 
 def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False) -> dict:
-    """Install Microsoft XACT DLLs into Wyrd's prefix without replacing existing files.
+    """Install verified cached Microsoft XACT DLLs into Wyrd's prefix only.
 
-    Source payloads are extracted from a pinned Microsoft redistributable.
-    The operation is additive and does not touch Steam's compatdata tree.
+    Existing Wine/user files are never replaced; changes are additive, journaled,
+    hash-verified and rolled back if post-write verification fails.
     """
     if not confirmed:
         return {"ok": False, "modified": False,
