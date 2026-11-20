@@ -531,63 +531,47 @@ def _resolve_xact_dlls(home: Path | None = None) -> dict:
     return result
 
 def inspect_audio_compatibility(home: Path | None = None) -> dict:
-    """Inspect XACT/XAudio files and Wine runtime diagnostics in Wyrd's prefix."""
+    """Inspect XACT/XAudio DLLs in the verified Wyrd prefix without mutation."""
     try:
         prefix, _ownership = _validated_wyrd_audio_prefix(home)
         windows = prefix / "pfx/drive_c/windows"
-        dll_sets = {
-            "xact": {"xactengine": ("syswow64", "xactengine3_7.dll")},
-            "xact_x64": {"xactengine": ("system32", "xactengine3_7.dll")},
-            "xaudio2": {"dll": ("syswow64", "xaudio2_7.dll")},
-            "xaudio2_x64": {"dll": ("system32", "xaudio2_7.dll")},
-            "x3daudio": {"dll": ("syswow64", "x3daudio1_7.dll")},
-            "x3daudio_x64": {"dll": ("system32", "x3daudio1_7.dll")},
+        dlls = {
+            "xact": ("syswow64", "xactengine3_7.dll"),
+            "xact_x64": ("system32", "xactengine3_7.dll"),
+            "xaudio2": ("syswow64", "xaudio2_7.dll"),
+            "xaudio2_x64": ("system32", "xaudio2_7.dll"),
+            "x3daudio": ("syswow64", "x3daudio1_7.dll"),
+            "x3daudio_x64": ("system32", "x3daudio1_7.dll"),
         }
         components = {}
-        for key, files in dll_sets.items():
-            category, relative = next(iter(files.values()))
-            target = windows / category / relative
-            if target.is_symlink():
-                raise RuntimeError(f"Symlink detected at compatibility target: {target}")
-            if target.exists() and not target.is_file():
-                raise RuntimeError(f"Compatibility target is not a regular file: {target}")
+        for key, (arch_dir, filename) in dlls.items():
+            target = windows / arch_dir / filename
+            if target.is_symlink() or target.exists() and not target.is_file():
+                raise RuntimeError(f"Unsafe XACT/XAudio target: {target}")
             components[key] = {
                 "path": str(target),
                 "state": "present" if target.is_file() else "missing",
                 "sha256": _sha256_file(target) if target.is_file() else None,
             }
-        # Wine/Proton audio implementation is provided by host runtime files,
-        # not a Windows DLL in the prefix. Report discoverable libraries without
-        # implying that an ELF or build label proves FFmpeg support.
-        runtime_env = {}
-        configured = os.environ.get("STEAM_COMPAT_DATA_PATH")
-        if configured:
-            runtime_env["STEAM_COMPAT_DATA_PATH"] = configured
-        proton_candidates = []
         state = inspect_wyrd_installation(home)
-        proton_value = state.get("metadata", {}).get("proton")
-        if proton_value:
-            proton_root = Path(proton_value)
-            for candidate in (
-                proton_root / "files/lib64/wine",
-                proton_root / "files/lib/wine",
-                proton_root / "dist/lib64/wine",
-            ):
-                if candidate.exists():
-                    proton_candidates.append(str(candidate))
-        runtime_info = {
-            "proton_roots": proton_candidates,
-            "faudio_host_support": "not directly verifiable from files; runtime test required",
-            "ffmpeg_support": "not inferable from installed filename; runtime test required",
-        }
-        missing = [key for key, value in components.items() if value["state"] == "missing"]
+        proton_root = Path(state.get("metadata", {}).get("proton", ""))
+        runtime_paths = []
+        for path in (proton_root / "files/lib64/wine", proton_root / "files/lib/wine",
+                     proton_root / "dist/lib64/wine"):
+            if path.is_dir():
+                runtime_paths.append(str(path))
         return {
             "ok": True, "safe": True, "prefix": str(prefix),
-            "components": components, "runtime": runtime_info,
-            "repair_recommended": any(key.startswith("xact") and value["state"] == "missing"
-                                      for key, value in components.items()),
+            "components": components,
+            "runtime": {
+                "proton_library_paths": runtime_paths,
+                "faudio_ffmpeg_support": "unknown; needs live runtime verification",
+            },
+            "repair_recommended": any(
+                components[name]["state"] == "missing" for name in ("xact", "xact_x64")
+            ),
             "runtime_verified": False,
-            "runtime_note": "Only an in-game dialogue test can verify Skyrim's voice path.",
+            "runtime_note": "File presence is not proof of dialogue audio; test an NPC conversation in Skyrim.",
             "message": "Wyrd prefix ownership verified; XACT and XAudio2 files inspected.",
         }
     except (OSError, RuntimeError, ValueError) as error:
@@ -596,6 +580,7 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
             "repair_recommended": False, "runtime_verified": False,
             "message": str(error),
         }
+
 
 def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False) -> dict:
     """Install Microsoft XACT DLLs into Wyrd's prefix without replacing existing files.
