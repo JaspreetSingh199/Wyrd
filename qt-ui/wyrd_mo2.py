@@ -854,7 +854,8 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
         })
-    detected.sort(key=lambda item: item["pid"])\n    associated = [item for item in detected if item["attributed_to_wyrd"]]
+    detected.sort(key=lambda item: item["pid"])
+    associated = [item for item in detected if item["attributed_to_wyrd"]]
     message = (f"Detected {len(associated)} Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
                if associated else
                "Skyrim/SKSE process(es) detected, but none could be attributed to Wyrd's managed prefix."
