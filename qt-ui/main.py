@@ -18,7 +18,7 @@ from wyrd_mo2 import (
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
-    launch_process_status, detect_skyrim_processes, _proc_start_time, _is_descendant_process,
+    launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process, read_launch_diagnostics,
 )
 
 STYLE = """
@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         self.launch_target_state: dict = {"ok": False, "targets": []}
         self._last_launch_pid: int | None = None
         self._last_launch_start_time: int | None = None
+        self._last_launch_log_path: str | None = None
         self._launch_poll_count = 0
         self._launch_poll_interval_ms = 2000
         self._launch_poll_limit = 150
@@ -480,6 +481,7 @@ class MainWindow(QMainWindow):
         if result.get("ok"):
             self._last_launch_pid = result.get("pid")
             self._last_launch_start_time = _proc_start_time(self._last_launch_pid) if self._last_launch_pid else None
+            self._last_launch_log_path = result.get("log_path")
             self._launch_poll_count = 0
             if self._last_launch_pid:
                 self._launch_monitor.start()
@@ -508,12 +510,17 @@ class MainWindow(QMainWindow):
                 "Launch monitoring timed out; use Check launch status or inspect diagnostics."
             )
             return
+        wrapper_identity = _proc_identity(self._last_launch_pid)
         result = launch_process_status(
             self._last_launch_pid, self._last_launch_start_time
         )
+        wrapper_identity_matches = (
+            self._last_launch_start_time is None
+            or wrapper_identity.get("start_time") == self._last_launch_start_time
+        )
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         session_processes = []
-        if process_scan.get("ok"):
+        if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
                 if _is_descendant_process(item["pid"], self._last_launch_pid):
                     session_processes.append(item)
@@ -545,6 +552,16 @@ class MainWindow(QMainWindow):
                 "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
             )
             self._log("Launch handoff ended without detected Skyrim: " + result["message"])
+            if self._last_launch_log_path:
+                diagnostics = read_launch_diagnostics(Path(self._last_launch_log_path))
+                if diagnostics.get("ok") and diagnostics.get("content", "").strip():
+                    excerpt = diagnostics["content"][-2400:].strip()
+                    self._log("Recent MO2/Proton diagnostics:\\n" + excerpt)
+                    self.progress_label.setText(
+                        "Launch handoff exited. Recent diagnostics were added to the setup log."
+                    )
+                elif not diagnostics.get("ok"):
+                    self._log("Launch diagnostics: " + diagnostics.get("message", "Unavailable."))
             self._stop_launch_monitor("wrapper exited without detected game process")
             return
         if result["state"] == "unknown":
@@ -561,12 +578,17 @@ class MainWindow(QMainWindow):
         if not self._last_launch_pid:
             QMessageBox.information(self, "Launch status", "No Wyrd launch handoff has been recorded in this session.")
             return
+        wrapper_identity = _proc_identity(self._last_launch_pid)
         result = launch_process_status(self._last_launch_pid, self._last_launch_start_time)
+        wrapper_identity_matches = (
+            self._last_launch_start_time is None
+            or wrapper_identity.get("start_time") == self._last_launch_start_time
+        )
         self._log(f"Launch PID {self._last_launch_pid}: {result['state']} — {result['message']}")
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
         session_processes = []
-        if process_scan.get("ok"):
+        if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
                 if _is_descendant_process(item["pid"], self._last_launch_pid):
                     session_processes.append(item)
