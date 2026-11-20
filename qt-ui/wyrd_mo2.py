@@ -446,89 +446,26 @@ def _sha256_file(path: Path) -> str:
 
 
 def _resolve_xact_dlls(home: Path | None = None) -> dict:
-    """Resolve verified Microsoft XACT payloads from a cached DirectX June 2010 installer.
+    """Return the XACT payload provenance for an explicitly installed, verified cache.
 
-    The redistributable is obtained only from Microsoft's official download
-    endpoint and pinned to the SHA-256 used by winetricks. It is extracted
-    without executing its installer.
+    Wyrd currently does not download or install redistributables automatically.
+    A future importer may populate this cache only after validating Microsoft's
+    signed package and every extracted file. Keeping this resolver fail-closed
+    avoids ever guessing a Proton/Wine DLL as a Microsoft redistributable.
     """
-    import hashlib
-    import urllib.request
-
-    expected_hash = "053f76dcbb28802e23341b6a787e3b0791c0fa5c8d4d011b1044172dbf89c73b"
-    url = (
-        "https://download.microsoft.com/download/8/4/A/"
-        "84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe"
-    )
-    cache_root = managed_paths(home)["root"] / "cache"
-    installer = cache_root / "directx_Jun2010_redist.exe"
-    if not installer.is_file():
-        cache_root.mkdir(parents=True, exist_ok=True)
-        temporary = cache_root / (installer.name + ".download")
-        try:
-            request = urllib.request.Request(url, headers={"User-Agent": "Wyrd-Audio-Compatibility"})
-            with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
-                shutil.copyfileobj(response, output)
-            if _sha256_file(temporary) != expected_hash:
-                raise RuntimeError("Microsoft DirectX June 2010 installer SHA-256 mismatch.")
-            os.replace(temporary, installer)
-        finally:
-            temporary.unlink(missing_ok=True)
-    if _sha256_file(installer) != expected_hash:
-        raise RuntimeError("Cached DirectX June 2010 installer failed SHA-256 verification.")
-    try:
-        import cabarchive
-    except ImportError as error:
-        raise RuntimeError("The cabarchive Python package is required to extract the DirectX installer.") from error
-    # The DirectX redistributable is a self-extracting archive. Never execute it.
-    extract_root = cache_root / "directx_Jun2010_extracted"
-    extract_root.mkdir(parents=True, exist_ok=True)
-    cabinets = [p for p in extract_root.rglob("*.cab") if p.is_file() and not p.is_symlink()]
-    if not cabinets:
-        seven_zip = shutil.which("7z") or shutil.which("7zz")
-        if not seven_zip:
-            raise RuntimeError("7z/7zz is required to extract the verified DirectX redistributable safely.")
-        result = subprocess.run(
-            [seven_zip, "x", "-y", f"-o{extract_root}", str(installer)],
-            capture_output=True, text=True, timeout=180, check=False,
-        )
-        if result.returncode not in (0, 1):
-            raise RuntimeError("Could not safely extract the verified DirectX redistributable: " +
-                               (result.stderr or result.stdout)[-2000:])
-        cabinets = [p for p in extract_root.rglob("*.cab") if p.is_file() and not p.is_symlink()]
-    if not cabinets:
-        raise RuntimeError("No CAB payloads were found in the verified DirectX redistributable.")
-    import fnmatch
-    result = {}
-    patterns = {
-        "xact": ("*_xact_*x86*.cab", "xactengine*.dll"),
-        "xact_x64": ("*_xact_*x64*.cab", "xactengine*.dll"),
+    cache_root = managed_paths(home)["root"] / "cache" / "xact"
+    required = {
+        "xact": cache_root / "xactengine3_7.dll",
+        "xact_x64": cache_root / "xactengine3_7_x64.dll",
     }
-    for key, (cab_pattern, dll_pattern) in patterns.items():
-        matches = []
-        for cabinet in cabinets:
-            if not fnmatch.fnmatch(cabinet.name.lower(), cab_pattern.lower()):
-                continue
-            try:
-                archive = cabarchive.CabArchive(cabinet.read_bytes())
-                for member_name, member in archive.items():
-                    if fnmatch.fnmatch(Path(member_name).name.lower(), dll_pattern.lower()):
-                        matches.append((cabinet, Path(member_name).name, member.buf))
-            except Exception:
-                continue
-        unique = {__import__("hashlib").sha256(item[2]).hexdigest(): item for item in matches}
-        if len(unique) == 1:
-            cabinet, filename, payload = next(iter(unique.values()))
-            digest = __import__("hashlib").sha256(payload).hexdigest()
-            destination = cache_root / key / filename
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if not destination.exists() or _sha256_file(destination) != digest:
-                temporary = destination.with_suffix(destination.suffix + ".tmp")
-                temporary.write_bytes(payload)
-                os.replace(temporary, destination)
-            result[key] = {"source": str(destination.resolve()), "sha256": digest,
-                           "source_archive": str(cabinet)}
-    return result
+    found = {}
+    for key, path in required.items():
+        if path.is_symlink() or not path.is_file():
+            continue
+        if path.read_bytes()[:2] != b"MZ":
+            continue
+        found[key] = {"source": str(path.resolve()), "sha256": _sha256_file(path)}
+    return found
 
 def inspect_audio_compatibility(home: Path | None = None) -> dict:
     """Inspect XACT/XAudio DLLs in the verified Wyrd prefix without mutation."""
@@ -599,8 +536,8 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
         sources = _resolve_xact_dlls(home)
         if set(sources) != {"xact", "xact_x64"}:
             raise RuntimeError(
-                "Could not uniquely resolve both XACT DLLs from the selected Proton runtime. "
-                "No files were changed."
+                "No verified Microsoft XACT payload cache is available. "
+                "Wyrd did not download or install DLLs and no files were changed."
             )
         windows = prefix / "pfx/drive_c/windows"
         targets = {
