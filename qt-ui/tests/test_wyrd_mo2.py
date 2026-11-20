@@ -562,6 +562,7 @@ if __name__ == "__main__":
             self.assertIn("will not overwrite", result["message"])
             self.assertEqual(target.read_bytes(), b"wine-builtin")
 
+
 class WyrdAudioCompatibilityTests(unittest.TestCase):
     def _managed_prefix(self, home: Path):
         from wyrd_mo2 import managed_paths
