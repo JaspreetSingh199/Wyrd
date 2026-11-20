@@ -134,16 +134,16 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
             window.mo2_state = {"metadata": {"game_path": "/games/Skyrim"}}
             window.start_skyrim()
-        self.assertEqual(window._last_launch_pid, 501)
-        self.assertEqual(window._last_launch_start_time, 123)
+        self.assertEqual(window.launch_session.wrapper_pid, 501)
+        self.assertEqual(window.launch_session.wrapper_start_time, 123)
         self.assertTrue(window._launch_monitor.isActive())
         window.close()
         self.assertFalse(window._launch_monitor.isActive())
 
     def test_launch_monitor_rejects_reused_wrapper_pid_for_tree_attribution(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
             "main.launch_process_status", return_value={
                 "state": "exited", "message": "original wrapper was replaced"
@@ -161,8 +161,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_includes_recent_diagnostics_on_early_exit(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_log_path = "/tmp/wyrd-launch.log"
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.log_path = "/tmp/wyrd-launch.log"
         with patch("main.launch_process_status", return_value={
             "state": "exited", "message": "wrapper exited"
         }), patch("main.detect_skyrim_processes", return_value={
@@ -179,8 +179,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_session_records_detected_process_start_times(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         scan = {
             "ok": True,
             "processes": [
@@ -202,8 +202,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_logs_actionable_diagnostic_classification(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_log_path = "/tmp/wyrd-launch.log"
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.log_path = "/tmp/wyrd-launch.log"
         with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.launch_process_status", return_value={"state": "exited", "message": "wrapper exited"}
         ), patch("main.detect_skyrim_processes", return_value={
@@ -218,8 +218,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_stops_when_session_game_process_is_detected(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         scan = {
             "ok": True,
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
@@ -237,8 +237,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_stops_when_wrapper_exits_without_game(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         with patch("main.launch_process_status", return_value={
             "state": "exited", "message": "wrapper exited"
         }), patch("main.detect_skyrim_processes", return_value={
@@ -251,8 +251,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_times_out_without_spawning_or_claiming_success(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._launch_poll_count = window._launch_poll_limit
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.poll_count = window._launch_poll_limit
         with patch("main.launch_process_status", return_value={
             "state": "running", "message": "wrapper alive"
         }), patch("main.detect_skyrim_processes", return_value={
@@ -265,8 +265,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_status_prefers_process_tree_attribution(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         process_scan = {
             "ok": True,
             "processes": [
@@ -292,8 +292,8 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_status_falls_back_to_prefix_attribution_when_tree_is_gone(self):
         window = self._window()
-        window._last_launch_pid = 500
-        window._last_launch_start_time = 900
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
         process_scan = {
             "ok": True,
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
