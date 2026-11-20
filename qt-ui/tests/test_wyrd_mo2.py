@@ -516,6 +516,52 @@ if __name__ == "__main__":
     unittest.main()
 
 
+    def test_xact_payload_cache_is_fail_closed_and_checks_pe_headers(self):
+        from wyrd_mo2 import _resolve_xact_dlls, managed_paths
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            cache = managed_paths(home)["root"] / "cache/xact"
+            cache.mkdir(parents=True)
+            x86 = cache / "xactengine3_7.dll"
+            x64 = cache / "xactengine3_7_x64.dll"
+            x86.write_bytes(b"not-a-pe")
+            x64.write_bytes(b"MZvalid")
+            self.assertEqual(_resolve_xact_dlls(home), {})
+            x86.write_bytes(b"MZvalid32")
+            result = _resolve_xact_dlls(home)
+            self.assertEqual(set(result), {"xact", "xact_x64"})
+            self.assertEqual(result["xact"]["sha256"], __import__("hashlib").sha256(x86.read_bytes()).hexdigest())
+
+    def test_audio_inspection_reports_xaudio_components(self):
+        from wyrd_mo2 import inspect_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = self._managed_prefix(Path(tmp))
+            windows = paths["prefix"] / "pfx/drive_c/windows"
+            (windows / "system32/xaudio2_7.dll").write_bytes(b"x64")
+            (windows / "syswow64/xaudio2_7.dll").write_bytes(b"x86")
+            report = inspect_audio_compatibility(Path(tmp))
+            self.assertTrue(report["safe"])
+            self.assertEqual(report["components"]["xaudio2"]["state"], "present")
+            self.assertEqual(report["components"]["xaudio2_x64"]["state"], "present")
+            self.assertFalse(report["runtime_verified"])
+            self.assertIn("unknown", report["runtime"]["faudio_ffmpeg_support"])
+
+    def test_repair_never_overwrites_existing_wine_xact_dlls(self):
+        from wyrd_mo2 import repair_audio_compatibility
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = self._managed_prefix(home)
+            target = paths["prefix"] / "pfx/drive_c/windows/syswow64/xactengine3_7.dll"
+            target.write_bytes(b"wine-builtin")
+            source_cache = paths["root"] / "cache/xact"
+            source_cache.mkdir(parents=True)
+            (source_cache / "xactengine3_7.dll").write_bytes(b"MZx86")
+            (source_cache / "xactengine3_7_x64.dll").write_bytes(b"MZx64")
+            result = repair_audio_compatibility(home, confirmed=True)
+            self.assertFalse(result["ok"])
+            self.assertIn("will not overwrite", result["message"])
+            self.assertEqual(target.read_bytes(), b"wine-builtin")
+
 class WyrdAudioCompatibilityTests(unittest.TestCase):
     def _managed_prefix(self, home: Path):
         from wyrd_mo2 import managed_paths
