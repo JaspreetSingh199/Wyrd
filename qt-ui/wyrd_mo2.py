@@ -767,6 +767,9 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not target_match:
         return {"ok": False, "message": "The selected Skyrim executable is no longer verified in this MO2 instance."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
+    # MO2 parses global options before the command name. Keep --instance
+    # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
+    # game instance rather than becoming an unparsed subcommand argument.
     command = [
         str(proton_path / "proton"), "run",
         str(paths["install"] / "ModOrganizer.exe"),
