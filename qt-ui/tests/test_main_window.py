@@ -353,6 +353,57 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("ancestry is unconfirmed", window.progress_label.text())
         window.close()
 
+    def test_manual_status_keeps_game_running_after_wrapper_exits(self):
+        window = self._window()
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
+        window.launch_session.game_processes = [
+            GameProcess(
+                pid=700, binary="skyrimse.exe", start_time=111,
+                detection_source="launch_process_tree",
+                attribution_confidence="confirmed",
+            )
+        ]
+        with patch.object(
+            window.launch_session.game_processes[0],
+            "matches_current_process", return_value=True
+        ), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": [],
+            "message": "No new process scan matches.",
+        }), patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "Proton wrapper has exited."
+        }), patch("main.QMessageBox.information") as info:
+            window.check_launch_status()
+        self.assertEqual(window.launch_session.state, "detected")
+        self.assertTrue(window._game_watch_timer.isActive())
+        self.assertIn("still present", info.call_args.args[2])
+        window.close()
+
+    def test_manual_status_records_exit_of_previously_tracked_game(self):
+        window = self._window()
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.game_processes = [
+            GameProcess(
+                pid=700, binary="skyrimse.exe", start_time=111,
+                detection_source="launch_process_tree",
+                attribution_confidence="confirmed",
+            )
+        ]
+        with patch.object(
+            window.launch_session.game_processes[0],
+            "matches_current_process", return_value=False
+        ), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "wyrd_processes": [],
+            "message": "No Skyrim processes found.",
+        }), patch("main.launch_process_status", return_value={
+            "state": "exited", "message": "Wrapper exited."
+        }), patch("main.QMessageBox.information") as info:
+            window.check_launch_status()
+        self.assertEqual(window.launch_session.state, "game-exited")
+        self.assertFalse(window._game_watch_timer.isActive())
+        self.assertIn("previously detected game process has exited", info.call_args.args[2])
+        window.close()
+
     def test_window_is_branded_wyrd_and_has_only_the_core_setup_flow(self):
         window = self._window()
         self.assertEqual(window.windowTitle(), "Wyrd — Skyrim Modding Environment")
