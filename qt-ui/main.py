@@ -181,6 +181,27 @@ class MainWindow(QMainWindow):
         self.mo2_panel = panel("3. Mod Organizer 2", "Checking Wyrd's managed installation…")
         layout.addWidget(self.mo2_panel)
 
+        self.audio_panel = panel(
+            "4. Audio compatibility",
+            "Inspect XACT/XAudio libraries in Wyrd's isolated MO2 prefix. Dialogue audio remains runtime-unverified.",
+        )
+        audio_layout = self.audio_panel.layout()
+        self.audio_detail = QLabel("Audio library inventory will be checked during detection.")
+        self.audio_detail.setObjectName("muted")
+        self.audio_detail.setWordWrap(True)
+        audio_layout.addWidget(self.audio_detail)
+        audio_actions = QHBoxLayout()
+        self.audio_check_button = QPushButton("Check Audio Libraries")
+        self.audio_check_button.clicked.connect(self.check_audio_libraries)
+        self.audio_repair_button = QPushButton("Repair XACT libraries")
+        self.audio_repair_button.clicked.connect(self.repair_audio)
+        self.audio_repair_button.setEnabled(False)
+        audio_actions.addWidget(self.audio_check_button)
+        audio_actions.addWidget(self.audio_repair_button)
+        audio_actions.addStretch(1)
+        audio_layout.addLayout(audio_actions)
+        layout.addWidget(self.audio_panel)
+
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self.install_button = QPushButton("Install MO2")
@@ -358,6 +379,7 @@ class MainWindow(QMainWindow):
             self.install_button.setText("Install MO2")
             self._log("Wyrd MO2 inspection: " + description)
 
+        self._refresh_audio_status()
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(ready and not (self.worker and self.worker.isRunning()))
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
@@ -389,6 +411,72 @@ class MainWindow(QMainWindow):
             }
         except OSError as error:
             self._log(f"Could not save Wyrd settings: {error}")
+
+    def _refresh_audio_status(self, report: dict | None = None) -> None:
+        """Render the read-only audio inventory and gate repair on verified safety."""
+        if report is None:
+            report = inspect_audio_compatibility()
+        self.audio_report = report
+        if not report.get("ok") or not report.get("safe"):
+            self.audio_detail.setText("Audio inspection is fail-closed: " + report.get("message", "Wyrd prefix ownership could not be verified."))
+            self.audio_repair_button.setEnabled(False)
+            return
+        components = report.get("components", {})
+        labels = [
+            ("xact", "XACT (32-bit)"), ("xact_x64", "XACT (64-bit)"),
+            ("xaudio2", "XAudio2 (32-bit)"), ("xaudio2_x64", "XAudio2 (64-bit)"),
+            ("x3daudio", "X3DAudio 1.7 (32-bit)"), ("x3daudio_x64", "X3DAudio 1.7 (64-bit)"),
+            ("xapofx", "XAPOFX 1.5 (32-bit)"), ("xapofx_x64", "XAPOFX 1.5 (64-bit)"),
+        ]
+        lines = [f"{label}: {components.get(key, {}).get('state', 'unknown')}" for key, label in labels]
+        lines += ["FAudio / FFmpeg support: UNKNOWN", "Dialogue audio: NOT VERIFIED (test an NPC conversation in Skyrim)"]
+        self.audio_detail.setText("\n".join(lines))
+        self.audio_repair_button.setEnabled(bool(report.get("repair_available") and report.get("safe")))
+
+    def check_audio_libraries(self) -> None:
+        """Manually refresh the read-only inventory of audio libraries."""
+        self.audio_check_button.setEnabled(False)
+        try:
+            report = inspect_audio_compatibility()
+            self._refresh_audio_status(report)
+            if report.get("ok") and report.get("safe"):
+                summary = ", ".join(f"{name}={item.get('state', 'unknown')}" for name, item in report.get("components", {}).items())
+                self._log("Audio library check completed (read-only): " + summary)
+            else:
+                self._log("Audio library check failed closed: " + report.get("message", "ownership could not be verified"))
+        except Exception as error:
+            self._log(f"Audio library check failed: {error}")
+            self.audio_detail.setText(f"Audio inspection failed: {error}")
+            self.audio_repair_button.setEnabled(False)
+        finally:
+            self.audio_check_button.setEnabled(True)
+
+    def repair_audio(self) -> None:
+        report = getattr(self, "audio_report", {})
+        if not report.get("ok") or not report.get("safe") or not report.get("repair_available"):
+            QMessageBox.warning(self, "Wyrd audio repair", "Repair is unavailable. A verified repair payload and safe prefix ownership are required.")
+            self.audio_repair_button.setEnabled(False)
+            return
+        answer = QMessageBox.question(
+            self, "Repair XACT libraries",
+            "Wyrd will install verified XACT libraries into its managed MO2 prefix only. Existing DLLs will not be overwritten. Dialogue audio will remain runtime-unverified. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.audio_repair_button.setEnabled(False)
+        try:
+            result = repair_audio_compatibility(confirmed=True)
+            self._log("Audio repair: " + result.get("message", "completed"))
+            self._refresh_audio_status(inspect_audio_compatibility())
+            if not result.get("ok"):
+                QMessageBox.warning(self, "Wyrd audio repair", result.get("message", "Repair failed."))
+        except Exception as error:
+            self._log(f"Audio repair failed: {error}")
+            QMessageBox.warning(self, "Wyrd audio repair", str(error))
+        finally:
+            self.audio_repair_button.setEnabled(bool(getattr(self, "audio_report", {}).get("repair_available")))
 
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
