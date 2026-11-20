@@ -648,6 +648,11 @@ def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
         arguments.append("--pick")
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
     if native_xaudio2_test:
+        existing = env.get("WINEDLLOVERRIDES", "")
+        entries = [entry for entry in existing.split(";") if entry and not entry.startswith("xaudio2_7=")]
+        entries.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(entries)
+    if native_xaudio2_test:
         overrides = env.get("WINEDLLOVERRIDES", "")
         entries = [item for item in overrides.split(";") if item and not item.startswith("xaudio2_7=")]
         entries.append("xaudio2_7=n,b")
@@ -1020,7 +1025,10 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
             log.write(f"instance: {instance}\\nexecutable: {title}\\npid: pending\\n")
             log.write("command: " + json.dumps(command) + "\\n")
-            log.write(f"audio_test_native_xaudio2: {native_xaudio2_test}\\n")\n            if native_xaudio2_test:\n                log.write("WINEDLLOVERRIDES: xaudio2_7=n,b (temporary launch test)\\n")\n            log.write("stdout/stderr are redirected to this diagnostic log.\\n")
+            log.write(f"audio_test_native_xaudio2: {native_xaudio2_test}\\n")
+            if native_xaudio2_test:
+                log.write("WINEDLLOVERRIDES: xaudio2_7=n,b (temporary launch test)\\n")
+            log.write("stdout/stderr are redirected to this diagnostic log.\\n")
             log.flush()
             process = subprocess.Popen(
                 command, cwd=str(paths["install"]), env=env,
