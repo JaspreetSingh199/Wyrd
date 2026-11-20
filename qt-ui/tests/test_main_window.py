@@ -51,6 +51,14 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
+    def test_native_xaudio2_test_checkbox_defaults_off(self):
+        window = self._window()
+        self.assertFalse(window.native_xaudio2_checkbox.isChecked())
+        window.native_xaudio2_checkbox.setChecked(True)
+        self.assertTrue(window.native_xaudio2_checkbox.isChecked())
+        window.close()
+
+
     def test_saved_proton_is_restored_and_selection_is_persisted(self):
         build_a = "/home/test/Proton A"
         build_b = "/home/test/Proton B"
