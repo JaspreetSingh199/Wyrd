@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
+    QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
     QWidget,
 )
@@ -199,6 +199,9 @@ class MainWindow(QMainWindow):
         self.audio_repair_button.setEnabled(False)
         audio_actions.addWidget(self.audio_check_button)
         audio_actions.addWidget(self.audio_repair_button)
+        self.native_xaudio2_checkbox = QCheckBox("Test native XAudio2 override on next Skyrim launch (xaudio2_7=n,b)")
+        self.native_xaudio2_checkbox.setToolTip("Temporary launch-only test. Does not install or replace DLLs.")
+        audio_actions.addWidget(self.native_xaudio2_checkbox)
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         layout.addWidget(self.audio_panel)
@@ -614,7 +617,9 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        result = launch_skyrim_via_mo2(selected, instance_name)
+        native_xaudio2_test = self.native_xaudio2_checkbox.isChecked()
+        self._log("Skyrim audio launch mode: " + ("native XAudio2 test override (xaudio2_7=n,b)" if native_xaudio2_test else "default Proton audio environment"))
+        result = launch_skyrim_via_mo2(selected, instance_name, native_xaudio2_test=native_xaudio2_test)
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
             self.launch_session.wrapper_pid = result.get("pid")
