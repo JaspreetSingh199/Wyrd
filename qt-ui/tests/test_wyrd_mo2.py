@@ -14,7 +14,7 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process,
 )
 
 
@@ -347,6 +347,38 @@ class WyrdMO2Tests(unittest.TestCase):
             kill.side_effect = PermissionError()
             self.assertEqual(launch_process_status(123)["state"], "unknown")
         self.assertEqual(launch_process_status(-1)["state"], "invalid")
+
+    def test_proc_identity_and_descendant_walk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp)
+            records = {
+                100: (1, 1000), 101: (100, 1010), 102: (101, 1020), 103: (1, 1030),
+            }
+            for pid, (ppid, start_time) in records.items():
+                folder = proc / str(pid)
+                folder.mkdir()
+                fields = ["S", str(ppid)] + [str(i) for i in range(2, 20)] + [str(start_time)]
+                (folder / "stat").write_text(
+                    f"{pid} (process {pid} with ) char) " + " ".join(fields),
+                    encoding="utf-8",
+                )
+            identity = _proc_identity(100, proc)
+            self.assertEqual(identity, {"ppid": 1, "start_time": 1000})
+            self.assertTrue(_is_descendant_process(102, 100, proc))
+            self.assertFalse(_is_descendant_process(103, 100, proc))
+
+    def test_descendant_walk_handles_missing_entries_and_cycles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp)
+            for pid, ppid in ((123, 124), (124, 123)):
+                folder = proc / str(pid)
+                folder.mkdir()
+                fields = ["S", str(ppid)] + [str(i) for i in range(2, 20)] + ["1"]
+                (folder / "stat").write_text(
+                    f"{pid} (cycle process) " + " ".join(fields), encoding="utf-8"
+                )
+            self.assertFalse(_is_descendant_process(123, 999, proc, max_depth=8))
+            self.assertFalse(_is_descendant_process(999, 123, proc))
 
     def test_proc_start_time_handles_parentheses_in_command_name(self):
         with tempfile.TemporaryDirectory() as tmp:
