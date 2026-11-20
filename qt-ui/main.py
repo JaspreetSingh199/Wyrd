@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,10 +19,10 @@ from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics,
-    launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process, read_launch_diagnostics,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
+    launch_process_status, detect_skyrim_processes, _proc_start_time,
+    _proc_identity, _is_descendant_process, read_launch_diagnostics,
 )
-
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -529,7 +530,7 @@ class MainWindow(QMainWindow):
             self._last_launch_log_path = result.get("log_path")
             self.launch_session.instance_name = instance_name
             self.launch_session.executable_title = selected
-            self.launch_session.started_at = __import__("time").time()
+            self.launch_session.started_at = time.time()
             self.launch_session.detected_processes = []
             self.launch_session.state = "handoff"
             self._launch_poll_count = 0
