@@ -598,11 +598,10 @@ def inspect_audio_compatibility(home: Path | None = None) -> dict:
         }
 
 def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False) -> dict:
-    """Install verified Microsoft XACT components into Wyrd's prefix only.
+    """Install Microsoft XACT DLLs into Wyrd's prefix without replacing existing files.
 
-    Existing targets are backed up before replacement. No Steam compatdata
-    location is read as a target or modified. Caller must obtain explicit
-    user confirmation before invoking with confirmed=True.
+    Source payloads are extracted from a pinned Microsoft redistributable.
+    The operation is additive and does not touch Steam's compatdata tree.
     """
     if not confirmed:
         return {"ok": False, "modified": False,
@@ -631,11 +630,8 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
                     f"XACT target already exists; Wyrd will not overwrite a Wine or user DLL: {target}"
                 )
         # Stage both source DLLs and backups before changing either target.
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        backup_root = prefix / "audio-repair-backups" / timestamp
         staged_root = prefix / ".audio-repair-staging"
         staged_root.mkdir(mode=0o700, exist_ok=True)
-        backup_root.mkdir(parents=True, mode=0o700, exist_ok=True)
         staged = {}
         backups = {}
         for key, target in targets.items():
@@ -686,7 +682,6 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
             raise
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(journal, indent=2) + "\\n")
-        shutil.rmtree(staged_root, ignore_errors=True)
         return {
             "ok": True, "modified": bool(modified), "verified": True,
             "runtime_verified": False, "log_path": str(log_path),
@@ -695,6 +690,9 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
     except (OSError, RuntimeError, ValueError) as error:
         return {"ok": False, "modified": False, "verified": False,
                 "runtime_verified": False, "message": str(error)}
+    finally:
+        if "staged_root" in locals():
+            shutil.rmtree(staged_root, ignore_errors=True)
 
 def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
     """Launch MO2 visibly through its configured Proton build."""
