@@ -127,6 +127,9 @@ class MainWindow(QMainWindow):
         self._launch_monitor = QTimer(self)
         self._launch_monitor.setInterval(self._launch_poll_interval_ms)
         self._launch_monitor.timeout.connect(self._poll_launch_status)
+        self._game_watch_timer = QTimer(self)
+        self._game_watch_timer.setInterval(self._launch_poll_interval_ms)
+        self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         self._restoring_selection = True
@@ -588,6 +591,7 @@ class MainWindow(QMainWindow):
             self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
             self._stop_launch_monitor("Skyrim/SKSE process detected")
+            self._start_game_process_watch()
             return
         if process_scan.get("ok") and process_scan.get("wyrd_processes"):
             detected = ", ".join(
@@ -614,6 +618,7 @@ class MainWindow(QMainWindow):
             ]
             self.launch_session.state = "detected-unconfirmed"
             self._stop_launch_monitor("managed-prefix Skyrim process detected")
+            self._start_game_process_watch()
             return
         if result["state"] in {"exited", "invalid"}:
             self.progress_label.setText(
@@ -646,6 +651,32 @@ class MainWindow(QMainWindow):
             self.progress_label.setText(
                 f"Waiting for Skyrim/SKSE… (check {self.launch_session.poll_count}/{self._launch_poll_limit})"
             )
+
+    def _start_game_process_watch(self) -> None:
+        """Keep watching detected game PIDs after the Proton wrapper has exited."""
+        if not self.launch_session.game_processes:
+            return
+        self._game_watch_timer.start()
+        self._log("Post-detection process watch started for " + ", ".join(
+            f"{process.binary} (PID {process.pid})"
+            for process in self.launch_session.game_processes
+        ))
+
+    def _revalidate_detected_game_processes(self) -> None:
+        """Revalidate saved process identities and report when the game exits."""
+        processes = self.launch_session.game_processes
+        if not processes:
+            self._game_watch_timer.stop()
+            return
+        active = [process for process in processes if process.matches_current_process()]
+        if active:
+            self.launch_session.game_processes = active
+            return
+        self._game_watch_timer.stop()
+        self.launch_session.game_processes = []
+        self.launch_session.state = "game-exited"
+        self.progress_label.setText("Skyrim/SKSE processes exited; launch session ended.")
+        self._log("Detected Skyrim/SKSE process identities are no longer present. Game exit recorded.")
 
     def check_launch_status(self) -> None:
         if not self.launch_session.wrapper_pid:
@@ -722,6 +753,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._stop_launch_monitor("application is closing")
+        self._game_watch_timer.stop()
         if self.worker and self.worker.isRunning():
             QMessageBox.information(
                 self, "Setup is running",
