@@ -35,6 +35,7 @@ class LaunchSession:
     started_at: float | None = None
     poll_count: int = 0
     detected_processes: list[dict] = field(default_factory=list)
+    process_identities: dict[int, int | None] = field(default_factory=dict)
     state: str = "idle"
 
 
@@ -532,6 +533,7 @@ class MainWindow(QMainWindow):
             self.launch_session.executable_title = selected
             self.launch_session.started_at = time.time()
             self.launch_session.detected_processes = []
+            self.launch_session.process_identities = {}
             self.launch_session.state = "handoff"
             self._launch_poll_count = 0
             if self._last_launch_pid:
@@ -584,6 +586,9 @@ class MainWindow(QMainWindow):
                 "Skyrim/SKSE detected in this Wyrd launch process tree."
             )
             self.launch_session.detected_processes = list(session_processes)
+            self.launch_session.process_identities = {
+                item["pid"]: item.get("start_time") for item in session_processes
+            }
             self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
             self._stop_launch_monitor("Skyrim/SKSE process detected")
@@ -600,6 +605,9 @@ class MainWindow(QMainWindow):
                 "Prefix-attributed Skyrim process(es), ancestry unconfirmed: " + detected
             )
             self.launch_session.detected_processes = list(process_scan["wyrd_processes"])
+            self.launch_session.process_identities = {
+                item["pid"]: item.get("start_time") for item in process_scan["wyrd_processes"]
+            }
             self.launch_session.state = "detected-unconfirmed"
             self._stop_launch_monitor("managed-prefix Skyrim process detected")
             return
