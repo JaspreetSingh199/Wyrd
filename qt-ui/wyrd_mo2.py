@@ -898,11 +898,12 @@ def launch_process_status(pid: int, start_time: int | None = None,
         return {"state": "unknown", "message": "The Proton wrapper exists but its status cannot be read."}
     except OSError as error:
         return {"state": "unknown", "message": f"Could not inspect Proton wrapper process: {error}"}
-    actual_start = _proc_start_time(pid, proc_root)
-    if actual_start is None:
-        return {"state": "unknown", "message": "The Proton wrapper exists, but its process identity cannot be verified from /proc."}
-    if start_time is not None and actual_start != start_time:
-        return {"state": "exited", "message": "The original Proton wrapper exited; its PID has since been reused by another process."}
+    if start_time is not None:
+        actual_start = _proc_start_time(pid, proc_root)
+        if actual_start is None:
+            return {"state": "unknown", "message": "The Proton wrapper exists, but its process identity cannot be verified from /proc."}
+        if actual_start != start_time:
+            return {"state": "exited", "message": "The original Proton wrapper exited; its PID has since been reused by another process."}
     return {
         "state": "running",
         "message": "The Proton wrapper process is still running. Skyrim startup is not independently confirmed.",
