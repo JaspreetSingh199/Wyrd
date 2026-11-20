@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
             "FAudio / FFmpeg support: UNKNOWN — requires runtime verification.",
             "Runtime dialogue audio: NOT VERIFIED — test dialogue in Skyrim.",
         ]
-        self.audio_detail.setText("\\n".join(lines))
+        self.audio_detail.setText("\n".join(lines))
         self._log("Audio compatibility inspection: " + ", ".join(
             f"{key}={value.get('state')}" for key, value in components.items()
         ))
