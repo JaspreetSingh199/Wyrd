@@ -22,6 +22,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
+    inspect_audio_compatibility, repair_audio_compatibility,
 )
 @dataclass
 class LaunchSession:
@@ -181,6 +182,32 @@ class MainWindow(QMainWindow):
         self.mo2_panel = panel("3. Mod Organizer 2", "Checking Wyrd's managed installation…")
         layout.addWidget(self.mo2_panel)
 
+        audio_panel = QFrame()
+        audio_panel.setObjectName("panel")
+        audio_layout = QVBoxLayout(audio_panel)
+        audio_layout.setContentsMargins(17, 15, 17, 15)
+        audio_heading = QLabel("4. Audio compatibility (XACT)")
+        audio_heading.setObjectName("section")
+        self.audio_detail = QLabel(
+            "Inspect XACT components in Wyrd's managed Proton prefix. "
+            "A file-level repair does not prove in-game dialogue audio works."
+        )
+        self.audio_detail.setObjectName("muted")
+        self.audio_detail.setWordWrap(True)
+        audio_layout.addWidget(audio_heading)
+        audio_layout.addWidget(self.audio_detail)
+        audio_buttons = QHBoxLayout()
+        self.audio_check_button = QPushButton("Check audio components")
+        self.audio_check_button.clicked.connect(self.check_audio_compatibility)
+        self.audio_repair_button = QPushButton("Repair XACT components")
+        self.audio_repair_button.clicked.connect(self.repair_audio)
+        self.audio_repair_button.setEnabled(False)
+        audio_buttons.addWidget(self.audio_check_button)
+        audio_buttons.addWidget(self.audio_repair_button)
+        audio_buttons.addStretch(1)
+        audio_layout.addLayout(audio_buttons)
+        layout.addWidget(audio_panel)
+
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self.install_button = QPushButton("Install MO2")
@@ -213,7 +240,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.progress)
 
         instructions = panel(
-            "4. Launch Skyrim from MO2",
+            "5. Launch Skyrim from MO2",
             "On the first MO2 launch, create a new instance and choose “Skyrim Special Edition”. "
             "Wyrd registers your detected game path only inside its own Proton prefix. "
             "After the instance is created, select Skyrim or SKSE in MO2's executable dropdown and press Run. "
@@ -361,6 +388,61 @@ class MainWindow(QMainWindow):
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(ready and not (self.worker and self.worker.isRunning()))
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
+        self.check_audio_compatibility()
+
+    def check_audio_compatibility(self) -> None:
+        report = inspect_audio_compatibility()
+        self.audio_report = report
+        self.audio_repair_button.setEnabled(
+            bool(report.get("safe") and report.get("repair_recommended"))
+        )
+        if not report.get("safe"):
+            self.audio_detail.setText(
+                "Audio inspection blocked (fail-closed): " + report.get("message", "Prefix ownership could not be verified.")
+            )
+            self._log("Audio compatibility: inspection blocked: " + report.get("message", "unknown reason"))
+            return
+        components = report.get("components", {})
+        lines = [
+            "Managed prefix: " + str(report.get("prefix")),
+            "XACT (32-bit): " + components.get("xact", {}).get("state", "unknown"),
+            "XACT (64-bit): " + components.get("xact_x64", {}).get("state", "unknown"),
+            "Runtime dialogue audio: NOT VERIFIED — test dialogue in Skyrim.",
+        ]
+        self.audio_detail.setText("\\n".join(lines))
+        self._log("Audio compatibility inspection: " + ", ".join(
+            f"{key}={value.get('state')}" for key, value in components.items()
+        ))
+
+    def repair_audio(self) -> None:
+        report = inspect_audio_compatibility()
+        if not report.get("safe"):
+            QMessageBox.warning(self, "Audio repair blocked", report.get("message", "Wyrd prefix ownership could not be verified."))
+            self.check_audio_compatibility()
+            return
+        if not report.get("repair_recommended"):
+            QMessageBox.information(self, "Audio compatibility", "Both XACT targets are already present. No repair is recommended.")
+            return
+        answer = QMessageBox.question(
+            self, "Repair Wyrd audio components",
+            "Wyrd will copy its selected Proton runtime's XACT DLLs into ONLY Wyrd's managed MO2 prefix. "
+            "Existing target files will be backed up and the resulting file hashes verified. "
+            "Steam's Skyrim prefix, Skyrim files, MO2 instances, profiles and mods will not be changed.\\n\\n"
+            "This does not guarantee that Skyrim dialogue audio will work. You must test dialogue in-game.\\n\\nContinue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = repair_audio_compatibility(confirmed=True)
+        self._log("Audio repair: " + result.get("message", "no result"))
+        if result.get("log_path"):
+            self._log("Audio repair log: " + result["log_path"])
+        if result.get("ok"):
+            QMessageBox.information(self, "XACT file repair complete", result.get("message", ""))
+        else:
+            QMessageBox.warning(self, "XACT file repair failed", result.get("message", "No changes were made."))
+        self.check_audio_compatibility()
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
