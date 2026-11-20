@@ -679,68 +679,125 @@ class MainWindow(QMainWindow):
         self._log("Detected Skyrim/SKSE process identities are no longer present. Game exit recorded.")
 
     def check_launch_status(self) -> None:
-        if not self.launch_session.wrapper_pid:
-            QMessageBox.information(self, "Launch status", "No Wyrd launch handoff has been recorded in this session.")
-            return
-        wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
-        result = launch_process_status(self.launch_session.wrapper_pid, self.launch_session.wrapper_start_time)
-        wrapper_identity_matches = (
-            self.launch_session.wrapper_start_time is None
-            or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
-        )
-        self._log(f"Launch PID {self.launch_session.wrapper_pid}: {result['state']} — {result['message']}")
+        """Report the current tracked game processes, even after Proton's wrapper exits."""
+        session = self.launch_session
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
+
+        # First revalidate processes already attributed to this launch. This avoids
+        # losing a still-running game when Proton's short-lived wrapper has exited.
+        tracked = [process for process in session.game_processes
+                   if process.matches_current_process()]
+        if tracked:
+            session.game_processes = tracked
+            session.state = (
+                "detected" if any(p.attribution_confidence == "confirmed" for p in tracked)
+                else "detected-unconfirmed"
+            )
+            self._start_game_process_watch()
+            detected = "\\n".join(
+                f"{p.binary} (PID {p.pid}) — {p.attribution_confidence}"
+                for p in tracked
+            )
+            self.progress_label.setText(
+                "Skyrim/SKSE is running; tracked process identity verified."
+            )
+            detail = "Tracked Skyrim/SKSE processes are still present:\\n" + detected
+            QMessageBox.information(self, "Launch process status", detail)
+            return
+
+        if session.game_processes:
+            session.game_processes = []
+            session.state = "game-exited"
+            self._game_watch_timer.stop()
+            self.progress_label.setText("Previously detected Skyrim/SKSE processes have exited.")
+            self._log("Tracked Skyrim/SKSE process identities are no longer present.")
+
+        if not session.wrapper_pid:
+            detail = (
+                "No Wyrd launch handoff has been recorded in this session.\\n\\n"
+                + process_scan.get("message", "Process detection unavailable.")
+            )
+            QMessageBox.information(self, "Launch status", detail)
+            return
+
+        wrapper_identity = _proc_identity(session.wrapper_pid)
+        wrapper_matches = (
+            session.wrapper_start_time is None
+            or wrapper_identity.get("start_time") == session.wrapper_start_time
+        )
+        result = launch_process_status(session.wrapper_pid, session.wrapper_start_time)
+        self._log(
+            f"Launch PID {session.wrapper_pid}: {result['state']} — {result['message']}"
+        )
+
         session_processes = []
-        if process_scan.get("ok") and wrapper_identity_matches:
+        if process_scan.get("ok") and wrapper_matches:
             for item in process_scan.get("processes", []):
-                if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
+                if _is_descendant_process(item["pid"], session.wrapper_pid):
                     session_processes.append(item)
+
         if session_processes:
+            tracked = [
+                GameProcess(
+                    pid=item["pid"], binary=item["binary"],
+                    start_time=item.get("start_time"),
+                    detection_source="launch_process_tree",
+                    attribution_confidence="confirmed",
+                )
+                for item in session_processes
+            ]
+            session.game_processes = tracked
+            session.detected_processes = list(session_processes)
+            session.process_identities = {
+                item["pid"]: item.get("start_time") for item in session_processes
+            }
+            session.state = "detected"
+            self._start_game_process_watch()
             detected = ", ".join(
                 f"{item['binary']} (PID {item['pid']})" for item in session_processes
             )
             self.progress_label.setText("Skyrim/SKSE detected in this Wyrd launch process tree.")
-            detail = (
-                result["message"] + "\n\n"
-                "Processes descended from this launch's Proton wrapper:\n" + detected
-            )
+            detail = result["message"] + "\\n\\nProcesses descended from this launch:\\n" + detected
         elif process_scan.get("ok") and process_scan.get("wyrd_processes"):
-            detected = ", ".join(
-                f"{item['binary']} (PID {item['pid']})"
-                for item in process_scan["wyrd_processes"]
-            )
+            items = process_scan["wyrd_processes"]
+            tracked = [
+                GameProcess(
+                    pid=item["pid"], binary=item["binary"],
+                    start_time=item.get("start_time"),
+                    detection_source="managed_prefix",
+                    attribution_confidence="prefix",
+                )
+                for item in items
+            ]
+            session.game_processes = tracked
+            session.detected_processes = list(items)
+            session.process_identities = {
+                item["pid"]: item.get("start_time") for item in items
+            }
+            session.state = "detected-unconfirmed"
+            self._start_game_process_watch()
+            detected = ", ".join(f"{item['binary']} (PID {item['pid']})" for item in items)
             self.progress_label.setText(
-                "Skyrim detected in Wyrd's prefix; launch-session ancestry is unconfirmed."
+                "Skyrim detected in Wyrd's prefix; launch ancestry is unconfirmed."
             )
-            detail = (
-                result["message"] + "\n\n" + process_scan["message"] + "\n" + detected
-            )
+            detail = result["message"] + "\\n\\n" + process_scan.get("message", "") + "\\n" + detected
         elif process_scan.get("ok") and process_scan.get("processes"):
-            self.progress_label.setText(
-                "Skyrim detected, but Wyrd ownership could not be confirmed."
-            )
-            detail = result["message"] + "\n\n" + process_scan["message"]
+            self.progress_label.setText("Skyrim detected, but Wyrd ownership could not be confirmed.")
+            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
+        elif session.state == "game-exited":
+            detail = "The previously detected game process has exited.\\n\\n" + result["message"]
         elif result["state"] == "exited":
-            self.progress_label.setText(
-                "Proton wrapper exited. Skyrim process not detected; review diagnostics."
-            )
-            detail = result["message"] + "\n\n" + process_scan.get(
-                "message", "Process detection unavailable."
-            )
+            self.progress_label.setText("Proton wrapper exited. Skyrim process not detected; review diagnostics.")
+            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         elif result["state"] == "running":
-            self.progress_label.setText(
-                "Proton wrapper is running; Skyrim process not detected yet."
-            )
-            detail = result["message"] + "\n\n" + process_scan.get(
-                "message", "Process detection unavailable."
-            )
+            self.progress_label.setText("Proton wrapper is running; Skyrim process not detected yet.")
+            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         else:
             self.progress_label.setText("Launch status is unknown; inspect diagnostics.")
-            detail = result["message"] + "\n\n" + process_scan.get(
-                "message", "Process detection unavailable."
-            )
+            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         QMessageBox.information(self, "Launch process status", detail)
+
 
     def show_launch_diagnostics(self) -> None:
         path = managed_paths()["root"] / "logs" / "skyrim-launch.log"
