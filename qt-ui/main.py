@@ -275,12 +275,21 @@ class MainWindow(QMainWindow):
         """Log the whitelisted audio environment read from actual game processes."""
         for item in processes:
             audio_env = item.get("audio_runtime_environment", {})
+            readable = item.get("audio_runtime_environment_readable")
+            if readable is False:
+                reason = item.get("audio_runtime_environment_error") or "access denied"
+                self._log(
+                    f"Audio runtime env from PID {item.get('pid')} ({item.get('binary')}): "
+                    f"<unavailable: {reason}>; values were not inspected"
+                )
+                continue
             overrides = audio_env.get("WINEDLLOVERRIDES")
             pulse = audio_env.get("PULSE_LATENCY_MSEC")
             self._log(
                 f"Audio runtime env from PID {item.get('pid')} ({item.get('binary')}): "
-                f"WINEDLLOVERRIDES={overrides if overrides is not None else '<unset>'}; "
-                f"PULSE_LATENCY_MSEC={pulse if pulse is not None else '<unset>'}"
+                f"WINEDLLOVERRIDES={overrides if overrides is not None else '<not present in initial environment>'}; "
+                f"PULSE_LATENCY_MSEC={pulse if pulse is not None else '<not present in initial environment>'} "
+                "(read from /proc; may not reflect later runtime changes)"
             )
 
     def refresh_all(self) -> None:
