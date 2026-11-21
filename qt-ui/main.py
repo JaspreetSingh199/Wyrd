@@ -316,6 +316,12 @@ class MainWindow(QMainWindow):
     def show_launch_diagnostics(self) -> None:
         """Show the launcher setup log and any available launch diagnostics."""
         details = self.log_view.toPlainText().strip() or "No diagnostics have been recorded yet."
+        bootstrap_log = managed_paths()["root"] / "logs" / "steam-bootstrap-environment.json"
+        if bootstrap_log.is_file():
+            try:
+                details += "\\n\\n--- Steam bootstrap environment ---\\n" + bootstrap_log.read_text(encoding="utf-8")
+            except OSError as error:
+                details += f"\\n\\nSteam bootstrap environment log unavailable: {error}"
         session = getattr(self, "launch_session", None)
         log_path = getattr(session, "log_path", None) if session else None
         if log_path:
