@@ -102,23 +102,26 @@ def build_game_mode_preflight(
     elif installation.get("installed"):
         findings.append(_item("MO2 instance storage inspection", "blocked",
                               storage.get("message", "Could not inspect MO2 instance storage.")))
-    # Do not guess the MO2 storage layout. Report the standard candidate and
-    # require an explicit existing directory until STL's mapping is confirmed.
-    data_source = paths["install"] / "ModOrganizer"
-    if data_source.is_dir():
-        findings.append(_item("MO2 data source candidate", "review",
-                              "Found a ModOrganizer directory under the Wyrd install; verify it is the active instance data.",
+    # STL documents MO2's data root inside its dedicated compatdata prefix:
+    # pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer. Game Mode
+    # exposes this same data root in the game's prefix. Keep this inspection
+    # read-only and only propose the link when the source already exists.
+    mo2_local = paths["prefix"] / "pfx/drive_c/users/steamuser/AppData/Local"
+    data_source = mo2_local / "ModOrganizer"
+    if data_source.is_dir() and not data_source.is_symlink():
+        findings.append(_item("MO2 data source", "review",
+                              "Existing MO2 data root found inside Wyrd's dedicated MO2 compatdata.",
                               str(data_source)))
     else:
-        findings.append(_item("MO2 data source candidate", "blocked",
-                              "No verified MO2 data directory exists at the conservative candidate path.",
+        findings.append(_item("MO2 data source", "blocked",
+                              "Expected MO2 data root is absent or is a symlink; Wyrd will not create or follow it during preflight.",
                               str(data_source)))
-        blockers.append("MO2 data source mapping is not confirmed; no link will be planned.")
+        blockers.append("MO2 data root was not found as a real directory in Wyrd's dedicated prefix.")
 
     proposed_links: list[dict] = []
-    if game_prefix and data_source.is_dir():
-        # Candidate target is deliberately explicit and is only inspected.
-        target = game_prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer"
+    if game_prefix and data_source.is_dir() and not data_source.is_symlink():
+        # STL-style data mapping: MO2 prefix Local/ModOrganizer -> game prefix Local/ModOrganizer.
+        target = game_prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer
         link_state = inspect_link(data_source, target, paths["config"] / "game-mode")
         proposed_links.append({
             "source": str(data_source),
