@@ -44,8 +44,8 @@ class GameModeStorageTests(unittest.TestCase):
             install.mkdir()
             ini = install / "ModOrganizer.ini"
             ini.write_text(
-                "[General]\\ngameName=Skyrim Special Edition\\ngamePath=Z:\\games\\Skyrim Special Edition\\n"
-                "selected_profile=Default\\n[Settings]\\nmod_directory=Z:\\mods\\Skyrim\\n",
+                "[General]\ngameName=Skyrim Special Edition\ngamePath=Z:\\games\\Skyrim Special Edition\n"
+                "selected_profile=Default\n[Settings]\nmod_directory=Z:\\mods\\Skyrim\n",
                 encoding="utf-8",
             )
             report = inspect_game_mode_storage(root, install)
