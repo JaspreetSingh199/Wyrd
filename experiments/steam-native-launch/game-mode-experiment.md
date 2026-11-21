@@ -39,3 +39,11 @@ The script writes a log under `$XDG_STATE_HOME/wyrd/steam-native-launch` (or `~/
 3. Capture MO2 and Skyrim process ancestry and environment.
 4. Add cleanup/rollback for Wyrd-created links only; never remove unknown files.
 5. Compare Steam, Wyrd standalone-prefix, and Wyrd Game Mode voice audio results.
+
+
+## Ownership-safe link primitive (implemented)
+
+Wyrd now has an isolated helper module, `qt-ui/mo2_game_mode_links.py`, for inspecting, creating, and rolling back MO2 data symlinks. It tracks exact source/target pairs in a Wyrd ownership manifest (`game-mode-links.json`). It refuses to overwrite real targets, foreign symlinks, unreadable manifests, and links that no longer match the recorded target during rollback. Unit tests were added in `qt-ui/tests/test_mo2_game_mode_links.py` for creation/rollback, occupied directories, foreign symlinks, and unowned rollback.
+
+
+This helper is not yet connected to the GUI or launch script. Tests have been committed but not executed in a local runtime.
