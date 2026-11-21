@@ -24,9 +24,6 @@ class SteamBootstrapTests(unittest.TestCase):
             root = Path(temp)
             script = root / "steam_bootstrap.py"
             main_script = root / "main.py"
-            python = root / ".venv/bin/python"
-            python.parent.mkdir(parents=True)
-            python.write_text("", encoding="utf-8")
             main_script.write_text("", encoding="utf-8")
             script.write_text("", encoding="utf-8")
             with patch.object(steam_bootstrap, "__file__", str(script)), \\
@@ -34,7 +31,7 @@ class SteamBootstrapTests(unittest.TestCase):
                 run.return_value.returncode = 0
                 self.assertEqual(steam_bootstrap.main(["--steam-bootstrap"]), 0)
                 command = run.call_args.args[0]
-                self.assertEqual(command[0], str(python))
+                self.assertEqual(command[0], steam_bootstrap.sys.executable)
                 self.assertEqual(command[1], str(main_script))
                 self.assertEqual(command[2], "--steam-bootstrap")
                 self.assertTrue(run.call_args.kwargs["check"] is False)
