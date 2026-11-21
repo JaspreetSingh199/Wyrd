@@ -53,6 +53,7 @@ class SteamShortcutTests(unittest.TestCase):
                 result = steam_shortcut.install_steam_shortcut(home)
                 self.assertFalse(result["ok"])
                 self.assertEqual(desktop.read_text(encoding="utf-8"), "user-owned")
+                self.assertFalse((app_dir / steam_shortcut.MARKER_NAME).exists())
 
     def test_remove_refuses_modified_owned_launcher(self):
         with tempfile.TemporaryDirectory() as temp:
