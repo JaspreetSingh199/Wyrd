@@ -121,7 +121,7 @@ def build_game_mode_preflight(
     proposed_links: list[dict] = []
     if game_prefix and data_source.is_dir() and not data_source.is_symlink():
         # STL-style data mapping: MO2 prefix Local/ModOrganizer -> game prefix Local/ModOrganizer.
-        target = game_prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer
+        target = game_prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer"
         link_state = inspect_link(data_source, target, paths["config"] / "game-mode")
         proposed_links.append({
             "source": str(data_source),
