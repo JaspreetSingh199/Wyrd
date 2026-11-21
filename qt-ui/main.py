@@ -18,6 +18,7 @@ from skyrim_detection import detect_skyrim
 from mo2_game_mode_preflight import build_game_mode_preflight, format_preflight_report
 from mo2_game_mode_prepare import prepare_game_mode
 from steam_shortcut import install_steam_shortcut, remove_steam_shortcut
+from steam_bootstrap import main as steam_bootstrap_main
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
@@ -1078,10 +1079,19 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    if "--steam-bootstrap" in sys.argv:
+        sys.argv.remove("--steam-bootstrap")
+        # Use the same Qt application path; MainWindow starts MO2 for bootstrap.
+        bootstrap_mode = True
+    else:
+        bootstrap_mode = False
     app = QApplication(sys.argv)
     app.setApplicationName("Wyrd")
     window = MainWindow()
     window.show()
+    if bootstrap_mode:
+        # Defer until the event loop is active and widgets have completed setup.
+        QTimer.singleShot(0, window.start_mo2)
     return app.exec()
 
 
