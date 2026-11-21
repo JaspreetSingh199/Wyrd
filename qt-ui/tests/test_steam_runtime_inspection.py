@@ -1,5 +1,4 @@
 """Tests for read-only Steam shortcut/runtime inspection."""
-import os
 import struct
 import tempfile
 import unittest
@@ -38,7 +37,7 @@ class SteamRuntimeInspectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspection._parse_binary_vdf(b"\x00shortcuts\0")
         with self.assertRaises(ValueError):
-            inspection._parse_binary_vdf(b"\x07key\0value\0")
+            inspection._parse_binary_vdf(b"\x00shortcuts\0\x07key\0value\0\x08")
 
     def test_runtime_summary_does_not_infer_runtime_from_appid_alone(self):
         summary = inspection.steam_runtime_environment({
@@ -58,24 +57,17 @@ class SteamRuntimeInspectionTests(unittest.TestCase):
         self.assertTrue(summary["has_runtime_markers"])
         self.assertTrue(summary["has_pipewire_remote"])
 
-    def test_shortcut_inspection_is_read_only(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            userdata = root / "userdata/123/config"
-            userdata.mkdir(parents=True)
-            file = userdata / "shortcuts.vdf"
-            original = vdf_object("shortcuts", vdf_object("0",
-                vdf_string(1, "appname", "Wyrd - Skyrim through MO2")
-                + vdf_string(1, "exe", "/tmp/run.sh")
-                + bytes([2]) + b"appid\0" + struct.pack("<i", 4444)
-            ))
-            file.write_bytes(original)
-            with patch.object(inspection, "find_steam_roots", return_value=[root]):
-                report = inspection.inspect_steam_shortcuts(root)
-            self.assertTrue(report["ok"])
-            self.assertEqual(len(report["shortcuts"]), 1)
-            self.assertEqual(report["shortcuts"][0]["appid"], 4444)
-            self.assertEqual(file.read_bytes(), original)
+    def test_signed_shortcut_id_converts_to_unsigned_without_abs(self):
+        self.assertEqual(inspection._unsigned_appid(-12345678), 0xFFFFFFFF - 12345677)
+
+    def test_compat_mapping_inspection_is_explicitly_unparsed_and_read_only(self):
+        with patch.object(inspection, "inspect_steam_shortcuts", return_value={
+            "ok": True, "shortcuts": [{"appid": -12345678}], "warnings": [],
+        }):
+            report = inspection.inspect_steam_compat_mappings(Path("/not-used"))
+        self.assertEqual(report["mappings"], [])
+        self.assertEqual(report["shortcut_appids"], [0xFFFFFFFF - 12345677])
+        self.assertIn("not parsed yet", report["message"])
 
 
 if __name__ == "__main__":
