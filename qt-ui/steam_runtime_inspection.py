@@ -79,14 +79,25 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
     home = (home or Path.home()).expanduser()
     results = []
     warnings = []
-    for root in find_steam_roots(home):
+    checked_files = []
+    detected_roots = [str(root) for root in find_steam_roots(home)]
+    for root in map(Path, detected_roots):
         userdata = root / "userdata"
         if not userdata.is_dir():
             continue
-        for account_dir in userdata.iterdir():
+        try:
+            account_dirs = sorted(
+                (entry for entry in userdata.iterdir() if entry.is_dir() and entry.name.isdigit()),
+                key=lambda entry: entry.name,
+            )
+        except OSError as error:
+            warnings.append(f"{userdata}: {error}")
+            continue
+        for account_dir in account_dirs:
             shortcuts = account_dir / "config" / "shortcuts.vdf"
             if not shortcuts.is_file():
                 continue
+            checked_files.append(str(shortcuts))
             try:
                 parsed = _parse_binary_vdf(shortcuts.read_bytes())
                 entries = parsed.get("shortcuts", {})
@@ -114,8 +125,14 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
         "ok": not warnings,
         "shortcuts": results,
         "warnings": warnings,
-        "message": f"Found {len(results)} Wyrd shortcut record(s)." if not warnings else
-                   "One or more Steam shortcut files could not be parsed; no files were modified.",
+        "detected_steam_roots": detected_roots,
+        "checked_shortcut_files": checked_files,
+        "message": (
+            f"Found {len(results)} Wyrd shortcut record(s) across {len(checked_files)} "
+            f"shortcuts.vdf file(s)."
+            if not warnings else
+            "One or more Steam shortcut files could not be parsed; no files were modified."
+        ),
     }
 
 
