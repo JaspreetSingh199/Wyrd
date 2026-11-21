@@ -119,79 +119,36 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
     }
 
 
-def _parse_text_vdf_object(text: str, root_name: str) -> dict[str, Any]:
-    """Parse nested Steam text VDF objects with quoted strings and braces."""
-    import re
-
-    tokens = re.findall(r'"((?:\\\\.|[^"\\\\])*)"|([{}])', text)
-    values = [a.replace(r'\\"', '"').replace(r"\\\\", "\\") if a else b for a, b in tokens]
-    index = 0
-
-    def parse_object() -> dict[str, Any]:
-        nonlocal index
-        result: dict[str, Any] = {}
-        while index < len(values):
-            token = values[index]
-            index += 1
-            if token == "}":
-                return result
-            if token == "{":
-                raise ValueError("unexpected opening brace in VDF")
-            if index >= len(values):
-                raise ValueError("missing VDF value")
-            value = values[index]
-            index += 1
-            if value == "{":
-                result[token] = parse_object()
-            elif value in ("}", ""):
-                raise ValueError("invalid VDF scalar value")
-            else:
-                result[token] = value
-        return result
-
-    while index < len(values):
-        key = values[index]
-        index += 1
-        if index < len(values) and values[index] == "{":
-            index += 1
-            parsed = parse_object()
-            if key == root_name:
-                return parsed
-    raise ValueError(f"VDF root {root_name!r} not found")
+def _unsigned_appid(value: Any) -> int | None:
+    try:
+        return int(value) & 0xFFFFFFFF
+    except (TypeError, ValueError):
+        return None
 
 
 def inspect_steam_compat_mappings(home: Path | None = None) -> dict:
-    """Read-only lookup of CompatToolMapping for actual Wyrd shortcut AppIDs."""
-    home = (home or Path.home()).expanduser()
+    """Fail closed until Steam text-VDF parsing has complete fixture coverage.
+
+    The shortcut AppID is still reported from binary shortcuts.vdf, but this
+    routine deliberately does not guess the CompatToolMapping block.
+    """
     shortcuts = inspect_steam_shortcuts(home)
-    appids = {
-        str(abs(item["appid"]))
-        for item in shortcuts["shortcuts"]
+    appids = sorted({
+        _unsigned_appid(item.get("appid"))
+        for item in shortcuts.get("shortcuts", [])
         if item.get("appid") is not None
-    }
-    matches = []
-    warnings = []
-    for root in find_steam_roots(home):
-        config = root / "config" / "config.vdf"
-        if not config.is_file():
-            continue
-        try:
-            text = config.read_text(encoding="utf-8", errors="replace")
-            mapping = _parse_text_vdf_object(text, "CompatToolMapping")
-            for appid in sorted(appids):
-                entry = mapping.get(appid)
-                if isinstance(entry, dict):
-                    matches.append({
-                        "steam_root": str(root), "appid": appid,
-                        "name": entry.get("name"), "config": entry.get("config"),
-                        "priority": entry.get("priority"),
-                    })
-        except (OSError, ValueError) as error:
-            warnings.append(f"{config}: {error}")
+    })
     return {
-        "ok": not warnings, "mappings": matches, "warnings": warnings,
-        "message": f"Found {len(matches)} matching Proton compatibility mapping(s).",
+        "ok": not shortcuts.get("warnings"),
+        "mappings": [],
+        "shortcut_appids": appids,
+        "warnings": list(shortcuts.get("warnings", [])),
+        "message": (
+            "Steam compatibility mappings are not parsed yet; config.vdf was left untouched. "
+            f"Detected unsigned shortcut AppID(s): {', '.join(map(str, appids)) or 'none'}."
+        ),
     }
+
 
 def steam_runtime_environment(environment: dict[str, str] | None = None) -> dict:
     """Summarize documented runtime indicators without changing process state."""
