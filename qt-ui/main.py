@@ -1008,3 +1008,16 @@ class MainWindow(QMainWindow):
             detail = result["message"] + "\n\n" + process_scan.get("message", "")
 
         QMessageBox.information(self, "Launch process status", detail)
+
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+    app.setApplicationName("Wyrd")
+    window = MainWindow()
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
