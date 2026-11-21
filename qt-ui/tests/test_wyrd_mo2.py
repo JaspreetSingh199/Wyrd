@@ -480,7 +480,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 # Do not let host-installed compatibility tools leak into this
                 # fixture-based discovery test.
                 with patch("pathlib.Path.home", return_value=home):
-                    builds = discover_proton_builds(home)
+                    builds = discover_proton_builds(home, system_roots=[])
             self.assertEqual([item["name"] for item in builds], ["Proton Good"])
 
     def test_unmanaged_prefix_is_never_initialized_or_adopted(self):
