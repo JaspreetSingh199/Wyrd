@@ -125,7 +125,12 @@ def inspect_steam_shortcut(home: Path | None = None) -> dict:
     desktop = app_dir / DESKTOP_FILE
     marker = app_dir / MARKER_NAME
     if not desktop.exists() and not marker.exists():
-        return {"installed": False, "owned": False, "message": "No Wyrd Steam desktop launcher is installed."}
+        return {
+            "installed": False, "owned": False,
+            "desktop_file": str(desktop), "marker_file": str(marker),
+            "data_home": str(data_home),
+            "message": f"No Wyrd Steam desktop launcher is installed at {desktop}.",
+        }
     if not marker.is_file():
         return {"installed": desktop.is_file(), "owned": False,
                 "message": "A launcher file exists without Wyrd ownership metadata; it will not be modified."}
@@ -145,8 +150,11 @@ def inspect_steam_shortcut(home: Path | None = None) -> dict:
     if not expected_hash or actual_hash != expected_hash:
         return {"installed": True, "owned": False,
                 "message": "Wyrd launcher content was modified; refusing to manage it."}
-    return {"installed": True, "owned": True, "desktop_file": str(desktop),
-            "message": "Wyrd native Steam launcher is installed and ownership-verified."}
+    return {
+        "installed": True, "owned": True, "desktop_file": str(desktop),
+        "marker_file": str(marker), "data_home": str(data_home),
+        "message": f"Wyrd native Steam launcher is installed and ownership-verified at {desktop}.",
+    }
 
 
 def remove_steam_shortcut(home: Path | None = None) -> dict:
