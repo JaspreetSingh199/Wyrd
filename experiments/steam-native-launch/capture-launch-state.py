@@ -108,7 +108,7 @@ def main() -> None:
     }
     rendered = json.dumps(report, indent=2)
     if args.output:
-        args.output.write_text(rendered + "\\n")
+        args.output.write_text(rendered)
         print(f"Wrote {len(candidates)} process(es) to {args.output}")
     else:
         print(rendered)
