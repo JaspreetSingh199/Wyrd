@@ -10,7 +10,6 @@ import json
 import hashlib
 import os
 import sys
-import sys
 from pathlib import Path
 
 from skyrim_detection import find_steam_roots
