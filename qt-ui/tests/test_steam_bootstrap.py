@@ -11,9 +11,10 @@ class SteamBootstrapTests(unittest.TestCase):
             steam_bootstrap.main([])
 
     def test_missing_launcher_returns_error_without_spawning(self):
-        with patch.object(steam_bootstrap.Path, "resolve") as resolve:
-            resolve.return_value.parent.__truediv__.return_value.is_file.return_value = False
-            self.assertEqual(steam_bootstrap.main(["--steam-bootstrap"]), 2)
+        from pathlib import Path
+        with patch.object(steam_bootstrap, "__file__", "/tmp/missing/steam_bootstrap.py"):
+            with patch.object(Path, "is_file", return_value=False):
+                self.assertEqual(steam_bootstrap.main(["--steam-bootstrap"]), 2)
 
 
 if __name__ == "__main__":
