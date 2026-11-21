@@ -28,9 +28,11 @@ manually to Steam as a non-Steam game.
    an allow-listed environment snapshot and opens Wyrd with the configured
    MO2 instance.
 
-The generated desktop entry uses `qt-ui/run.sh`, so it uses the same project
-virtual environment and PySide6 installation as the regular launcher. Wyrd
-does not try to run Python or Qt inside Proton.
+The generated desktop entry invokes the standard-library-only
+`steam_bootstrap.py` using the Python interpreter that installed Wyrd. The
+bootstrap writes the allow-listed snapshot, then delegates to `qt-ui/run.sh`
+so Qt starts from the same project virtual environment and PySide6 installation
+as the regular launcher. Wyrd does not try to run Python or Qt inside Proton.
 
 **Important limitation:** this is a Steam-managed *native bootstrap*, not yet a
 Steam-managed Proton launch of MO2 or Skyrim. Wyrd still invokes the selected
