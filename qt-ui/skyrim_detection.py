@@ -10,22 +10,35 @@ STEAM_CANDIDATES = (
     ".local/share/Steam",
     ".steam/root",
     ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+    ".var/app/com.valvesoftware.Steam/.steam/steam",
 )
+
+def _steam_root_candidates(home: Path | None = None) -> list[Path]:
+    """Return conventional Steam client roots plus an explicit install-path hint."""
+    home = (home or Path.home()).expanduser()
+    candidates = [home / relative for relative in STEAM_CANDIDATES]
+    configured = os.environ.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", "").strip()
+    if configured:
+        candidates.insert(0, Path(configured).expanduser())
+    roots: list[Path] = []
+    for candidate in candidates:
+        try:
+            if not candidate.is_dir() or not (candidate / "steamapps").is_dir():
+                continue
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
 
 def _parse_vdf_paths(text: str) -> list[str]:
     # Steam libraryfolders VDF: extract values associated with the "path" key.
     return [p.replace("\\\\", "\\") for p in re.findall(r'"path"\s+"([^"]+)"', text)]
 
 def find_steam_roots(home: Path | None = None) -> list[Path]:
-    home = home or Path.home()
-    roots: list[Path] = []
-    for relative in STEAM_CANDIDATES:
-        path = (home / relative).expanduser()
-        if (path / "steamapps").is_dir():
-            resolved = path.resolve()
-            if resolved not in roots:
-                roots.append(resolved)
-    return roots
+    """Find installed Steam client roots, not secondary Steam game libraries."""
+    return _steam_root_candidates(home)
 
 def steam_libraries(steam_root: Path) -> list[Path]:
     libraries = [steam_root / "steamapps"]
