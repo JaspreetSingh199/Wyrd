@@ -22,8 +22,8 @@ MARKER_NAME = ".wyrd-steam-shortcut.json"
 def _desktop_exec_quote(value: str) -> str:
     """Quote one Exec argument using Desktop Entry, not shell, escaping rules."""
     escaped = json.dumps(value, ensure_ascii=False)[1:-1]
-    escaped = (escaped.replace("$", r"\\$")
-                       .replace("`", r"\\`")
+    escaped = (escaped.replace("$", "\\\\$")
+                       .replace("`", "\\\\`")
                        .replace("%", "%%"))
     return '"' + escaped + '"'
 
