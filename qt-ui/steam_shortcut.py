@@ -89,7 +89,7 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         created_desktop = True
         marker_payload = json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
-            "bootstrap": str(bootstrap), "run_script": str(run_script.resolve()),
+            "bootstrap": str(bootstrap), "run_script": str((Path(__file__).resolve().parent / "run.sh").resolve()),
             "name": SHORTCUT_NAME,
             "desktop_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         }, indent=2)
