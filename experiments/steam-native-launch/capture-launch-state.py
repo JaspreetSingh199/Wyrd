@@ -30,7 +30,7 @@ def read_text(path: Path) -> str:
 
 def process_info(pid: int) -> dict | None:
     root = Path("/proc") / str(pid)
-    cmdline = read_text(root / "cmdline").replace("\\0", " ").strip()
+    cmdline = read_text(root / "cmdline").replace("\0", " ").strip()
     if not cmdline:
         return None
     comm = read_text(root / "comm").strip()
@@ -43,7 +43,7 @@ def process_info(pid: int) -> dict | None:
         ppid = None
     env_raw = read_text(root / "environ")
     env = {}
-    for entry in env_raw.split("\\0"):
+    for entry in env_raw.split("\0"):
         if "=" not in entry:
             continue
         key, value = entry.split("=", 1)
