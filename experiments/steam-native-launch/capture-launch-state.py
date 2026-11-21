@@ -67,14 +67,25 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     proc = Path("/proc")
-    candidates = []
-    for entry in proc.iterdir():
-        if not entry.name.isdigit():
-            continue
-        info = process_info(int(entry.name))
-        if info and any(hint in (info["comm"] + " " + info["cmdline"]).lower()
-                        for hint in PROCESS_HINTS):
-            candidates.append(info)
+    deadline = time.monotonic() + max(0, args.wait)
+
+    while True:
+        candidates = []
+        for entry in proc.iterdir():
+            if not entry.name.isdigit():
+                continue
+            info = process_info(int(entry.name))
+            if not info:
+                continue
+            haystack = (info["comm"] + " " + info["cmdline"]).lower()
+            if args.game_only:
+                if "skyrimse.exe" in haystack or "skyrim.exe" in haystack:
+                    candidates.append(info)
+            elif any(hint in haystack for hint in PROCESS_HINTS):
+                candidates.append(info)
+        if candidates or time.monotonic() >= deadline:
+            break
+        time.sleep(0.25)
 
     for item in candidates:
         chain = []
@@ -101,7 +112,6 @@ def main() -> None:
         print(f"Wrote {len(candidates)} process(es) to {args.output}")
     else:
         print(rendered)
-
 
 if __name__ == "__main__":
     main()
