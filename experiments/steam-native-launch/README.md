@@ -42,3 +42,21 @@ Compare the actual process environment and ancestry where possible. Avoid guessi
 3. Keep interception minimal and reversible; document exact changes and rollback.
 4. Test with a cleanly documented baseline and compare results.
 5. Run tests and review the diff before proposing anything for `main`.
+
+## Capture the actual game process
+
+Run the capture while `SkyrimSE.exe` is running (not only the launcher or MO2):
+
+```bash
+python experiments/steam-native-launch/capture-launch-state.py --game-only --wait 15 --output ~/skyrim-steam-game.json
+```
+
+
+Repeat for Wyrd, using different output names:
+
+```bash
+python experiments/steam-native-launch/capture-launch-state.py --game-only --wait 15 --output ~/skyrim-wyrd-game.json
+```
+
+
+The capture is read-only and records a limited environment allowlist, process ancestry, and command lines. It does not dump the full environment. The `--wait` option waits briefly for the game process to appear; `--game-only` avoids capturing unrelated Proton/MO2 processes.
