@@ -718,7 +718,11 @@ class MainWindow(QMainWindow):
                 "this is a native Linux Qt launcher. Steam starts Wyrd, and "
                 "Wyrd still launches MO2 through its selected Proton build. "
                 "This does not guarantee Steam Runtime parity or fix audio. "
-                "Wyrd does not edit shortcuts.vdf."
+                "Wyrd does not edit shortcuts.vdf.\n\n"
+                f"Desktop entry: {result.get('desktop_file', '(unknown)')}\n"
+                "After adding it to Steam, launch it once. Then inspect the report again.\n"
+                "Expected snapshot: ~/.local/share/wyrd/logs/steam-bootstrap-environment.json "
+                "(or $XDG_DATA_HOME/wyrd/logs/steam-bootstrap-environment.json)."
             )
         elif not result.get("ok"):
             QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Installation failed."))
