@@ -56,11 +56,11 @@ class GameModePreflightTests(unittest.TestCase):
             detection = {"found": True, "game_dir": str(game), "library": str(steamapps)}
             proton = [{"ok": True, "path": str(root / "Proton")}]
             with patch.dict("os.environ", {"XDG_DATA_HOME": str(root / ".local/share"),
-                                           "XDG_CONFIG_HOME": str(root / ".config")}), \\
-                 patch("mo2_game_mode_preflight.inspect_wyrd_installation",
-                       return_value={"installed": True, "executable": str(exe)}), \\
-                 patch("mo2_game_mode_preflight.inspect_game_mode_storage",
-                       return_value={"ok": True, "instances": [], "message": "test inventory"}):
+                                           "XDG_CONFIG_HOME": str(root / ".config")}):
+                with patch("mo2_game_mode_preflight.inspect_wyrd_installation",
+                           return_value={"installed": True, "executable": str(exe)}):
+                    with patch("mo2_game_mode_preflight.inspect_game_mode_storage",
+                               return_value={"ok": True, "instances": [], "message": "test inventory"}):
                 result = build_game_mode_preflight(root, detection, proton)
             self.assertEqual(len(result["proposed_links"]), 1)
             link = result["proposed_links"][0]
