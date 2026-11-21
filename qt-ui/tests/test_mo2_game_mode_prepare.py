@@ -45,6 +45,17 @@ class GameModePrepareTests(unittest.TestCase):
             self.assertEqual(target.resolve(), source.resolve())
             self.assertEqual(len(result["created"]), 1)
 
+    def test_does_not_adopt_existing_unowned_matching_link(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, target = root / "source", root / "target"
+            source.mkdir()
+            target.symlink_to(source, target_is_directory=True)
+            result = prepare_game_mode(self._report(source, target), root / "state", confirmed=True)
+            self.assertFalse(result["ok"])
+            self.assertTrue(target.is_symlink())
+            self.assertFalse((root / "state/game-mode-links.json").exists())
+
     def test_failure_rolls_back_links_created_by_this_attempt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
