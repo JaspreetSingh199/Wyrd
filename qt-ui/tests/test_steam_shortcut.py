@@ -142,5 +142,34 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertTrue(desktop.exists())
 
 
+    def test_inspect_reports_owned_launcher(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            steam = home / ".steam/root"
+            steam.mkdir(parents=True)
+            data_home = home / ".local/share"
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                installed = steam_shortcut.install_steam_shortcut(home)
+                status = steam_shortcut.inspect_steam_shortcut(home)
+                self.assertTrue(installed["ok"])
+                self.assertTrue(status["installed"])
+                self.assertTrue(status["owned"])
+
+    def test_inspect_refuses_to_claim_modified_launcher(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            steam = home / ".steam/root"
+            steam.mkdir(parents=True)
+            data_home = home / ".local/share"
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                installed = steam_shortcut.install_steam_shortcut(home)
+                Path(installed["desktop_file"]).write_text("changed", encoding="utf-8")
+                status = steam_shortcut.inspect_steam_shortcut(home)
+                self.assertFalse(status["owned"])
+                self.assertIn("modified", status["message"])
+
+
 if __name__ == "__main__":
     unittest.main()
