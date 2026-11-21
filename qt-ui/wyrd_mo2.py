@@ -645,6 +645,44 @@ def repair_audio_compatibility(home: Path | None = None, confirmed: bool = False
         if "staged_root" in locals():
             shutil.rmtree(staged_root, ignore_errors=True)
 
+def launch_mo2_in_skyrim_prefix(home: Path | None = None) -> dict:
+    """Experimental launch-only test: run Wyrd-installed MO2 in Skyrim's Proton prefix.
+
+    This does not copy files, modify Skyrim's executable, or initialize a prefix.
+    """
+    home = (home or Path.home()).expanduser()
+    state = inspect_wyrd_installation(home)
+    if not state.get("installed"):
+        return {"ok": False, "message": "Wyrd-managed MO2 is not installed."}
+    metadata = state.get("metadata", {})
+    proton_path = Path(metadata.get("proton", ""))
+    game_state = detect_skyrim(home)
+    if not game_state.get("found"):
+        return {"ok": False, "message": "Skyrim was not detected in Steam libraries."}
+    library = Path(game_state["library"])
+    prefix_root = library / "compatdata" / APP_ID
+    prefix = prefix_root / "pfx"
+    if not (prefix / "drive_c").is_dir():
+        return {"ok": False, "message": f"Skyrim Proton prefix is not initialized: {prefix}"}
+    if not proton_path.is_dir() or not (proton_path / "proton").is_file():
+        return {"ok": False, "message": "Wyrd's selected Proton build is missing."}
+    validation = inspect_proton_build(proton_path)
+    if not validation.get("ok"):
+        return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+    executable = managed_paths(home)["install"] / "ModOrganizer.exe"
+    if not executable.is_file():
+        return {"ok": False, "message": f"MO2 executable is missing: {executable}"}
+    env = _runtime_environment(proton_path, Path(game_state["steam_root"]), prefix_root)
+    try:
+        process = subprocess.Popen(
+            [str(proton_path / "proton"), "run", str(executable)],
+            cwd=str(executable.parent), env=env, start_new_session=True,
+        )
+    except OSError as error:
+        return {"ok": False, "message": f"Could not launch MO2 in Skyrim's prefix: {error}"}
+    return {"ok": True, "pid": process.pid, "prefix": str(prefix),
+            "message": "MO2 launched using Skyrim's existing Proton prefix (experimental)."}
+
 def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
     """Launch MO2 visibly through its configured Proton build."""
     home = (home or Path.home()).expanduser()
