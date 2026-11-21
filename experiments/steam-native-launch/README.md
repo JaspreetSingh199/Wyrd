@@ -60,3 +60,8 @@ python experiments/steam-native-launch/capture-launch-state.py --game-only --wai
 
 
 The capture is read-only and records a limited environment allowlist, process ancestry, and command lines. It does not dump the full environment. The `--wait` option waits briefly for the game process to appear; `--game-only` avoids capturing unrelated Proton/MO2 processes.
+
+
+## Experimental MO2 Game Mode test
+
+A minimal direct-Proton test that runs the existing Wyrd-managed MO2 executable in Skyrim's `compatdata/489830` prefix is available in [`game-mode-experiment.md`](game-mode-experiment.md). It does not change Steam launch options or copy/install MO2 into the prefix, but Proton may initialize/update the prefix. Back up the prefix first if rollback is important. Run the script with `bash`; it is intentionally not marked executable through the GitHub contents API.
