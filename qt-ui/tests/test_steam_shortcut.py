@@ -48,7 +48,7 @@ class SteamShortcutTests(unittest.TestCase):
             steam = home / ".steam/root"
             steam.mkdir(parents=True)
             data_home = home / ".local/share"
-            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \
                  patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
                 installed = steam_shortcut.install_steam_shortcut(home)
                 desktop = Path(installed["desktop_file"])
@@ -83,8 +83,8 @@ class SteamShortcutTests(unittest.TestCase):
                     raise OSError("marker failure")
                 return real_open(path, flags, mode)
 
-            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
-                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}), \\
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}), \
                  patch.object(steam_shortcut.os, "open", side_effect=open_side_effect):
                 result = steam_shortcut.install_steam_shortcut(home)
             desktop = app_dir / steam_shortcut.DESKTOP_FILE
@@ -116,7 +116,7 @@ class SteamShortcutTests(unittest.TestCase):
             steam = home / ".steam/root"
             steam.mkdir(parents=True)
             data_home = home / ".local/share"
-            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \
                  patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
                 installed = steam_shortcut.install_steam_shortcut(home)
                 desktop = Path(installed["desktop_file"])
