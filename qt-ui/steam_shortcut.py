@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import sys
 from pathlib import Path
 
 from skyrim_detection import find_steam_roots
@@ -21,7 +22,7 @@ MARKER_NAME = ".wyrd-steam-shortcut.json"
 def _desktop_entry(bootstrap: Path, working_dir: Path) -> str:
     # This is an XDG desktop entry intended for the native host. It does not
     # run the Python launcher through Proton.
-    exec_line = shlex.join([str(bootstrap.resolve()), "--steam-bootstrap"])
+    exec_line = shlex.join([sys.executable, str(bootstrap.resolve()), "--steam-bootstrap"])
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
