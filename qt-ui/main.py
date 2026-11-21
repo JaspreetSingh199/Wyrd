@@ -18,6 +18,7 @@ from skyrim_detection import detect_skyrim
 from mo2_game_mode_preflight import build_game_mode_preflight, format_preflight_report
 from mo2_game_mode_prepare import prepare_game_mode
 from steam_shortcut import inspect_steam_shortcut, install_steam_shortcut, remove_steam_shortcut
+from steam_runtime_inspection import inspect_steam_shortcuts, inspect_steam_compat_mappings, steam_runtime_environment
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
@@ -247,6 +248,9 @@ class MainWindow(QMainWindow):
         self.remove_steam_button.clicked.connect(self.remove_steam_launcher)
         steam_actions.addWidget(self.install_steam_button)
         steam_actions.addWidget(self.remove_steam_button)
+        self.inspect_steam_button = QPushButton("Inspect Steam shortcut/runtime")
+        self.inspect_steam_button.clicked.connect(self.inspect_steam_runtime)
+        steam_actions.addWidget(self.inspect_steam_button)
         steam_actions.addStretch(1)
         steam_layout.addLayout(steam_actions)
         layout.addWidget(self.steam_panel)
@@ -718,6 +722,55 @@ class MainWindow(QMainWindow):
             )
         elif not result.get("ok"):
             QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Installation failed."))
+
+    def inspect_steam_runtime(self) -> None:
+        """Read-only inspection of Steam's generated shortcut identity and runtime hints."""
+        shortcuts = inspect_steam_shortcuts()
+        mappings = inspect_steam_compat_mappings()
+        runtime = steam_runtime_environment()
+        lines = [
+            "Steam shortcut inspection (read-only)",
+            shortcuts.get("message", ""),
+            "",
+        ]
+        if shortcuts.get("shortcuts"):
+            for item in shortcuts["shortcuts"]:
+                lines.extend([
+                    f"Name: {item.get('name') or '(unnamed)'}",
+                    f"AppID (signed VDF): {item.get('appid')}",
+                    f"Executable: {item.get('exe')}",
+                    f"Start directory: {item.get('start_dir')}",
+                    f"Launch options: {item.get('launch_options') or '(none)'}",
+                    "",
+                ])
+        else:
+            lines.append("No Wyrd shortcut was found in detected Steam userdata.")
+        if shortcuts.get("warnings"):
+            lines.extend(["Warnings:", *shortcuts["warnings"], ""])
+        lines.extend([
+            "Current Wyrd process runtime indicators:",
+            f"Steam identity: {runtime.get('steam_identity') or '(not present)'}",
+            f"Runtime markers present: {runtime.get('has_runtime_markers')}",
+            f"PulseAudio server variable: {runtime.get('has_pulse_server')}",
+            f"PipeWire remote variable: {runtime.get('has_pipewire_remote')}",
+            "",
+            "CompatToolMapping inspection:",
+        ])
+        if mappings.get("mappings"):
+            for item in mappings["mappings"]:
+                lines.append(f"AppID {item['appid']}: {item['excerpt']}")
+        else:
+            lines.append("No matching compatibility mapping was found (or Steam stores it outside detected config.vdf).")
+        if mappings.get("warnings"):
+            lines.extend(["Warnings:", *mappings["warnings"]])
+        lines.extend([
+            "",
+            "This report is read-only. Steam owns shortcut generation and runtime setup. "
+            "A shortcut AppID alone does not prove that Proton or Steam Runtime is active.",
+        ])
+        report = "\n".join(lines)
+        self._log(report)
+        QMessageBox.information(self, "Steam shortcut/runtime inspection", report)
 
     def remove_steam_launcher(self) -> None:
         """Remove only the Wyrd-owned optional desktop launcher."""
