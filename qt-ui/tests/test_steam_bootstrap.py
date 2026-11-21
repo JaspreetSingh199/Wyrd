@@ -54,6 +54,7 @@ class SteamBootstrapTests(unittest.TestCase):
             self.assertTrue(snapshot["launched_from_steam"])
             self.assertEqual(snapshot["steam_shortcut_app_id"], "1234567890")
             self.assertEqual(snapshot["run_script"], str(runner))
+            self.assertEqual(snapshot["bootstrap"], str(script))
 
 
 if __name__ == "__main__":
