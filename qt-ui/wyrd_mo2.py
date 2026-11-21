@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Callable
 
-from skyrim_detection import find_steam_roots
+from skyrim_detection import detect_skyrim, find_steam_roots
 from mo2_inspection import find_mo2_installations
 
 APP_ID = "489830"
