@@ -883,7 +883,8 @@ class MainWindow(QMainWindow):
         if not processes:
             self._game_watch_timer.stop()
             return
-        active = [process for process in processes if process.matches_current_process()]        if active:
+        active = [process for process in processes if process.matches_current_process()]
+        if active:
             self.launch_session.game_processes = active
             return
         self._game_watch_timer.stop()
