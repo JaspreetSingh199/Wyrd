@@ -14,9 +14,12 @@ class SteamShortcutTests(unittest.TestCase):
             root = Path(temp)
             bootstrap = root / "steam_bootstrap.py"
             bootstrap.write_text("# bootstrap", encoding="utf-8")
-            entry = steam_shortcut._desktop_entry(bootstrap, root)
+            with patch.object(steam_shortcut.sys, "executable", str(root / "python bin/python")):
+                entry = steam_shortcut._desktop_entry(bootstrap, root)
             self.assertIn("Name=Wyrd - Skyrim through MO2", entry)
             self.assertIn("--steam-bootstrap", entry)
+            self.assertIn('"', entry.split("Exec=", 1)[1].splitlines()[0])
+            self.assertIn("python bin/python", entry)
             self.assertNotIn("proton run", entry.lower())
 
     def test_install_is_idempotent_and_remove_only_owned_files(self):
