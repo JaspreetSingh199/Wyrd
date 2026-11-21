@@ -745,6 +745,10 @@ class MainWindow(QMainWindow):
                 ])
         else:
             lines.append("No Wyrd shortcut was found in detected Steam userdata.")
+        lines.append("Detected Steam roots:")
+        lines.extend(shortcuts.get("detected_steam_roots") or ["(none)"])
+        lines.append("shortcuts.vdf files inspected:")
+        lines.extend(shortcuts.get("checked_shortcut_files") or ["(none found)"])
         if shortcuts.get("warnings"):
             lines.extend(["Warnings:", *shortcuts["warnings"], ""])
         lines.extend([
@@ -760,7 +764,10 @@ class MainWindow(QMainWindow):
             for item in mappings["mappings"]:
                 lines.append(f"AppID {item['appid']}: {item['excerpt']}")
         else:
-            lines.append("No matching compatibility mapping was found (or Steam stores it outside detected config.vdf).")
+            lines.append(mappings.get(
+                "message",
+                "Compatibility mappings were not inspected; no conclusion can be drawn.",
+            ))
         if mappings.get("warnings"):
             lines.extend(["Warnings:", *mappings["warnings"]])
         lines.extend([
