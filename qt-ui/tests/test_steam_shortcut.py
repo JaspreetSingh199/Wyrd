@@ -42,6 +42,31 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertFalse(refused["ok"])
                 self.assertTrue(desktop.exists())
 
+    def test_removes_intact_owned_launcher(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            steam = home / ".steam/root"
+            steam.mkdir(parents=True)
+            data_home = home / ".local/share"
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                installed = steam_shortcut.install_steam_shortcut(home)
+                desktop = Path(installed["desktop_file"])
+                marker = desktop.parent / steam_shortcut.MARKER_NAME
+                self.assertTrue(desktop.is_file())
+                self.assertTrue(marker.is_file())
+                removed = steam_shortcut.remove_steam_shortcut(home)
+                self.assertTrue(removed["ok"])
+                self.assertFalse(desktop.exists())
+                self.assertFalse(marker.exists())
+
+    def test_desktop_exec_quotes_special_characters(self):
+        value = "a path/with spaces/$cash/100%/tick"
+        quoted = steam_shortcut._desktop_exec_quote(value)
+        self.assertTrue(quoted.startswith('"') and quoted.endswith('"'))
+        self.assertIn(r"\$", quoted)
+        self.assertIn("%%", quoted)
+
     def test_install_rolls_back_launcher_if_marker_creation_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
