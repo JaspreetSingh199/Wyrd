@@ -77,15 +77,22 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
     bootstrap = Path(__file__).resolve().with_name("steam_bootstrap.py")
     content = _desktop_entry(bootstrap, Path(__file__).resolve().parent)
     temporary = desktop.with_suffix(".desktop.tmp")
+    created_desktop = False
     try:
         temporary.write_text(content, encoding="utf-8")
-        temporary.replace(desktop)
+        # Exclusive create prevents replacing a file created after the preflight.
+        descriptor = os.open(desktop, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        created_desktop = True
         marker.write_text(json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
             "bootstrap": str(bootstrap), "name": SHORTCUT_NAME,
         }, indent=2), encoding="utf-8")
+        temporary.unlink(missing_ok=True)
     except OSError as error:
-        desktop.unlink(missing_ok=True)
+        if created_desktop:
+            desktop.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
         return {"ok": False, "message": f"Could not install Wyrd's Steam launcher: {error}"}
     return {"ok": True, "already_installed": False, "desktop_file": str(desktop),
