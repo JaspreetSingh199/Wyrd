@@ -164,6 +164,8 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertTrue(installed["ok"])
                 self.assertTrue(status["installed"])
                 self.assertTrue(status["owned"])
+                self.assertEqual(status["desktop_file"], str(desktop))
+                self.assertEqual(status["data_home"], str(data_home))
 
     def test_inspect_refuses_to_claim_modified_launcher(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -178,6 +180,20 @@ class SteamShortcutTests(unittest.TestCase):
                 status = steam_shortcut.inspect_steam_shortcut(home)
                 self.assertFalse(status["owned"])
                 self.assertIn("modified", status["message"])
+
+    def test_inspect_reports_expected_path_when_launcher_is_not_installed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            data_home = home / ".local/share"
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                status = steam_shortcut.inspect_steam_shortcut(home)
+            self.assertFalse(status["installed"])
+            self.assertFalse(status["owned"])
+            self.assertEqual(
+                status["desktop_file"],
+                str(data_home / "applications" / steam_shortcut.DESKTOP_FILE),
+            )
+            self.assertIn("No Wyrd Steam desktop launcher", status["message"])
 
 
 if __name__ == "__main__":
