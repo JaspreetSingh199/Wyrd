@@ -9,6 +9,27 @@ class DetectionTests(unittest.TestCase):
     def test_parse_vdf_path(self):
         self.assertEqual(_parse_vdf_paths('"path" "/mnt/games"'), ["/mnt/games"])
 
+    def test_flatpak_steam_root_detection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
+            (steam / "steamapps").mkdir(parents=True)
+            self.assertEqual(
+                [Path(item) for item in __import__("skyrim_detection").find_steam_roots(home)],
+                [steam.resolve()],
+            )
+
+    def test_configured_steam_root_detection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / "custom/Steam"
+            (steam / "steamapps").mkdir(parents=True)
+            with __import__("unittest").mock.patch.dict(
+                "os.environ", {"STEAM_COMPAT_CLIENT_INSTALL_PATH": str(steam)}
+            ):
+                found = __import__("skyrim_detection").find_steam_roots(home)
+            self.assertIn(steam.resolve(), found)
+
     def test_no_steam_roots(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertFalse(detect_skyrim(Path(tmp))["found"])
