@@ -19,7 +19,9 @@ class SteamShortcutTests(unittest.TestCase):
             self.assertIn("Name=Wyrd - Skyrim through MO2", entry)
             self.assertIn("--steam-bootstrap", entry)
             self.assertIn('"', entry.split("Exec=", 1)[1].splitlines()[0])
-            self.assertIn("python bin/python", entry)
+            self.assertIn('"bash"', entry)
+            self.assertIn(str((root / "run.sh").resolve()), entry)
+            self.assertIn("--steam-bootstrap", entry)
             self.assertNotIn("proton run", entry.lower())
 
     def test_install_is_idempotent_and_remove_only_owned_files(self):
