@@ -58,6 +58,11 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
             return {"ok": False, "message": "Wyrd shortcut ownership marker is malformed; no changes made."}
         if record.get("managed_by") != "Wyrd" or record.get("desktop_file") != str(desktop):
             return {"ok": False, "message": "Shortcut ownership marker does not match this launcher; no changes made."}
+        if not desktop.is_file() or desktop.is_symlink():
+            return {"ok": False, "message": "Wyrd ownership marker exists but launcher is missing or unsafe; no changes made."}
+        expected_hash = record.get("desktop_sha256")
+        if not expected_hash or hashlib.sha256(desktop.read_bytes()).hexdigest() != expected_hash:
+            return {"ok": False, "message": "Existing launcher content changed; refusing to treat it as Wyrd-owned."}
         return {"ok": True, "already_installed": True, "desktop_file": str(desktop),
                 "message": "Wyrd's Steam launcher is already installed."}
     bootstrap = Path(__file__).resolve().with_name("steam_bootstrap.py")
