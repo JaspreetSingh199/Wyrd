@@ -7,6 +7,7 @@ real AppID manifest, compatibility settings, or an existing Steam shortcut.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import shlex
 import sys
@@ -73,7 +74,7 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         marker.write_text(json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
             "bootstrap": str(bootstrap), "name": SHORTCUT_NAME,
-            "desktop_sha256": __import__("hashlib").sha256(content.encode("utf-8")).hexdigest(),
+            "desktop_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         }, indent=2), encoding="utf-8")
         temporary.unlink(missing_ok=True)
     except OSError as error:
