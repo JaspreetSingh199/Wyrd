@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 from skyrim_detection import detect_skyrim
 from mo2_game_mode_preflight import build_game_mode_preflight, format_preflight_report
 from mo2_game_mode_prepare import prepare_game_mode
-from steam_shortcut import install_steam_shortcut, remove_steam_shortcut
+from steam_shortcut import inspect_steam_shortcut, install_steam_shortcut, remove_steam_shortcut
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
@@ -235,7 +235,8 @@ class MainWindow(QMainWindow):
             "Install a native Wyrd launcher, then add it to Steam manually as a non-Steam game. Steam starts Wyrd natively; MO2 still uses Wyrd's selected Proton build. This does not yet prove Steam Runtime parity or fix audio.",
         )
         steam_layout = self.steam_panel.layout()
-        self.steam_status = QLabel("No Steam-native launcher has been installed.")
+        steam_state = inspect_steam_shortcut()
+        self.steam_status = QLabel(steam_state.get("message", "No Steam-native launcher has been installed."))
         self.steam_status.setObjectName("muted")
         self.steam_status.setWordWrap(True)
         steam_layout.addWidget(self.steam_status)
@@ -702,7 +703,8 @@ class MainWindow(QMainWindow):
         """Install the optional, reversible native Steam bootstrap launcher."""
         result = install_steam_shortcut()
         self._log("Steam launcher: " + result.get("message", "unknown result"))
-        self.steam_status.setText(result.get("message", "Steam launcher operation completed."))
+        steam_state = inspect_steam_shortcut()
+        self.steam_status.setText(steam_state.get("message", result.get("message", "Steam launcher operation completed.")))
         if result.get("ok") and result.get("desktop_file"):
             QMessageBox.information(
                 self, "Steam-native bootstrap",
@@ -721,7 +723,8 @@ class MainWindow(QMainWindow):
         """Remove only the Wyrd-owned optional desktop launcher."""
         result = remove_steam_shortcut()
         self._log("Steam launcher: " + result.get("message", "unknown result"))
-        self.steam_status.setText(result.get("message", "Steam launcher operation completed."))
+        steam_state = inspect_steam_shortcut()
+        self.steam_status.setText(steam_state.get("message", result.get("message", "Steam launcher operation completed.")))
         if not result.get("ok"):
             QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Removal failed."))
 
