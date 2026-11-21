@@ -26,9 +26,12 @@ def _parse_binary_vdf(data: bytes) -> dict[str, Any]:
     Supports nested objects, strings, and 32-bit integers. Unknown scalar
     types are rejected rather than skipped, keeping diagnostics fail-closed.
     """
-    if not data:
-        raise ValueError("empty VDF")
-    cursor = 0
+    if not data or data[0] != 0x00:
+        raise ValueError("binary VDF must begin with a root object")
+    cursor = 1
+    root_key, cursor = _decode_vdf_string(data, cursor)
+    if root_key != "shortcuts":
+        raise ValueError(f"unexpected binary VDF root object: {root_key!r}")
 
     def parse_object(stop_on_end: bool = False) -> dict[str, Any]:
         nonlocal cursor
@@ -56,7 +59,10 @@ def _parse_binary_vdf(data: bytes) -> dict[str, Any]:
             raise ValueError("unterminated VDF object")
         return result
 
-    return parse_object()
+    parsed = parse_object(stop_on_end=True)
+    if cursor != len(data):
+        raise ValueError("unexpected trailing data after root object")
+    return {"shortcuts": parsed}
 
 
 def _signed_appid(value: Any) -> int | None:
