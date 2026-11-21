@@ -39,6 +39,11 @@ def environment_snapshot(environment: dict[str, str] | None = None) -> dict:
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "launched_from_steam": identity is not None,
         "steam_shortcut_app_id": identity,
+        "xdg_data_home": env.get("XDG_DATA_HOME") or str(Path.home() / ".local/share"),
+        "snapshot_path": str(
+            Path(env.get("XDG_DATA_HOME", Path.home() / ".local/share")).expanduser()
+            / "wyrd" / "logs" / "steam-bootstrap-environment.json"
+        ),
         "environment": {key: env[key] for key in ENVIRONMENT_KEYS if key in env},
     }
 
