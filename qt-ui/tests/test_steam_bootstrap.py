@@ -37,6 +37,10 @@ class SteamBootstrapTests(unittest.TestCase):
                 self.assertEqual(command[1], str(main_script))
                 self.assertEqual(command[2], "--steam-bootstrap")
                 self.assertTrue(run.call_args.kwargs["check"] is False)
+            snapshot_path = root / "xdg/wyrd/logs/steam-bootstrap-environment.json"
+            self.assertTrue(snapshot_path.is_file())
+            snapshot = __import__("json").loads(snapshot_path.read_text(encoding="utf-8"))
+            self.assertFalse(snapshot["launched_from_steam"])
 
 
 if __name__ == "__main__":
