@@ -271,6 +271,18 @@ class MainWindow(QMainWindow):
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
 
+    def _log_audio_runtime_environment(self, processes: list[dict]) -> None:
+        """Log the whitelisted audio environment read from actual game processes."""
+        for item in processes:
+            audio_env = item.get("audio_runtime_environment", {})
+            overrides = audio_env.get("WINEDLLOVERRIDES")
+            pulse = audio_env.get("PULSE_LATENCY_MSEC")
+            self._log(
+                f"Audio runtime env from PID {item.get('pid')} ({item.get('binary')}): "
+                f"WINEDLLOVERRIDES={overrides if overrides is not None else '<unset>'}; "
+                f"PULSE_LATENCY_MSEC={pulse if pulse is not None else '<unset>'}"
+            )
+
     def refresh_all(self) -> None:
         selected = self.proton_combo.currentData()
         self.game_state = detect_skyrim()
@@ -696,6 +708,7 @@ class MainWindow(QMainWindow):
             ]
             self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
+            self._log_audio_runtime_environment(session_processes)
             self._stop_launch_monitor("Skyrim/SKSE process detected")
             self._start_game_process_watch()
             return
@@ -710,6 +723,7 @@ class MainWindow(QMainWindow):
             self._log(
                 "Prefix-attributed Skyrim process(es), ancestry unconfirmed: " + detected
             )
+            self._log_audio_runtime_environment(process_scan["wyrd_processes"])
             self.launch_session.detected_processes = list(process_scan["wyrd_processes"])
             self.launch_session.process_identities = {
                 item["pid"]: item.get("start_time") for item in process_scan["wyrd_processes"]
