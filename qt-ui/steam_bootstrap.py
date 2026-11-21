@@ -23,7 +23,11 @@ def main(argv: list[str] | None = None) -> int:
     if not launcher.is_file():
         print(f"Wyrd launcher is missing: {launcher}", file=sys.stderr)
         return 2
-    command = ["bash", str(launcher), "--steam-bootstrap"]
+    python = script_dir / ".venv" / "bin" / "python"
+    if not python.is_file():
+        print("Wyrd virtual environment is missing. Run qt-ui/run.sh once first.", file=sys.stderr)
+        return 2
+    command = [str(python), str(script_dir / "main.py"), "--steam-bootstrap"]
     try:
         process = subprocess.Popen(command, cwd=script_dir, start_new_session=True)
     except OSError as error:
