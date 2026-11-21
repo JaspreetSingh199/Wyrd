@@ -81,10 +81,14 @@ class WyrdMO2Tests(unittest.TestCase):
             entry.mkdir(parents=True)
             (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
             (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
-            with patch("wyrd_mo2.Path.read_bytes", side_effect=lambda path: (
-                b"SkyrimSE.exe\\0" if path.name == "cmdline" else
-                (_ for _ in ()).throw(PermissionError("permission denied"))
-            )):
+            original_read_bytes = Path.read_bytes
+
+            def read_bytes_with_denied_environ(path):
+                if path.name == "environ":
+                    raise PermissionError("permission denied")
+                return original_read_bytes(path)
+
+            with patch("pathlib.Path.read_bytes", new=read_bytes_with_denied_environ):
                 with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
                     result = detect_skyrim_processes(proc_root=proc)
             self.assertTrue(result["ok"])
@@ -473,7 +477,10 @@ class WyrdMO2Tests(unittest.TestCase):
             make_proton(root / "steamapps/common/Proton Good", machine=62)
             make_proton(root / "steamapps/common/Proton aarch64", machine=183)
             with patch("wyrd_mo2.find_steam_roots", return_value=[root]):
-                builds = discover_proton_builds(home)
+                # Do not let host-installed compatibility tools leak into this
+                # fixture-based discovery test.
+                with patch("pathlib.Path.home", return_value=home):
+                    builds = discover_proton_builds(home)
             self.assertEqual([item["name"] for item in builds], ["Proton Good"])
 
     def test_unmanaged_prefix_is_never_initialized_or_adopted(self):
