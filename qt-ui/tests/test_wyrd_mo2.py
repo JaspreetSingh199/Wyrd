@@ -70,6 +70,32 @@ class WyrdMO2Tests(unittest.TestCase):
                 result["processes"][0]["audio_runtime_environment"],
                 {"WINEDLLOVERRIDES": None, "PULSE_LATENCY_MSEC": None},
             )
+            self.assertTrue(result["processes"][0]["audio_runtime_environment_readable"])
+            self.assertTrue(result["processes"][1]["audio_runtime_environment_readable"])
+            self.assertIsNone(result["processes"][1]["audio_runtime_environment_error"])
+
+    def test_procfs_audio_environment_reports_unreadable_separately_from_unset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            entry = proc / "321"
+            entry.mkdir(parents=True)
+            (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
+            (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
+            with patch("wyrd_mo2.Path.read_bytes", side_effect=lambda path: (
+                b"SkyrimSE.exe\\0" if path.name == "cmdline" else
+                (_ for _ in ()).throw(PermissionError("permission denied"))
+            )):
+                with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+                    result = detect_skyrim_processes(proc_root=proc)
+            self.assertTrue(result["ok"])
+            self.assertEqual(len(result["processes"]), 1)
+            process = result["processes"][0]
+            self.assertFalse(process["audio_runtime_environment_readable"])
+            self.assertIn("permission denied", process["audio_runtime_environment_error"])
+            self.assertEqual(
+                process["audio_runtime_environment"],
+                {"WINEDLLOVERRIDES": None, "PULSE_LATENCY_MSEC": None},
+            )
 
     def test_procfs_detection_handles_unreadable_proc_root(self):
         result = detect_skyrim_processes(proc_root=Path("/missing/wyrd-proc"))
