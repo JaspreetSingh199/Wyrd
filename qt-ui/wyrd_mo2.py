@@ -175,13 +175,26 @@ def _steam_root_for_game(game_path: Path, home: Path) -> Path:
 
 
 def _runtime_environment(proton: Path, steam_root: Path, prefix_root: Path) -> dict[str, str]:
+    """Build Proton's environment while preserving an inherited Steam shortcut ID.
+
+    When Wyrd is started from a Steam non-Steam shortcut, Steam's generated
+    identity should follow the MO2/Proton child process. The Wyrd-owned prefix
+    remains explicit and independent of that identity. Direct desktop launches
+    retain the Skyrim AppID fallback used by the existing workflow.
+    """
     env = os.environ.copy()
+    inherited_app_id = next(
+        (env.get(key, "").strip() for key in ("STEAM_COMPAT_APP_ID", "SteamAppId", "SteamGameId")
+         if env.get(key, "").strip().isdigit()),
+        None,
+    )
+    app_id = inherited_app_id or APP_ID
     env.update({
         "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(steam_root),
         "STEAM_COMPAT_DATA_PATH": str(prefix_root),
-        "SteamAppId": APP_ID,
-        "SteamGameId": APP_ID,
-        "STEAM_COMPAT_APP_ID": APP_ID,
+        "SteamAppId": app_id,
+        "SteamGameId": app_id,
+        "STEAM_COMPAT_APP_ID": app_id,
         "PROTON_LOG": "0",
     })
     env.setdefault("PROTON_NO_ESYNC", "0")
