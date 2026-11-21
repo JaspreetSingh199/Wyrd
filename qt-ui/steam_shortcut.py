@@ -77,7 +77,11 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         return {"ok": True, "already_installed": True, "desktop_file": str(desktop),
                 "message": "Wyrd's Steam launcher is already installed."}
     bootstrap = Path(__file__).resolve().with_name("steam_bootstrap.py")
-    content = _desktop_entry(bootstrap, Path(__file__).resolve().parent)
+    working_dir = Path(__file__).resolve().parent
+    run_script = working_dir / "run.sh"
+    if not run_script.is_file():
+        return {"ok": False, "message": f"Wyrd runner is missing: {run_script}"}
+    content = _desktop_entry(bootstrap, working_dir)
     temporary = desktop.with_suffix(".desktop.tmp")
     created_desktop = False
     try:
