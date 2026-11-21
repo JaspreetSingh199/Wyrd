@@ -84,10 +84,10 @@ def build_game_mode_preflight(
         blockers.append("A verified Wyrd-managed MO2 installation is required; external installs are not adopted.")
 
     paths = managed_paths(home)
-    storage = inspect_game_mode_storage(paths["prefix"])
+    storage = inspect_game_mode_storage(paths["prefix"], paths["install"])
     if storage.get("ok"):
         findings.append(_item("MO2 instance storage inspection", "ready",
-                              storage.get("message", "Read-only instance inventory completed."),
+                              storage.get("message", "Read-only instance/config inventory completed."),
                               str(paths["prefix"])))
         for instance in storage.get("instances", []):
             findings.append(_item(
