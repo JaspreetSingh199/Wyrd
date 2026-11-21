@@ -420,7 +420,8 @@ class MainWindow(QMainWindow):
             description = self.mo2_state.get("message", "MO2 is not installed.")
             if external:
                 description += "\nExisting installation(s):\n" + "\n".join(external)
-                description += "\nThese copies are left untouched; Wyrd installs into its own managed location."            self.mo2_panel.detail_label.setText(description)
+                description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
+            self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
             self.install_button.setText("Install MO2")
