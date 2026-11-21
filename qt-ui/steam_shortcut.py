@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import hashlib
 import os
-import sys
 from pathlib import Path
 
 from skyrim_detection import find_steam_roots
@@ -29,9 +28,12 @@ def _desktop_exec_quote(value: str) -> str:
 def _desktop_entry(bootstrap: Path, working_dir: Path) -> str:
     # XDG Desktop Entry Exec syntax is not shell syntax: quote each argument
     # using double quotes and desktop-entry escapes, including for paths with spaces.
+    # Use run.sh so Steam uses the same venv-aware native launch path.
+    # A system Python may not have PySide6, while run.sh provisions the project venv.
+    run_script = working_dir / "run.sh"
     exec_line = " ".join(
         _desktop_exec_quote(value)
-        for value in (sys.executable, str(bootstrap.resolve()), "--steam-bootstrap")
+        for value in ("bash", str(run_script.resolve()), "--steam-bootstrap")
     )
     return (
         "[Desktop Entry]\n"
@@ -87,7 +89,8 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         created_desktop = True
         marker_payload = json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
-            "bootstrap": str(bootstrap), "name": SHORTCUT_NAME,
+            "bootstrap": str(bootstrap), "run_script": str(run_script.resolve()),
+            "name": SHORTCUT_NAME,
             "desktop_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         }, indent=2)
         marker_fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -104,7 +107,7 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         temporary.unlink(missing_ok=True)
         return {"ok": False, "message": f"Could not install Wyrd's Steam launcher: {error}"}
     return {"ok": True, "already_installed": False, "desktop_file": str(desktop),
-            "message": "Installed Wyrd's native Steam launcher. Add it to Steam as a non-Steam game; existing Steam entries were not changed."}
+            "message": "Installed Wyrd's native Steam launcher using qt-ui/run.sh. Add it to Steam as a non-Steam game and leave Force Compatibility disabled; existing Steam entries were not changed."}
 
 
 def remove_steam_shortcut(home: Path | None = None) -> dict:
