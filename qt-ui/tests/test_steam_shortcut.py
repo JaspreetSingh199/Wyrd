@@ -46,24 +46,24 @@ class SteamShortcutTests(unittest.TestCase):
             steam.mkdir(parents=True)
             data_home = home / ".local/share"
             app_dir = data_home / "applications"
+            real_open = os.open
+            calls = []
+
+            def open_side_effect(path, flags, mode=0o777):
+                calls.append(path)
+                if len(calls) == 2:
+                    raise OSError("marker failure")
+                return real_open(path, flags, mode)
+
             with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
                  patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}), \\
-                 patch.object(steam_shortcut.os, "open", side_effect=[None, OSError("marker failure")]):
-                # Force the second exclusive open (marker) to fail; the first
-                # open creates the desktop entry.
-                calls = []
-                real_open = os.open
-                def open_side_effect(path, flags, mode=0o777):
-                    calls.append(path)
-                    if len(calls) == 2:
-                        raise OSError("marker failure")
-                    return real_open(path, flags, mode)
-                with patch.object(steam_shortcut.os, "open", side_effect=open_side_effect):
-                    result = steam_shortcut.install_steam_shortcut(home)
-                desktop = app_dir / steam_shortcut.DESKTOP_FILE
-                self.assertFalse(result["ok"])
-                self.assertFalse(desktop.exists())
-                self.assertFalse((app_dir / steam_shortcut.MARKER_NAME).exists())
+                 patch.object(steam_shortcut.os, "open", side_effect=open_side_effect):
+                result = steam_shortcut.install_steam_shortcut(home)
+            desktop = app_dir / steam_shortcut.DESKTOP_FILE
+            marker = app_dir / steam_shortcut.MARKER_NAME
+            self.assertFalse(result["ok"])
+            self.assertFalse(desktop.exists())
+            self.assertFalse(marker.exists())
 
     def test_refuses_to_overwrite_unowned_desktop_file(self):
         with tempfile.TemporaryDirectory() as temp:
