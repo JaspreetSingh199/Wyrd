@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
 
         self.steam_panel = panel(
             "6. Steam-native bootstrap (experimental)",
-            "Install a native Wyrd launcher, then add it to Steam manually as a non-Steam game. Steam must launch the native bootstrap; do not force Proton on Wyrd.",
+            "Install a native Wyrd launcher, then add it to Steam manually as a non-Steam game. Steam starts Wyrd natively; MO2 still uses Wyrd's selected Proton build. This does not yet prove Steam Runtime parity or fix audio.",
         )
         steam_layout = self.steam_panel.layout()
         self.steam_status = QLabel("No Steam-native launcher has been installed.")
@@ -708,9 +708,11 @@ class MainWindow(QMainWindow):
                 self, "Steam-native bootstrap",
                 result.get("message", "") + "\n\n"
                 "Next: open Steam → Games → Add a Non-Steam Game and select "
-                "Wyrd - Skyrim through MO2. Leave compatibility/Proton disabled "
-                "for this native Linux launcher. This is a first experimental "
-                "desktop-entry handoff; it does not edit shortcuts.vdf."
+                "Wyrd - Skyrim through MO2. Leave Force Compatibility disabled: "
+                "this is a native Linux Qt launcher. Steam starts Wyrd, and "
+                "Wyrd still launches MO2 through its selected Proton build. "
+                "This does not guarantee Steam Runtime parity or fix audio. "
+                "Wyrd does not edit shortcuts.vdf."
             )
         elif not result.get("ok"):
             QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Installation failed."))
