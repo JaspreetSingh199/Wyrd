@@ -701,9 +701,10 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, "Steam-native bootstrap",
                 result.get("message", "") + "\n\n"
-                "Next: open Steam → Games → Add a Non-Steam Game, "
-                "select the Wyrd launcher desktop entry, and enable Steam Play/Proton "
-                "only for the Skyrim game entry—not for this native Wyrd launcher."
+                "Next: open Steam → Games → Add a Non-Steam Game and select "
+                "Wyrd - Skyrim through MO2. Leave compatibility/Proton disabled "
+                "for this native Linux launcher. This is a first experimental "
+                "desktop-entry handoff; it does not edit shortcuts.vdf."
             )
         elif not result.get("ok"):
             QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Installation failed."))
