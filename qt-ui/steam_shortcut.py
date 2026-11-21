@@ -110,6 +110,39 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
             "message": "Installed Wyrd's native Steam launcher using qt-ui/run.sh. Add it to Steam as a non-Steam game and leave Force Compatibility disabled; existing Steam entries were not changed."}
 
 
+
+def inspect_steam_shortcut(home: Path | None = None) -> dict:
+    """Read-only status for the Wyrd-owned Steam-import desktop launcher."""
+    home = (home or Path.home()).expanduser()
+    data_home = Path(os.environ.get("XDG_DATA_HOME", home / ".local/share")).expanduser()
+    app_dir = data_home / "applications"
+    desktop = app_dir / DESKTOP_FILE
+    marker = app_dir / MARKER_NAME
+    if not desktop.exists() and not marker.exists():
+        return {"installed": False, "owned": False, "message": "No Wyrd Steam desktop launcher is installed."}
+    if not marker.is_file():
+        return {"installed": desktop.is_file(), "owned": False,
+                "message": "A launcher file exists without Wyrd ownership metadata; it will not be modified."}
+    try:
+        record = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"installed": desktop.is_file(), "owned": False,
+                "message": "Wyrd launcher ownership metadata is unreadable."}
+    if record.get("managed_by") != "Wyrd" or record.get("desktop_file") != str(desktop):
+        return {"installed": desktop.is_file(), "owned": False,
+                "message": "Launcher ownership metadata does not match this Wyrd entry."}
+    if not desktop.is_file() or desktop.is_symlink():
+        return {"installed": False, "owned": True,
+                "message": "Wyrd launcher is missing or its path is unsafe."}
+    expected_hash = record.get("desktop_sha256", "")
+    actual_hash = hashlib.sha256(desktop.read_bytes()).hexdigest()
+    if not expected_hash or actual_hash != expected_hash:
+        return {"installed": True, "owned": False,
+                "message": "Wyrd launcher content was modified; refusing to manage it."}
+    return {"installed": True, "owned": True, "desktop_file": str(desktop),
+            "message": "Wyrd native Steam launcher is installed and ownership-verified."}
+
+
 def remove_steam_shortcut(home: Path | None = None) -> dict:
     """Remove only the exact desktop entry and marker recorded as Wyrd-owned."""
     home = (home or Path.home()).expanduser()
