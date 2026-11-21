@@ -64,6 +64,7 @@ class SteamRuntimeInspectionTests(unittest.TestCase):
             with patch.object(inspection, "find_steam_roots", return_value=[steam_root]):
                 report = inspection.inspect_steam_shortcuts(Path(temp))
             self.assertEqual(report["checked_shortcut_files"], [])
+            self.assertEqual(report["userdata_directories"], [str(steam_root / "userdata")])
             self.assertEqual(report["shortcuts"], [])
             self.assertEqual(report["warnings"], [])
             self.assertIn("across 0 shortcuts.vdf file(s)", report["message"])
