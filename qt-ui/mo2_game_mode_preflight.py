@@ -9,6 +9,7 @@ from typing import Any
 from mo2_game_mode_links import inspect_link, MANIFEST_NAME
 from skyrim_detection import detect_skyrim, APP_ID
 from wyrd_mo2 import managed_paths, inspect_wyrd_installation, discover_proton_builds
+from mo2_game_mode_storage import inspect_game_mode_storage
 
 
 def _item(name: str, status: str, detail: str, path: str | None = None) -> dict[str, Any]:
@@ -83,6 +84,24 @@ def build_game_mode_preflight(
         blockers.append("A verified Wyrd-managed MO2 installation is required; external installs are not adopted.")
 
     paths = managed_paths(home)
+    storage = inspect_game_mode_storage(paths["prefix"])
+    if storage.get("ok"):
+        findings.append(_item("MO2 instance storage inspection", "ready",
+                              storage.get("message", "Read-only instance inventory completed."),
+                              str(paths["prefix"])))
+        for instance in storage.get("instances", []):
+            findings.append(_item(
+                f"MO2 instance: {instance['name']}",
+                "review" if instance.get("is_skyrim_se") else "info",
+                "Skyrim SE instance detected." if instance.get("is_skyrim_se") else "Instance detected; game identity not confirmed.",
+                instance.get("path"),
+            ))
+            for key, value in instance.get("storage_paths", {}).items():
+                findings.append(_item(f"MO2 configured {key}", "review",
+                                      "Path read from MO2 configuration; not resolved or modified.", value))
+    elif installation.get("installed"):
+        findings.append(_item("MO2 instance storage inspection", "blocked",
+                              storage.get("message", "Could not inspect MO2 instance storage.")))
     # Do not guess the MO2 storage layout. Report the standard candidate and
     # require an explicit existing directory until STL's mapping is confirmed.
     data_source = paths["install"] / "ModOrganizer"
