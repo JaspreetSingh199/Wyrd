@@ -34,9 +34,10 @@ class SteamShortcutTests(unittest.TestCase):
                 second = steam_shortcut.install_steam_shortcut(home)
                 self.assertTrue(second["ok"])
                 self.assertTrue(second["already_installed"])
-                removed = steam_shortcut.remove_steam_shortcut(home)
-                self.assertTrue(removed["ok"])
-                self.assertFalse(desktop.exists())
+                desktop.write_text("modified by user", encoding="utf-8")
+                refused = steam_shortcut.remove_steam_shortcut(home)
+                self.assertFalse(refused["ok"])
+                self.assertTrue(desktop.exists())
 
     def test_refuses_to_overwrite_unowned_desktop_file(self):
         with tempfile.TemporaryDirectory() as temp:
