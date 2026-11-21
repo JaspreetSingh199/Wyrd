@@ -199,7 +199,8 @@ class MainWindow(QMainWindow):
         self.audio_repair_button = QPushButton("Repair XACT libraries")
         self.audio_repair_button.clicked.connect(self.repair_audio)
         self.audio_repair_button.setEnabled(False)
-        audio_actions.addWidget(self.audio_check_button)        audio_actions.addWidget(self.audio_repair_button)
+        audio_actions.addWidget(self.audio_check_button)
+        audio_actions.addWidget(self.audio_repair_button)
         self.native_xaudio2_checkbox = QCheckBox("Test native XAudio2 override on next Skyrim launch (xaudio2_7=n,b)")
         self.native_xaudio2_checkbox.setToolTip("Temporary launch-only test. Does not install or replace DLLs.")
         audio_actions.addWidget(self.native_xaudio2_checkbox)
@@ -998,49 +999,3 @@ class MainWindow(QMainWindow):
             self.progress_label.setText("Skyrim detected, but Wyrd ownership could not be confirmed.")
             detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         elif session.state == "game-exited":
-            detail = "The previously detected game process has exited.\\n\\n" + result["message"]
-        elif result["state"] == "exited":
-            self.progress_label.setText("Proton wrapper exited. Skyrim process not detected; review diagnostics.")
-            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
-        elif result["state"] == "running":
-            self.progress_label.setText("Proton wrapper is running; Skyrim process not detected yet.")
-            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
-        else:
-            self.progress_label.setText("Launch status is unknown; inspect diagnostics.")
-            detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
-        QMessageBox.information(self, "Launch process status", detail)
-
-
-    def show_launch_diagnostics(self) -> None:
-        path = managed_paths()["root"] / "logs" / "skyrim-launch.log"
-        result = read_launch_diagnostics(path)
-        if not result.get("ok"):
-            QMessageBox.information(self, "Launch diagnostics", result.get("message", "No diagnostics available."))
-            return
-        self._log("Launch diagnostics opened: " + result["path"])
-        QMessageBox.information(self, "Launch diagnostics", result["content"][-5000:])
-
-    def closeEvent(self, event) -> None:
-        self._stop_launch_monitor("application is closing")
-        self._game_watch_timer.stop()
-        if self.worker and self.worker.isRunning():
-            QMessageBox.information(
-                self, "Setup is running",
-                "MO2 installation is still running. Wait for it to finish before closing Wyrd."
-            )
-            event.ignore()
-            return
-        event.accept()
-
-
-def main() -> int:
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
-    app.setStyleSheet(STYLE)
-    window = MainWindow()
-    window.show()
-    return app.exec()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
