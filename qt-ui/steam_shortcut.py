@@ -1,10 +1,8 @@
-"""Reversible Steam shortcut integration for Wyrd's native bootstrap.
+"""Reversible desktop launcher integration for a Steam-added Wyrd bootstrap.
 
-This module only adds/removes a dedicated non-Steam shortcut. It never edits
-Skyrim's real AppID manifest, compatibility settings, or an existing shortcut.
-Steam's binary shortcuts.vdf format is not rewritten here: installation writes a
-small, Wyrd-owned .desktop entry into the user's Steam shortcuts directory,
-which Steam can expose as a non-Steam application via the desktop launcher.
+This writes a XDG desktop application entry. The user adds that entry to Steam
+using its Add a Non-Steam Game UI. This module never edits shortcuts.vdf, Skyrim's
+real AppID manifest, compatibility settings, or an existing Steam shortcut.
 """
 from __future__ import annotations
 
@@ -18,20 +16,6 @@ from skyrim_detection import find_steam_roots
 SHORTCUT_NAME = "Wyrd - Skyrim through MO2"
 DESKTOP_FILE = "wyrd-skyrim-mo2.desktop"
 MARKER_NAME = ".wyrd-steam-shortcut.json"
-
-
-def _shortcut_paths(home: Path | None = None) -> list[Path]:
-    home = (home or Path.home()).expanduser()
-    paths: list[Path] = []
-    for root in find_steam_roots(home):
-        candidates = (
-            root / "userdata",
-            root / "steamapps",
-        )
-        for candidate in candidates:
-            if candidate.is_dir():
-                paths.append(candidate)
-    return paths
 
 
 def _desktop_entry(bootstrap: Path, working_dir: Path) -> str:
