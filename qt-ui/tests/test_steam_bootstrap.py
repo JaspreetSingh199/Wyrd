@@ -27,8 +27,8 @@ class SteamBootstrapTests(unittest.TestCase):
             main_script = root / "main.py"
             main_script.write_text("", encoding="utf-8")
             script.write_text("", encoding="utf-8")
-            with patch.object(steam_bootstrap, "__file__", str(script)), \\
-                 patch.dict(os.environ, {"XDG_DATA_HOME": str(root / "xdg")}), \\
+            with patch.object(steam_bootstrap, "__file__", str(script)), \
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(root / "xdg")}), \
                  patch.object(steam_bootstrap.subprocess, "run") as run:
                 run.return_value.returncode = 0
                 self.assertEqual(steam_bootstrap.main(["--steam-bootstrap"]), 0)
