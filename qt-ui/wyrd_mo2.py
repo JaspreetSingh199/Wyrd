@@ -88,15 +88,20 @@ def inspect_proton_build(path: Path, host: str | None = None) -> dict:
     }
 
 
-def discover_proton_builds(home: Path | None = None) -> list[dict]:
-    """Discover built-in and user-installed Proton builds across Steam roots."""
+def discover_proton_builds(home: Path | None = None,
+                           system_roots: list[Path] | None = None) -> list[dict]:
+    """Discover Proton builds across Steam roots and optional system locations.
+
+    ``system_roots=None`` uses the normal host-wide locations. Passing an explicit
+    list makes discovery deterministic for isolated tests or callers.
+    """
     home = (home or Path.home()).expanduser()
     candidates: list[Path] = []
     for steam_root in find_steam_roots(home):
         candidates.extend((steam_root / "steamapps/common").glob("Proton*"))
         candidates.extend((steam_root / "compatibilitytools.d").iterdir()
                           if (steam_root / "compatibilitytools.d").is_dir() else [])
-    extra_roots = [
+    extra_roots = system_roots if system_roots is not None else [
         home / ".steam/root/compatibilitytools.d",
         home / ".steam/steam/compatibilitytools.d",
         home / ".local/share/Steam/compatibilitytools.d",
