@@ -39,6 +39,35 @@ class SteamRuntimeInspectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspection._parse_binary_vdf(b"\x00shortcuts\0\x07key\0value\0\x08")
 
+    def test_shortcut_scan_reports_roots_and_files_checked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            steam_root = Path(temp) / ".steam" / "root"
+            account = steam_root / "userdata" / "12345" / "config"
+            account.mkdir(parents=True)
+            payload = vdf_object("shortcuts", vdf_object("0", (
+                vdf_string(1, "appname", "Wyrd - Skyrim through MO2")
+                + vdf_string(1, "exe", '"/home/user/Wyrd/qt-ui/run.sh"')
+            )))
+            shortcut_file = account / "shortcuts.vdf"
+            shortcut_file.write_bytes(payload)
+            with patch.object(inspection, "find_steam_roots", return_value=[steam_root]):
+                report = inspection.inspect_steam_shortcuts(Path(temp))
+            self.assertEqual(report["detected_steam_roots"], [str(steam_root)])
+            self.assertEqual(report["checked_shortcut_files"], [str(shortcut_file)])
+            self.assertEqual(len(report["shortcuts"]), 1)
+            self.assertIn("across 1 shortcuts.vdf file(s)", report["message"])
+
+    def test_shortcut_scan_reports_no_userdata_files_without_claiming_parse_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            steam_root = Path(temp) / ".steam" / "root"
+            (steam_root / "userdata").mkdir(parents=True)
+            with patch.object(inspection, "find_steam_roots", return_value=[steam_root]):
+                report = inspection.inspect_steam_shortcuts(Path(temp))
+            self.assertEqual(report["checked_shortcut_files"], [])
+            self.assertEqual(report["shortcuts"], [])
+            self.assertEqual(report["warnings"], [])
+            self.assertIn("across 0 shortcuts.vdf file(s)", report["message"])
+
     def test_runtime_summary_does_not_infer_runtime_from_appid_alone(self):
         summary = inspection.steam_runtime_environment({
             "SteamAppId": "123456789",
