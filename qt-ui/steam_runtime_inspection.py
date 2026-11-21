@@ -119,9 +119,56 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
     }
 
 
+def _parse_text_vdf_object(text: str, root_name: str) -> dict[str, Any]:
+    """Parse nested Steam text VDF objects with quoted strings and braces."""
+    import re
+
+    tokens = re.findall(r'"((?:\\\\.|[^"\\\\])*)"|([{}])', text)
+    values = [a.replace(r'\\"', '"').replace(r"\\\\", "\\") if a else b for a, b in tokens]
+    index = 0
+
+    def parse_object() -> dict[str, Any]:
+        nonlocal index
+        result: dict[str, Any] = {}
+        while index < len(values):
+            token = values[index]
+            index += 1
+            if token == "}":
+                return result
+            if token == "{":
+                raise ValueError("unexpected opening brace in VDF")
+            if index >= len(values):
+                raise ValueError("missing VDF value")
+            value = values[index]
+            index += 1
+            if value == "{":
+                result[token] = parse_object()
+            elif value in ("}", ""):
+                raise ValueError("invalid VDF scalar value")
+            else:
+                result[token] = value
+        return result
+
+    while index < len(values):
+        key = values[index]
+        index += 1
+        if index < len(values) and values[index] == "{":
+            index += 1
+            parsed = parse_object()
+            if key == root_name:
+                return parsed
+    raise ValueError(f"VDF root {root_name!r} not found")
+
+
 def inspect_steam_compat_mappings(home: Path | None = None) -> dict:
-    """Read only matching Steam CompatToolMapping blocks from config.vdf."""
+    """Read-only lookup of CompatToolMapping for actual Wyrd shortcut AppIDs."""
     home = (home or Path.home()).expanduser()
+    shortcuts = inspect_steam_shortcuts(home)
+    appids = {
+        str(abs(item["appid"]))
+        for item in shortcuts["shortcuts"]
+        if item.get("appid") is not None
+    }
     matches = []
     warnings = []
     for root in find_steam_roots(home):
@@ -129,29 +176,22 @@ def inspect_steam_compat_mappings(home: Path | None = None) -> dict:
         if not config.is_file():
             continue
         try:
-            # Keep the parser deliberately read-only and narrow: enumerate
-            # shortcut appids already discovered in shortcuts.vdf, then report
-            # exact numeric keys and nearby mapping names only.
-            shortcut_state = inspect_steam_shortcuts(home)
-            appids = {
-                str(abs(item["appid"]))
-                for item in shortcut_state["shortcuts"]
-                if item.get("appid") is not None
-            }
             text = config.read_text(encoding="utf-8", errors="replace")
-            for appid in appids:
-                marker = f'"{appid}"'
-                start = text.find(marker)
-                while start >= 0:
-                    excerpt = text[start:text.find("\n\t\t\t}", start) + 5 if text.find("\n\t\t\t}", start) >= 0 else start + 500]
-                    if "CompatToolMapping" in text[max(0, start - 5000):start]:
-                        matches.append({"steam_root": str(root), "appid": appid, "excerpt": excerpt[:700]})
-                        break
-                    start = text.find(marker, start + len(marker))
-        except OSError as error:
+            mapping = _parse_text_vdf_object(text, "CompatToolMapping")
+            for appid in sorted(appids):
+                entry = mapping.get(appid)
+                if isinstance(entry, dict):
+                    matches.append({
+                        "steam_root": str(root), "appid": appid,
+                        "name": entry.get("name"), "config": entry.get("config"),
+                        "priority": entry.get("priority"),
+                    })
+        except (OSError, ValueError) as error:
             warnings.append(f"{config}: {error}")
-    return {"ok": not warnings, "mappings": matches, "warnings": warnings}
-
+    return {
+        "ok": not warnings, "mappings": matches, "warnings": warnings,
+        "message": f"Found {len(matches)} matching Proton compatibility mapping(s).",
+    }
 
 def steam_runtime_environment(environment: dict[str, str] | None = None) -> dict:
     """Summarize documented runtime indicators without changing process state."""
