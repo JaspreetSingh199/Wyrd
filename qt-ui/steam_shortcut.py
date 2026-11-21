@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import sys
 from pathlib import Path
 
 from skyrim_detection import find_steam_roots
@@ -28,12 +29,11 @@ def _desktop_exec_quote(value: str) -> str:
 def _desktop_entry(bootstrap: Path, working_dir: Path) -> str:
     # XDG Desktop Entry Exec syntax is not shell syntax: quote each argument
     # using double quotes and desktop-entry escapes, including for paths with spaces.
-    # Use run.sh so Steam uses the same venv-aware native launch path.
-    # A system Python may not have PySide6, while run.sh provisions the project venv.
-    run_script = working_dir / "run.sh"
+    # The stdlib-only bootstrap captures Steam's environment, then delegates to
+    # run.sh so Qt starts from Wyrd's project virtual environment.
     exec_line = " ".join(
         _desktop_exec_quote(value)
-        for value in ("bash", str(run_script.resolve()), "--steam-bootstrap")
+        for value in (sys.executable, str(bootstrap.resolve()), "--steam-bootstrap")
     )
     return (
         "[Desktop Entry]\n"
@@ -79,6 +79,8 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
     bootstrap = Path(__file__).resolve().with_name("steam_bootstrap.py")
     working_dir = Path(__file__).resolve().parent
     run_script = working_dir / "run.sh"
+    if not bootstrap.is_file():
+        return {"ok": False, "message": f"Wyrd Steam bootstrap is missing: {bootstrap}"}
     if not run_script.is_file():
         return {"ok": False, "message": f"Wyrd runner is missing: {run_script}"}
     content = _desktop_entry(bootstrap, working_dir)
@@ -111,7 +113,7 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         temporary.unlink(missing_ok=True)
         return {"ok": False, "message": f"Could not install Wyrd's Steam launcher: {error}"}
     return {"ok": True, "already_installed": False, "desktop_file": str(desktop),
-            "message": "Installed Wyrd's native Steam launcher using qt-ui/run.sh. Add it to Steam as a non-Steam game and leave Force Compatibility disabled; existing Steam entries were not changed."}
+            "message": "Installed Wyrd's native Steam launcher through steam_bootstrap.py and qt-ui/run.sh. Add it to Steam as a non-Steam game and leave Force Compatibility disabled; existing Steam entries were not changed."}
 
 
 
