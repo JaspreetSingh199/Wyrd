@@ -747,6 +747,8 @@ class MainWindow(QMainWindow):
             lines.append("No Wyrd shortcut was found in detected Steam userdata.")
         lines.append("Detected Steam roots:")
         lines.extend(shortcuts.get("detected_steam_roots") or ["(none)"])
+        lines.append("Steam userdata directories found:")
+        lines.extend(shortcuts.get("userdata_directories") or ["(none found)"])
         lines.append("shortcuts.vdf files inspected:")
         lines.extend(shortcuts.get("checked_shortcut_files") or ["(none found)"])
         if shortcuts.get("warnings"):
