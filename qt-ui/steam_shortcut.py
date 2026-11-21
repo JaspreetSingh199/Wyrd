@@ -72,6 +72,7 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         marker.write_text(json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
             "bootstrap": str(bootstrap), "name": SHORTCUT_NAME,
+            "desktop_sha256": __import__("hashlib").sha256(content.encode("utf-8")).hexdigest(),
         }, indent=2), encoding="utf-8")
         temporary.unlink(missing_ok=True)
     except OSError as error:
@@ -101,6 +102,12 @@ def remove_steam_shortcut(home: Path | None = None) -> dict:
     if desktop.is_symlink() or (desktop.exists() and not desktop.is_file()):
         return {"ok": False, "message": "Launcher path is not a regular file; nothing removed."}
     if desktop.is_file():
+        expected_hash = record.get("desktop_sha256")
+        if not expected_hash:
+            return {"ok": False, "message": "Ownership marker has no content hash; refusing to remove an unverified launcher."}
+        actual_hash = __import__("hashlib").sha256(desktop.read_bytes()).hexdigest()
+        if actual_hash != expected_hash:
+            return {"ok": False, "message": "Launcher content changed since installation; refusing to remove it."}
         desktop.unlink()
     marker.unlink()
     return {"ok": True, "message": "Removed Wyrd's owned desktop launcher. Steam's other entries and game configuration were untouched."}
