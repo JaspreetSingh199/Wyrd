@@ -35,6 +35,27 @@ class GameModeStorageTests(unittest.TestCase):
             self.assertTrue(ini.is_file())
             self.assertFalse((root / "storage-inspection.json").exists())
 
+    def test_detects_portable_config_at_wyrd_install_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            marker = root / ".wyrd-managed.json"
+            marker.write_text(json.dumps({"managed_by": "Wyrd"}), encoding="utf-8")
+            install = root / "mo2"
+            install.mkdir()
+            ini = install / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\\ngameName=Skyrim Special Edition\\ngamePath=Z:\\games\\Skyrim Special Edition\\n"
+                "selected_profile=Default\\n[Settings]\\nmod_directory=Z:\\mods\\Skyrim\\n",
+                encoding="utf-8",
+            )
+            report = inspect_game_mode_storage(root, install)
+            self.assertTrue(report["ok"])
+            self.assertEqual(len(report["instances"]), 1)
+            self.assertEqual(report["instances"][0]["layout"], "portable")
+            self.assertTrue(report["instances"][0]["is_skyrim_se"])
+            self.assertEqual(report["instances"][0]["storage_paths"]["mod_directory"], "Z:\\mods\\Skyrim")
+            self.assertTrue(ini.is_file())
+
     def test_unowned_prefix_is_not_inspected(self):
         with tempfile.TemporaryDirectory() as temp:
             report = inspect_game_mode_storage(Path(temp))
