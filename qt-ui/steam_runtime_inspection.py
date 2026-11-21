@@ -80,6 +80,7 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
     results = []
     warnings = []
     checked_files = []
+    userdata_directories = []
     detected_roots = [str(root) for root in find_steam_roots(home)]
     for root in map(Path, detected_roots):
         userdata = root / "userdata"
@@ -93,8 +94,15 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
         except OSError as error:
             warnings.append(f"{userdata}: {error}")
             continue
+        userdata_directories.append(str(userdata))
         for account_dir in account_dirs:
-            shortcuts = account_dir / "config" / "shortcuts.vdf"
+            config_dir = account_dir / "config"
+            config_file = config_dir / "shortcuts.vdf"
+            if config_dir.is_dir() and not config_file.exists():
+                # Record account config locations even if Steam has not written
+                # shortcuts.vdf yet; do not assume that absence means import failed.
+                continue
+            shortcuts = config_file
             if not shortcuts.is_file():
                 continue
             checked_files.append(str(shortcuts))
@@ -127,6 +135,7 @@ def inspect_steam_shortcuts(home: Path | None = None) -> dict:
         "warnings": warnings,
         "detected_steam_roots": detected_roots,
         "checked_shortcut_files": checked_files,
+        "userdata_directories": userdata_directories,
         "message": (
             f"Found {len(results)} Wyrd shortcut record(s) across {len(checked_files)} "
             f"shortcuts.vdf file(s)."
