@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from skyrim_detection import detect_skyrim
+from mo2_game_mode_preflight import build_game_mode_preflight, format_preflight_report
+from mo2_game_mode_prepare import prepare_game_mode
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
@@ -197,14 +199,34 @@ class MainWindow(QMainWindow):
         self.audio_repair_button = QPushButton("Repair XACT libraries")
         self.audio_repair_button.clicked.connect(self.repair_audio)
         self.audio_repair_button.setEnabled(False)
-        audio_actions.addWidget(self.audio_check_button)
-        audio_actions.addWidget(self.audio_repair_button)
+        audio_actions.addWidget(self.audio_check_button)        audio_actions.addWidget(self.audio_repair_button)
         self.native_xaudio2_checkbox = QCheckBox("Test native XAudio2 override on next Skyrim launch (xaudio2_7=n,b)")
         self.native_xaudio2_checkbox.setToolTip("Temporary launch-only test. Does not install or replace DLLs.")
         audio_actions.addWidget(self.native_xaudio2_checkbox)
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         layout.addWidget(self.audio_panel)
+
+        self.game_mode_panel = panel(
+            "5. Experimental Game Mode",
+            "Review the MO2 data mapping into Skyrim's Proton prefix. Nothing changes until you review and confirm preparation.",
+        )
+        game_mode_layout = self.game_mode_panel.layout()
+        self.game_mode_status = QLabel("Game Mode has not been inspected.")
+        self.game_mode_status.setObjectName("muted")
+        self.game_mode_status.setWordWrap(True)
+        game_mode_layout.addWidget(self.game_mode_status)
+        game_mode_actions = QHBoxLayout()
+        self.game_mode_review_button = QPushButton("Review Game Mode")
+        self.game_mode_review_button.clicked.connect(self.review_game_mode)
+        self.game_mode_prepare_button = QPushButton("Prepare reviewed links")
+        self.game_mode_prepare_button.clicked.connect(self.prepare_game_mode)
+        self.game_mode_prepare_button.setEnabled(False)
+        game_mode_actions.addWidget(self.game_mode_review_button)
+        game_mode_actions.addWidget(self.game_mode_prepare_button)
+        game_mode_actions.addStretch(1)
+        game_mode_layout.addLayout(game_mode_actions)
+        layout.addWidget(self.game_mode_panel)
 
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
@@ -397,8 +419,7 @@ class MainWindow(QMainWindow):
             description = self.mo2_state.get("message", "MO2 is not installed.")
             if external:
                 description += "\nExisting installation(s):\n" + "\n".join(external)
-                description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
-            self.mo2_panel.detail_label.setText(description)
+                description += "\nThese copies are left untouched; Wyrd installs into its own managed location."            self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
             self.install_button.setText("Install MO2")
@@ -503,6 +524,70 @@ class MainWindow(QMainWindow):
         finally:
             self.audio_repair_button.setEnabled(bool(getattr(self, "audio_report", {}).get("repair_available")))
 
+    def review_game_mode(self) -> None:
+        """Run a read-only Game Mode preflight and show all proposed paths."""
+        try:
+            report = build_game_mode_preflight()
+        except Exception as error:
+            self.game_mode_status.setText("Preflight failed: " + str(error))
+            self.game_mode_prepare_button.setEnabled(False)
+            self._log("Game Mode preflight exception: " + str(error))
+            QMessageBox.warning(self, "Game Mode review", str(error))
+            return
+        self.game_mode_report = report
+        self.game_mode_prepare_button.setEnabled(bool(report.get("ok") and report.get("proposed_links")))
+        self.game_mode_status.setText(
+            "Preflight is ready for review. No changes made."
+            if report.get("ok") else
+            "Preflight found blockers. No changes made."
+        )
+        self._log("Game Mode read-only preflight: " + report.get("message", "completed"))
+        QMessageBox.information(self, "Game Mode — read-only review", format_preflight_report(report))
+
+    def prepare_game_mode(self) -> None:
+        """Re-run preflight and require a separate explicit confirmation before linking."""
+        try:
+            report = build_game_mode_preflight()
+        except Exception as error:
+            self.game_mode_status.setText("Fresh preflight failed: " + str(error))
+            self.game_mode_prepare_button.setEnabled(False)
+            QMessageBox.warning(self, "Game Mode preparation", str(error))
+            return
+        self.game_mode_report = report
+        if not report.get("ok") or not report.get("proposed_links"):
+            self.game_mode_prepare_button.setEnabled(False)
+            self.game_mode_status.setText("Fresh preflight is blocked. No changes made.")
+            QMessageBox.warning(self, "Game Mode preparation", format_preflight_report(report))
+            return
+        links = report["proposed_links"]
+        link_summary = "\n\n".join(
+            f"Target (in Skyrim prefix):\n{item['target']}\n\nSource (Wyrd MO2 prefix):\n{item['source']}"
+            for item in links
+        )
+        answer = QMessageBox.question(
+            self, "Confirm Game Mode link preparation",
+            "Wyrd will create only the reviewed symlink(s) shown below and record ownership. "
+            "It will not copy data, overwrite existing files, reset either Proton prefix, or touch Skyrim saves. "
+            "Preparation is experimental and the mapping has not yet been validated by a full game launch.\n\n"
+            + link_summary + "\n\nProceed?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            self.game_mode_status.setText("Preparation cancelled. No changes made.")
+            return
+        try:
+            result = prepare_game_mode(report, managed_paths()["config"] / "game-mode", confirmed=True)
+        except Exception as error:
+            result = {"ok": False, "message": str(error)}
+        self._log("Game Mode preparation: " + result.get("message", "completed"))
+        self.game_mode_status.setText(result.get("message", "Preparation result unavailable."))
+        if result.get("ok"):
+            QMessageBox.information(self, "Game Mode prepared", result.get("message", "Links prepared and ownership-recorded."))
+        else:
+            QMessageBox.warning(self, "Game Mode preparation failed", result.get("message", "No successful preparation reported."))
+        self.review_game_mode()
+
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
             return
@@ -597,8 +682,7 @@ class MainWindow(QMainWindow):
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
         if not instances:
-            QMessageBox.warning(
-                self, "Skyrim launch unavailable",
+            QMessageBox.warning(                self, "Skyrim launch unavailable",
                 self.instance_state.get("message", "No Skyrim Special Edition MO2 instance is available."),
             )
             return
@@ -797,8 +881,7 @@ class MainWindow(QMainWindow):
         if not processes:
             self._game_watch_timer.stop()
             return
-        active = [process for process in processes if process.matches_current_process()]
-        if active:
+        active = [process for process in processes if process.matches_current_process()]        if active:
             self.launch_session.game_processes = active
             return
         self._game_watch_timer.stop()
