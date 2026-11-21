@@ -26,7 +26,11 @@ def prepare_game_mode(report: dict[str, Any], state_dir: Path, *, confirmed: boo
     for item in links:
         source, target = Path(item["source"]), Path(item["target"])
         result = create_owned_link(source, target, state_dir)
-        if not result.get("ok"):
+        if (not result.get("ok") or
+                (result.get("state") == "linked" and not result.get("owned"))):
+            if result.get("ok"):
+                result = {"ok": False, "state": "unowned-link",
+                          "message": "Matching symlink exists but is not recorded as Wyrd-owned; it was not adopted."}
             rolled_back = []
             rollback_errors = []
             for old_source, old_target in reversed(created):
