@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from mo2_game_mode_links import create_owned_link, inspect_link, rollback_owned_link
+from mo2_game_mode_links import (
+    create_owned_link, inspect_link, rollback_owned_link, manifest_path,
+)
 
 
 class GameModeLinkTests(unittest.TestCase):
@@ -25,8 +27,7 @@ class GameModeLinkTests(unittest.TestCase):
         self.assertEqual(created["state"], "created")
         self.assertTrue(self.target.is_symlink())
         self.assertEqual(self.target.resolve(), self.source.resolve())
-        manifest = self.state / "game-mode-links.json"
-        self.assertEqual(len(json.loads(manifest.read_text())["links"]), 1)
+        self.assertEqual(len(json.loads(manifest_path(self.state).read_text())["links"]), 1)
         removed = rollback_owned_link(self.source, self.target, self.state)
         self.assertTrue(removed["ok"])
         self.assertFalse(self.target.exists())
@@ -47,6 +48,7 @@ class GameModeLinkTests(unittest.TestCase):
         result = create_owned_link(self.source, self.target, self.state)
         self.assertFalse(result["ok"])
         self.assertEqual(self.target.resolve(), other.resolve())
+        self.assertFalse(self.state.exists())
 
     def test_rollback_refuses_unowned_link(self):
         self.target.parent.mkdir()
@@ -54,6 +56,21 @@ class GameModeLinkTests(unittest.TestCase):
         result = rollback_owned_link(self.source, self.target, self.state)
         self.assertFalse(result["ok"])
         self.assertTrue(self.target.is_symlink())
+
+    def test_malformed_manifest_blocks_mutation(self):
+        self.state.mkdir()
+        manifest_path(self.state).write_text('{"version": 1, "links": "not-a-list"}')
+        result = create_owned_link(self.source, self.target, self.state)
+        self.assertFalse(result["ok"])
+        self.assertFalse(self.target.is_symlink())
+
+    def test_missing_recorded_link_can_be_forgotten(self):
+        created = create_owned_link(self.source, self.target, self.state)
+        self.assertTrue(created["ok"])
+        self.target.unlink()
+        result = rollback_owned_link(self.source, self.target, self.state)
+        self.assertEqual(result["state"], "already-absent")
+        self.assertEqual(json.loads(manifest_path(self.state).read_text())["links"], [])
 
 
 if __name__ == "__main__":
