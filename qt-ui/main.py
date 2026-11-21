@@ -291,6 +291,20 @@ class MainWindow(QMainWindow):
         self._restore_saved_selection()
         self._save_selection(self.proton_combo.currentIndex())
 
+    def show_launch_diagnostics(self) -> None:
+        """Show the launcher setup log and any available launch diagnostics."""
+        details = self.log_view.toPlainText().strip() or "No diagnostics have been recorded yet."
+        session = getattr(self, "launch_session", None)
+        log_path = getattr(session, "log_path", None) if session else None
+        if log_path:
+            diagnostics = read_launch_diagnostics(Path(log_path))
+            if diagnostics.get("ok") and diagnostics.get("content", "").strip():
+                details += "\n\n--- Recent MO2/Proton log ---\n" + diagnostics["content"][-6000:]
+            elif not diagnostics.get("ok"):
+                details += "\n\nLaunch log: " + diagnostics.get("message", "unavailable")
+        QMessageBox.information(self, "Wyrd diagnostics", details)
+
+
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
 
