@@ -29,12 +29,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     command = [str(python), str(script_dir / "main.py"), "--steam-bootstrap"]
     try:
-        process = subprocess.Popen(command, cwd=script_dir, start_new_session=True)
+        completed = subprocess.run(command, cwd=script_dir, check=False)
     except OSError as error:
         print(f"Could not start Wyrd: {error}", file=sys.stderr)
         return 1
-    print(f"Started Wyrd bootstrap (PID {process.pid}).")
-    return 0
+    return completed.returncode
 
 
 if __name__ == "__main__":
