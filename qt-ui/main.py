@@ -1001,3 +1001,11 @@ class MainWindow(QMainWindow):
             self.progress_label.setText("Skyrim detected, but Wyrd ownership could not be confirmed.")
             detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         elif session.state == "game-exited":
+        elif session.state == "game-exited":
+            self.progress_label.setText("Skyrim/SKSE is no longer running.")
+            detail = "Previously detected Skyrim/SKSE processes have exited.\n\n" + process_scan.get("message", "")
+        else:
+            self.progress_label.setText("No Skyrim/SKSE process could be confirmed.")
+            detail = result["message"] + "\n\n" + process_scan.get("message", "")
+
+        QMessageBox.information(self, "Launch process status", detail)
