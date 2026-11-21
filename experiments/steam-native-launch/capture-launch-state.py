@@ -6,6 +6,7 @@ environment is never dumped because it may contain secrets.
 """
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 import time
@@ -52,7 +53,19 @@ def process_info(pid: int) -> dict | None:
     return {"pid": pid, "ppid": ppid, "comm": comm, "cmdline": cmdline, "environment": env}
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Capture read-only Steam/Proton process diagnostics.")
+    parser.add_argument("--game-only", action="store_true",
+                        help="Only include SkyrimSE.exe / Skyrim.exe processes.")
+    parser.add_argument("--wait", type=float, default=0,
+                        help="Wait up to this many seconds for SkyrimSE.exe to appear.")
+    parser.add_argument("--output", type=Path,
+                        help="Write JSON to this file instead of stdout.")
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     proc = Path("/proc")
     candidates = []
     for entry in proc.iterdir():
@@ -82,7 +95,12 @@ def main() -> None:
         "capture_mode": "read-only; environment allowlist only",
         "processes": sorted(candidates, key=lambda x: x["pid"]),
     }
-    print(json.dumps(report, indent=2))
+    rendered = json.dumps(report, indent=2)
+    if args.output:
+        args.output.write_text(rendered + "\\n")
+        print(f"Wrote {len(candidates)} process(es) to {args.output}")
+    else:
+        print(rendered)
 
 
 if __name__ == "__main__":
