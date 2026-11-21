@@ -35,6 +35,11 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertTrue(first["ok"])
                 desktop = Path(first["desktop_file"])
                 self.assertTrue(desktop.is_file())
+                entry = desktop.read_text(encoding="utf-8")
+                marker_path = desktop.parent / steam_shortcut.MARKER_NAME
+                marker = __import__("json").loads(marker_path.read_text(encoding="utf-8"))
+                self.assertIn(str((Path(steam_shortcut.__file__).resolve().parent / "run.sh").resolve()), entry)
+                self.assertEqual(marker["run_script"], str((Path(steam_shortcut.__file__).resolve().parent / "run.sh").resolve()))
                 second = steam_shortcut.install_steam_shortcut(home)
                 self.assertTrue(second["ok"])
                 self.assertTrue(second["already_installed"])
