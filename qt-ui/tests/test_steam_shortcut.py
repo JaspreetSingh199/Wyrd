@@ -54,6 +54,21 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertFalse(result["ok"])
                 self.assertEqual(desktop.read_text(encoding="utf-8"), "user-owned")
 
+    def test_remove_refuses_modified_owned_launcher(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            steam = home / ".steam/root"
+            steam.mkdir(parents=True)
+            data_home = home / ".local/share"
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                installed = steam_shortcut.install_steam_shortcut(home)
+                desktop = Path(installed["desktop_file"])
+                desktop.write_text("modified by user", encoding="utf-8")
+                result = steam_shortcut.remove_steam_shortcut(home)
+                self.assertFalse(result["ok"])
+                self.assertTrue(desktop.exists())
+
     def test_remove_refuses_mismatched_ownership_marker(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
