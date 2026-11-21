@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
-import shlex
+import sys
 import sys
 from pathlib import Path
 
@@ -20,10 +20,23 @@ DESKTOP_FILE = "wyrd-skyrim-mo2.desktop"
 MARKER_NAME = ".wyrd-steam-shortcut.json"
 
 
+def _desktop_exec_quote(value: str) -> str:
+    """Quote one Exec argument using Desktop Entry, not shell, escaping rules."""
+    escaped = (value.replace("\\\\", "\\\\\\\\")
+                    .replace('"', '\\\\"')
+                    .replace("$", "\\\\$")
+                    .replace("`", "\\\\`")
+                    .replace("%", "%%"))
+    return '"' + escaped + '"'
+
+
 def _desktop_entry(bootstrap: Path, working_dir: Path) -> str:
-    # This is an XDG desktop entry intended for the native host. It does not
-    # run the Python launcher through Proton.
-    exec_line = shlex.join([sys.executable, str(bootstrap.resolve()), "--steam-bootstrap"])
+    # XDG Desktop Entry Exec syntax is not shell syntax: quote each argument
+    # using double quotes and desktop-entry escapes, including for paths with spaces.
+    exec_line = " ".join(
+        _desktop_exec_quote(value)
+        for value in (sys.executable, str(bootstrap.resolve()), "--steam-bootstrap")
+    )
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
