@@ -1128,10 +1128,18 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
             continue
         env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
         attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
+        # Only expose a small, non-secret audio-related environment allowlist.
+        # This reads the actual Skyrim/SKSE process environment, not the Proton wrapper.
+        audio_runtime = {}
+        for key in ("WINEDLLOVERRIDES", "PULSE_LATENCY_MSEC"):
+            value = next((part.split("=", 1)[1] for part in env_parts
+                         if part.startswith(key + "=")), None)
+            audio_runtime[key] = value
         detected.append({
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
             "start_time": _proc_start_time(int(entry.name), Path(proc_root)),
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
+            "audio_runtime_environment": audio_runtime,
         })
     detected.sort(key=lambda item: item["pid"])
     associated = [item for item in detected if item["attributed_to_wyrd"]]
