@@ -18,8 +18,9 @@ class SteamShortcutTests(unittest.TestCase):
             self.assertIn("Name=Wyrd - Skyrim through MO2", entry)
             self.assertIn("--steam-bootstrap", entry)
             self.assertIn('"', entry.split("Exec=", 1)[1].splitlines()[0])
-            self.assertIn('"bash"', entry)
-            self.assertIn(str((root / "run.sh").resolve()), entry)
+            self.assertIn(steam_shortcut._desktop_exec_quote(str(bootstrap.resolve())), entry)
+            self.assertIn(steam_shortcut._desktop_exec_quote(__import__("sys").executable), entry)
+            self.assertNotIn(str((root / "run.sh").resolve()), entry)
             self.assertIn("--steam-bootstrap", entry)
             self.assertNotIn("proton run", entry.lower())
 
@@ -38,8 +39,11 @@ class SteamShortcutTests(unittest.TestCase):
                 entry = desktop.read_text(encoding="utf-8")
                 marker_path = desktop.parent / steam_shortcut.MARKER_NAME
                 marker = __import__("json").loads(marker_path.read_text(encoding="utf-8"))
-                self.assertIn(str((Path(steam_shortcut.__file__).resolve().parent / "run.sh").resolve()), entry)
-                self.assertEqual(marker["run_script"], str((Path(steam_shortcut.__file__).resolve().parent / "run.sh").resolve()))
+                bootstrap = Path(steam_shortcut.__file__).resolve().with_name("steam_bootstrap.py")
+                run_script = Path(steam_shortcut.__file__).resolve().parent / "run.sh"
+                self.assertIn(str(bootstrap), entry)
+                self.assertEqual(marker["bootstrap"], str(bootstrap))
+                self.assertEqual(marker["run_script"], str(run_script.resolve()))
                 second = steam_shortcut.install_steam_shortcut(home)
                 self.assertTrue(second["ok"])
                 self.assertTrue(second["already_installed"])
