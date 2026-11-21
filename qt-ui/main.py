@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from skyrim_detection import detect_skyrim
 from mo2_game_mode_preflight import build_game_mode_preflight, format_preflight_report
 from mo2_game_mode_prepare import prepare_game_mode
+from steam_shortcut import install_steam_shortcut, remove_steam_shortcut
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
@@ -228,6 +229,27 @@ class MainWindow(QMainWindow):
         game_mode_actions.addStretch(1)
         game_mode_layout.addLayout(game_mode_actions)
         layout.addWidget(self.game_mode_panel)
+
+        self.steam_panel = panel(
+            "6. Steam-native bootstrap (experimental)",
+            "Install a native Wyrd launcher, then add it to Steam manually as a non-Steam game. Steam must launch the native bootstrap; do not force Proton on Wyrd.",
+        )
+        steam_layout = self.steam_panel.layout()
+        self.steam_status = QLabel("No Steam-native launcher has been installed.")
+        self.steam_status.setObjectName("muted")
+        self.steam_status.setWordWrap(True)
+        steam_layout.addWidget(self.steam_status)
+        steam_actions = QHBoxLayout()
+        self.install_steam_button = QPushButton("Install Steam launcher")
+        self.install_steam_button.clicked.connect(self.install_steam_launcher)
+        self.remove_steam_button = QPushButton("Remove Steam launcher")
+        self.remove_steam_button.clicked.connect(self.remove_steam_launcher)
+        steam_actions.addWidget(self.install_steam_button)
+        steam_actions.addWidget(self.remove_steam_button)
+        steam_actions.addStretch(1)
+        steam_layout.addLayout(steam_actions)
+        layout.addWidget(self.steam_panel)
+
 
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
@@ -669,6 +691,30 @@ class MainWindow(QMainWindow):
     def _has_instance(self) -> bool:
         state = self._instance_inspection()
         return bool(state.get("ok") and state.get("instances"))
+
+    def install_steam_launcher(self) -> None:
+        """Install the optional, reversible native Steam bootstrap launcher."""
+        result = install_steam_shortcut()
+        self._log("Steam launcher: " + result.get("message", "unknown result"))
+        self.steam_status.setText(result.get("message", "Steam launcher operation completed."))
+        if result.get("ok") and result.get("desktop_file"):
+            QMessageBox.information(
+                self, "Steam-native bootstrap",
+                result.get("message", "") + "\n\n"
+                "Next: open Steam → Games → Add a Non-Steam Game, "
+                "select the Wyrd launcher desktop entry, and enable Steam Play/Proton "
+                "only for the Skyrim game entry—not for this native Wyrd launcher."
+            )
+        elif not result.get("ok"):
+            QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Installation failed."))
+
+    def remove_steam_launcher(self) -> None:
+        """Remove only the Wyrd-owned optional desktop launcher."""
+        result = remove_steam_shortcut()
+        self._log("Steam launcher: " + result.get("message", "unknown result"))
+        self.steam_status.setText(result.get("message", "Steam launcher operation completed."))
+        if not result.get("ok"):
+            QMessageBox.warning(self, "Steam-native bootstrap", result.get("message", "Removal failed."))
 
     def start_mo2(self) -> None:
         state = self._instance_inspection()
