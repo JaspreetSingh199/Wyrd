@@ -46,7 +46,7 @@ class WyrdMO2Tests(unittest.TestCase):
             proc.mkdir()
             for pid, argv, env, comm in [
                 ("100", ["SkyrimSE.exe"], [], "SkyrimSE.exe"),
-                ("101", ["skse64_loader.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}"], "skse64_loader.exe"),
+                ("101", ["skse64_loader.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}", "WINEDLLOVERRIDES=xaudio2_7=n,b", "PULSE_LATENCY_MSEC=90"], "skse64_loader.exe"),
                 ("102", ["python"], [], "python"),
             ]:
                 entry = proc / pid
@@ -62,6 +62,14 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual([item["pid"] for item in result["processes"]], [100, 101])
             self.assertEqual([item["pid"] for item in result["wyrd_processes"]], [101])
             self.assertFalse(result["processes"][0]["attributed_to_wyrd"])
+            self.assertEqual(
+                result["processes"][1]["audio_runtime_environment"],
+                {"WINEDLLOVERRIDES": "xaudio2_7=n,b", "PULSE_LATENCY_MSEC": "90"},
+            )
+            self.assertEqual(
+                result["processes"][0]["audio_runtime_environment"],
+                {"WINEDLLOVERRIDES": None, "PULSE_LATENCY_MSEC": None},
+            )
 
     def test_procfs_detection_handles_unreadable_proc_root(self):
         result = detect_skyrim_processes(proc_root=Path("/missing/wyrd-proc"))
