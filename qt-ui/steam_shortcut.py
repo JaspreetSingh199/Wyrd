@@ -83,6 +83,10 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
     except OSError as error:
         if created_desktop:
             desktop.unlink(missing_ok=True)
+        # Remove a marker only if this operation created it. O_EXCL above
+        # ensures an existing user-owned marker is never replaced.
+        if "marker_fd" in locals():
+            marker.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
         return {"ok": False, "message": f"Could not install Wyrd's Steam launcher: {error}"}
     return {"ok": True, "already_installed": False, "desktop_file": str(desktop),
