@@ -151,6 +151,21 @@ class SteamShortcutTests(unittest.TestCase):
                 self.assertTrue(desktop.exists())
 
 
+    def test_existing_owned_launcher_is_reported_with_exact_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            steam = home / ".steam/root"
+            steam.mkdir(parents=True)
+            data_home = home / ".local/share"
+            with patch.object(steam_shortcut, "find_steam_roots", return_value=[steam]), \\
+                 patch.dict(os.environ, {"XDG_DATA_HOME": str(data_home)}):
+                installed = steam_shortcut.install_steam_shortcut(home)
+                status = steam_shortcut.inspect_steam_shortcut(home)
+            self.assertTrue(status["installed"])
+            self.assertTrue(status["owned"])
+            self.assertEqual(status["desktop_file"], installed["desktop_file"])
+            self.assertEqual(status["data_home"], str(data_home))
+
     def test_inspect_reports_owned_launcher(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
