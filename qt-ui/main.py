@@ -21,7 +21,7 @@ from steam_shortcut import inspect_steam_shortcut, install_steam_shortcut, remov
 from steam_runtime_inspection import inspect_steam_shortcuts, inspect_steam_compat_mappings, steam_runtime_environment
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
-    install_mo2_environment, launch_mo2, managed_paths,
+    install_mo2_environment, launch_mo2, launch_mo2_in_skyrim_prefix, managed_paths,
     read_settings, write_settings, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
@@ -263,6 +263,9 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
+        self.launch_skyrim_prefix_button = QPushButton("Launch MO2 (Skyrim prefix · experimental)")
+        self.launch_skyrim_prefix_button.clicked.connect(self.start_mo2_skyrim_prefix)
+        self.launch_skyrim_prefix_button.setEnabled(False)
         self.launch_game_button = QPushButton("Launch Skyrim")
         self.launch_game_button.clicked.connect(self.start_skyrim)
         self.launch_game_button.setEnabled(False)
@@ -273,6 +276,7 @@ class MainWindow(QMainWindow):
         self.launch_status_button.setEnabled(False)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
+        action_row.addWidget(self.launch_skyrim_prefix_button)
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.diagnostics_button)
         action_row.addWidget(self.launch_status_button)
@@ -459,6 +463,7 @@ class MainWindow(QMainWindow):
                 f'{instance_summary}'
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
+            self.launch_skyrim_prefix_button.setEnabled(bool(self.mo2_state.get("installed") and self.game_state.get("found")))
             self.launch_game_button.setEnabled(bool(self.launch_target_state.get("ok")))
             self.install_button.setText("Recheck MO2" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
@@ -470,6 +475,7 @@ class MainWindow(QMainWindow):
                 description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
             self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
+            self.launch_skyrim_prefix_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
             self.install_button.setText("Install MO2")
             self._log("Wyrd MO2 inspection: " + description)
@@ -818,6 +824,19 @@ class MainWindow(QMainWindow):
                 )
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
+
+    def start_mo2_skyrim_prefix(self) -> None:
+        result = launch_mo2_in_skyrim_prefix()
+        self._log(result.get("message", "Experimental launch failed."))
+        if result.get("ok"):
+            QMessageBox.information(
+                self, "Experimental MO2 launch",
+                "MO2 was launched in Skyrim's existing Proton prefix.\\n\\n"
+                "This basic test does not replace Skyrim's executable or change Steam settings. "
+                "Close MO2 before switching back to the normal Wyrd launch.",
+            )
+        else:
+            QMessageBox.warning(self, "Experimental MO2 launch", result.get("message", "Launch failed."))
 
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
