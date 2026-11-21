@@ -1111,10 +1111,17 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
             exe_path = os.readlink(entry / "exe")
         except OSError:
             exe_path = ""
+        env_readable = True
+        env_error = None
         try:
             env_data = (entry / "environ").read_bytes()
-        except OSError:
+        except OSError as error:
+            # /proc/<pid>/environ may be restricted by ptrace/Yama or process
+            # ownership. Do not misreport an inspection failure as an unset
+            # variable.
             env_data = b""
+            env_readable = False
+            env_error = str(error)
         argv = [part.decode("utf-8", errors="replace") for part in
                 argv_data.split(bytes([0])) if part]
         if not argv and not comm and not exe_path:
@@ -1134,12 +1141,14 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         for key in ("WINEDLLOVERRIDES", "PULSE_LATENCY_MSEC"):
             value = next((part.split("=", 1)[1] for part in env_parts
                          if part.startswith(key + "=")), None)
-            audio_runtime[key] = value
+            audio_runtime[key] = value if env_readable else None
         detected.append({
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
             "start_time": _proc_start_time(int(entry.name), Path(proc_root)),
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
             "audio_runtime_environment": audio_runtime,
+            "audio_runtime_environment_readable": env_readable,
+            "audio_runtime_environment_error": env_error,
         })
     detected.sort(key=lambda item: item["pid"])
     associated = [item for item in detected if item["attributed_to_wyrd"]]
