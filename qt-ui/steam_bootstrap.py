@@ -19,9 +19,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.steam_bootstrap:
         parser.error("--steam-bootstrap is required")
     script_dir = Path(__file__).resolve().parent
-    launcher = script_dir / "run.sh"
-    if not launcher.is_file():
-        print(f"Wyrd launcher is missing: {launcher}", file=sys.stderr)
+    main_script = script_dir / "main.py"
+    if not main_script.is_file():
+        print(f"Wyrd application is missing: {main_script}", file=sys.stderr)
         return 2
     python = script_dir / ".venv" / "bin" / "python"
     if not python.is_file():
