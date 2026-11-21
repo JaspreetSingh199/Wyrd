@@ -71,11 +71,14 @@ def install_steam_shortcut(home: Path | None = None) -> dict:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(content)
         created_desktop = True
-        marker.write_text(json.dumps({
+        marker_payload = json.dumps({
             "managed_by": "Wyrd", "desktop_file": str(desktop),
             "bootstrap": str(bootstrap), "name": SHORTCUT_NAME,
             "desktop_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-        }, indent=2), encoding="utf-8")
+        }, indent=2)
+        marker_fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(marker_fd, "w", encoding="utf-8") as handle:
+            handle.write(marker_payload)
         temporary.unlink(missing_ok=True)
     except OSError as error:
         if created_desktop:
