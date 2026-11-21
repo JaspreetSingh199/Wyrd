@@ -1,8 +1,9 @@
 name: Wyrd tests and release bundle
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, experiment/steam-native-launch]
   pull_request:
     branches: [main]
 
