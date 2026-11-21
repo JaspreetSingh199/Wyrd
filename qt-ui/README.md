@@ -44,3 +44,29 @@ Steam yourself.
 This is an experimental handoff, not a verified Steam-managed Proton launch
 for Skyrim. Do not enable Force Compatibility/Proton on the Wyrd desktop
 launcher: Wyrd is a native Linux application. Audio improvement is not assumed.
+
+
+### Comparing Steam and Wyrd audio/runtime environments
+
+When Wyrd is started from the Steam-added non-Steam shortcut, the native
+bootstrap writes an allow-listed environment snapshot to
+`$XDG_DATA_HOME/wyrd/logs/steam-bootstrap-environment.json`
+(normally `~/.local/share/wyrd/logs/steam-bootstrap-environment.json`).
+It records Steam identity, selected Steam Runtime/library path variables,
+PulseAudio/PipeWire socket variables, and display-session variables. It does
+not dump the complete process environment.
+
+The Proton child environment now preserves a numeric Steam shortcut identity
+(`SteamAppId`, `SteamGameId`, and `STEAM_COMPAT_APP_ID`) when inherited from
+Steam, while continuing to use Wyrd's explicitly managed MO2 prefix as
+`STEAM_COMPAT_DATA_PATH`. Direct desktop launches keep the existing Skyrim
+AppID fallback. This is an experiment; compare the snapshot with the same
+allow-listed values from a known-good Steam-launched Proton game before
+drawing conclusions about audio.
+
+This first integration intentionally does not edit Steam's
+`userdata/<account>/config/shortcuts.vdf` or Steam's compatibility mapping.
+Steam must be closed before any future automated VDF edit because the client
+keeps shortcut state in memory and may overwrite external changes. Steam also
+generates the non-Steam shortcut identity, so Wyrd does not guess or hard-code
+that value.
