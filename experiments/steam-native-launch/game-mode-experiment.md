@@ -47,3 +47,34 @@ Wyrd now has an isolated helper module, `qt-ui/mo2_game_mode_links.py`, for insp
 
 
 This helper is not yet connected to the GUI or launch script. Tests have been committed but not executed in a local runtime.
+
+
+## Current implementation update
+
+### Hardened link manager
+- Strictly validates ownership-manifest version and entries.
+- Writes ownership intent atomically before creating a symlink.
+- Uses exclusive symlink creation so an existing destination is never replaced.
+- Rollback removes only an exact manifest-owned symlink.
+- A missing recorded link can be forgotten safely; a changed/occupied target is left untouched.
+
+### Read-only preflight
+- `qt-ui/mo2_game_mode_preflight.py` generates a structured report and plain-text rendering.
+- Checks Skyrim detection, AppID prefix presence, Proton discovery, Wyrd-managed MO2 verification, candidate data path, candidate link state, and ownership-manifest status.
+- Performs no directory creation, link creation, or prefix initialization.
+- Does not guess the compatdata location from a saved game path when the Steam library root cannot be established.
+- The exact MO2 source/target mapping remains deliberately unapproved pending verification against STL source and the active MO2 layout. Thus the preflight never sets `ready_for_prepare` true yet.
+
+### Tests added
+- Link safety regression tests now cover malformed manifests and missing recorded links.
+- Preflight tests cover missing game detection, no manifest creation, and refusing to guess a prefix from a saved game path.
+- Tests are committed but have not been executed in a local runtime.
+
+### Local commands
+```bash
+PYTHONPATH=qt-ui python3 -m unittest discover -s qt-ui/tests -p 'test_mo2_game_mode_links.py' -v
+PYTHONPATH=qt-ui python3 -m unittest discover -s qt-ui/tests -p 'test_mo2_game_mode_preflight.py' -v
+PYTHONPATH=qt-ui python3 -m mo2_game_mode_preflight
+```
+
+Preflight CLI exits with status 2 when blockers remain. This is expected until a verified MO2 data mapping and a safe prepare workflow are implemented.
