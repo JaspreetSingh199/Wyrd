@@ -7,7 +7,6 @@ environment is never dumped because it may contain secrets.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import time
 
@@ -36,7 +35,10 @@ def process_info(pid: int) -> dict | None:
         return None
     comm = read_text(root / "comm").strip()
     try:
-        ppid = int(read_text(root / "stat").split()[3])
+        stat = read_text(root / "stat")
+        # comm is parenthesized and can itself contain spaces; split after its final ')'.
+        stat_tail = stat[stat.rfind(")") + 1:].split()
+        ppid = int(stat_tail[1])  # state is index 0, parent PID is index 1
     except (ValueError, IndexError):
         ppid = None
     env_raw = read_text(root / "environ")
@@ -61,7 +63,6 @@ def main() -> None:
                         for hint in PROCESS_HINTS):
             candidates.append(info)
 
-    by_pid = {item["pid"]: item for item in candidates}
     for item in candidates:
         chain = []
         ppid = item["ppid"]
