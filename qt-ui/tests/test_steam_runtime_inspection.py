@@ -70,5 +70,12 @@ class SteamRuntimeInspectionTests(unittest.TestCase):
         self.assertIn("not parsed yet", report["message"])
 
 
+    def test_inspection_ui_wiring_is_present_in_main_source(self):
+        main_path = Path(__file__).resolve().parents[1] / "main.py"
+        source = main_path.read_text(encoding="utf-8")
+        self.assertIn("def inspect_steam_runtime(self)", source)
+        self.assertIn('QPushButton("Inspect Steam shortcut/runtime")', source)
+
+
 if __name__ == "__main__":
     unittest.main()
