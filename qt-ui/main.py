@@ -727,6 +727,10 @@ class MainWindow(QMainWindow):
                       state.get("message", "unknown inspection error"))
             return
         first_run = not state.get("instances")
+        if "--steam-bootstrap" in sys.argv:
+            # Steam initiated the native bootstrap; open MO2 automatically.
+            sys.argv.remove("--steam-bootstrap")
+            self._log("Steam-native bootstrap received: opening the Wyrd-managed MO2 instance.")
         result = launch_mo2(pick_instance=first_run)
         self._log(result.get("message", "MO2 launch failed."))
         if result.get("ok"):
