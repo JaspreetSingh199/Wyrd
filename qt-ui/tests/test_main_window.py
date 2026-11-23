@@ -438,6 +438,19 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window.install_button.isEnabled())
         window.close()
 
+    def test_ready_mo2_disables_install_action_and_keeps_launch_separate(self):
+        state = {
+            "installed": True, "prefix_ready": True,
+            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
+            "metadata": {"version": "v2.5.2", "game_path": "/games/Skyrim Special Edition"},
+            "external_installations": [],
+        }
+        window = self._window(state=state)
+        self.assertEqual(window.install_button.text(), "MO2 Ready")
+        self.assertFalse(window.install_button.isEnabled())
+        self.assertTrue(window.launch_button.isEnabled())
+        window.close()
+
     def test_incomplete_wyrd_prefix_offers_repair_not_launch(self):
         state = {
             "installed": True, "prefix_ready": False,
