@@ -24,7 +24,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
-    inspect_audio_compatibility,
+    inspect_audio_compatibility, reset_mo2_compatdata,
 )
 @dataclass
 class LaunchSession:
@@ -209,6 +209,9 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
+        self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
+        self.reset_prefix_button.setEnabled(False)
+        self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
         self.launch_game_button = QPushButton("Launch Skyrim (MO2)")
         self.launch_game_button.clicked.connect(self.start_skyrim)
         self.launch_game_button.setEnabled(False)
@@ -221,6 +224,7 @@ class MainWindow(QMainWindow):
         self.launch_status_button.clicked.connect(self.check_launch_status)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
+        action_row.addWidget(self.reset_prefix_button)
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.launch_direct_button)
         action_row.addWidget(self.diagnostics_button)
@@ -427,6 +431,8 @@ class MainWindow(QMainWindow):
             self._log("Wyrd MO2 inspection: " + description)
 
         self._refresh_audio_status()
+        prefix_path = managed_paths()['prefix']
+        self.reset_prefix_button.setEnabled(prefix_path.exists() and not prefix_path.is_symlink())
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(
             ready
@@ -498,6 +504,39 @@ class MainWindow(QMainWindow):
             self.audio_detail.setText(f"Audio inspection failed: {error}")
         finally:
             self.audio_check_button.setEnabled(True)
+
+    def reset_mo2_prefix(self) -> None:
+        """Reset only Wyrd-owned MO2 compatdata after two explicit confirmations."""
+        prefix = managed_paths()["prefix"]
+        if not prefix.exists() or prefix.is_symlink():
+            QMessageBox.warning(self, "Reset MO2 compatdata", "The managed MO2 prefix is absent or unsafe to reset.")
+            return
+        first = QMessageBox.warning(
+            self, "Nuke MO2 Compatdata",
+            "This permanently deletes Wyrd's MO2 Proton compatdata (prefix), including its Wine settings and installed Windows components.\n\n"
+            "It does NOT delete Wyrd's MO2 installation files, Skyrim, Steam compatdata, mods stored outside the prefix, or your game files. "
+            "MO2 may need to be configured again after reset.\n\nProceed?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if first != QMessageBox.StandardButton.Yes:
+            return
+        second = QMessageBox.question(
+            self, "Final confirmation — delete MO2 prefix",
+            f"Delete this Wyrd-managed prefix now?\n\n{prefix}\n\nThis cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if second != QMessageBox.StandardButton.Yes:
+            return
+        result = reset_mo2_compatdata(confirmed=True)
+        self._log(result.get("message", "MO2 compatdata reset attempted."))
+        if result.get("ok"):
+            self.progress_label.setText("MO2 compatdata removed. Use Repair MO2 runtime to recreate it.")
+            QMessageBox.information(self, "MO2 compatdata reset", result["message"])
+        else:
+            QMessageBox.warning(self, "MO2 compatdata reset failed", result.get("message", "Reset failed."))
+        self.refresh_all()
 
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
