@@ -870,6 +870,26 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                 profile_status = "verified"
             else:
                 profile_status = "not-selected"
+            # Report MO2 storage roots for migration preview. Never traverse
+            # custom external paths here; they require explicit verification.
+            def configured_path(key: str, default: str) -> tuple[str, str]:
+                raw = settings.get(key, "").strip() or default
+                expanded = raw.replace("%BASE_DIR%", base_value)
+                candidate = Path(expanded).expanduser()
+                if not candidate.is_absolute():
+                    candidate = Path(base_value).expanduser() / candidate
+                if candidate.is_symlink():
+                    return str(candidate), "symlink"
+                if candidate.is_dir():
+                    return str(candidate.resolve()), "available"
+                return str(candidate), "missing"
+
+            base_path = Path(base_value).expanduser()
+            base_status = "symlink" if base_path.is_symlink() else ("available" if base_path.is_dir() else "missing")
+            profiles_path, profiles_status = configured_path("profiles_directory", "%BASE_DIR%/profiles")
+            mods_path, mods_status = configured_path("mod_directory", "%BASE_DIR%/mods")
+            downloads_path, downloads_status = configured_path("download_directory", "%BASE_DIR%/downloads")
+
             game_name = general.get("gameName", "").strip()
 
             executables = []
@@ -939,6 +959,12 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                 "selected_profile_candidate": profile,
                 "selected_profile_path": str(profile_dir) if profile_dir else "",
                 "selected_profile_status": profile_status,
+                "storage": {
+                    "base": {"path": str(base_path), "status": base_status},
+                    "profiles": {"path": profiles_path, "status": profiles_status},
+                    "mods": {"path": mods_path, "status": mods_status},
+                    "downloads": {"path": downloads_path, "status": downloads_status},
+                },
                 "is_skyrim_se": is_skyrim,
                 "executables": executables,
             })
