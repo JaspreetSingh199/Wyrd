@@ -946,7 +946,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
     instances = sorted(discovered, key=lambda item: item["name"].casefold())
     skyrim_instances = [item for item in instances if item["is_skyrim_se"]]
     return {
-        "ok": True, "managed": True,
+        "ok": True, "managed": bool(require_managed),
         "instances": instances,
         "skyrim_instances": skyrim_instances,
         "errors": errors,
