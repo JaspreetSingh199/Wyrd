@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.progress)
 
         instructions = panel(
-            "4. Launch Skyrim from MO2",
+            "5. Launch Skyrim from MO2",
             "On the first MO2 launch, create a new instance and choose “Skyrim Special Edition”. "
             "Wyrd registers your detected game path only inside its own Proton prefix. "
             "After the instance is created, select Skyrim or SKSE in MO2's executable dropdown and press Run. "
@@ -384,7 +384,7 @@ class MainWindow(QMainWindow):
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
             self.launch_game_button.setEnabled(bool(self.launch_target_state.get("ok")))
-            self.install_button.setText("Recheck MO2" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
+            self.install_button.setText("MO2 Ready" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
         else:
             external = self.mo2_state.get("external_installations", [])
@@ -400,7 +400,11 @@ class MainWindow(QMainWindow):
 
         self._refresh_audio_status()
         ready = bool(self.game_state.get("found") and self.proton_builds)
-        self.install_button.setEnabled(ready and not (self.worker and self.worker.isRunning()))
+        self.install_button.setEnabled(
+            ready
+            and not (self.worker and self.worker.isRunning())
+            and not (self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"))
+        ))
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
 
     def _restore_saved_selection(self) -> None:
@@ -478,7 +482,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Wyrd setup", "No compatible Proton build is selected.")
             return
         if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
-            self.start_mo2()
+            self.refresh_all()
             return
         answer = QMessageBox.question(
             self, "Install Mod Organizer 2",
