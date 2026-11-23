@@ -51,11 +51,9 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
-    def test_native_xaudio2_test_checkbox_defaults_off(self):
+    def test_v1_does_not_expose_experimental_audio_override(self):
         window = self._window()
-        self.assertFalse(window.native_xaudio2_checkbox.isChecked())
-        window.native_xaudio2_checkbox.setChecked(True)
-        self.assertTrue(window.native_xaudio2_checkbox.isChecked())
+        self.assertFalse(hasattr(window, "native_xaudio2_checkbox"))
         window.close()
 
 
