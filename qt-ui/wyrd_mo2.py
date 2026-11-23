@@ -705,12 +705,14 @@ def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
             "message": "MO2 launched through Wyrd's dedicated Proton prefix."}
 
 
-def write_settings(home: Path | None, proton_path: Path, game_path: Path) -> None:
+def write_settings(home: Path | None, proton_path: Path, game_path: Path,
+                   xaudio2_compat: bool = False) -> None:
     paths = managed_paths(home)
     paths["config"].mkdir(parents=True, exist_ok=True)
     temporary = paths["settings"].with_suffix(".tmp")
     temporary.write_text(json.dumps({
         "proton": str(proton_path.resolve()), "game_path": str(game_path.resolve()),
+        "xaudio2_compat": bool(xaudio2_compat),
         "updated": datetime.now(timezone.utc).isoformat(),
     }, indent=2), encoding="utf-8")
     os.replace(temporary, paths["settings"])
@@ -731,6 +733,7 @@ def read_settings(home: Path | None = None) -> dict:
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             result[key] = value
+    result["xaudio2_compat"] = bool(payload.get("xaudio2_compat", False))
     return result
 
 def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list[Path]:
