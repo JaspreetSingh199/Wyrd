@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
 
         self.mo2_state = inspect_wyrd_installation()
         if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
-            self.instance_state = inspect_mo2_instances(managed_paths()["prefix"])
+            self.instance_state = inspect_mo2_instances(managed_paths()["prefix"], managed_paths()["install"])
             self.launch_target_state = inspect_skyrim_launch_targets(
                 managed_paths()["prefix"], Path(self.mo2_state["metadata"].get("game_path", ""))
             )
