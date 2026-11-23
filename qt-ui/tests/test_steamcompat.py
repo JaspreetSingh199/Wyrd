@@ -41,7 +41,8 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     proton = tmp_path / "Proton"
     game = tmp_path / "Skyrim"
     prefix = root / "steamapps/compatdata/489830"
-    (prefix / "pfx/drive_c").mkdir(parents=True)
+    (prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition").mkdir(parents=True)
+    (prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition/ModOrganizer.ini").write_text("[General]\\ngameName=Skyrim Special Edition\\n", encoding="utf-8")
     install.mkdir()
     (install / "ModOrganizer.exe").write_bytes(b"MZ")
     proton.mkdir()
@@ -66,5 +67,5 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     assert result["pid"] == 1234
     assert calls["env"]["STEAM_COMPAT_DATA_PATH"] == str(prefix.resolve())
     assert calls["env"]["SteamAppId"] == "489830"
-    assert calls["command"][-1] == str(install / "ModOrganizer.exe")
+    assert calls["command"][-2:] == ["--instance", "Skyrim Special Edition"]
     assert (prefix / "pfx/drive_c").is_dir()
