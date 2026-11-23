@@ -692,7 +692,7 @@ def read_settings(home: Path | None = None) -> dict:
             result[key] = value
     return result
 
-def _instance_roots(prefix_root: Path) -> list[Path]:
+def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list[Path]:
     """Return known MO2 instance roots inside this managed Proton prefix."""
     users = prefix_root / "pfx/drive_c/users"
     roots: list[Path] = []
@@ -709,10 +709,16 @@ def _instance_roots(prefix_root: Path) -> list[Path]:
             user_dir / "Documents/Modding/ModOrganizer/instances",
         )
         roots.extend(path for path in candidates if path.is_dir())
+    # MO2 portable instances are stored beside the executable in Wyrd's
+    # managed installation directory. Inspect this known path read-only.
+    if install_root is not None:
+        portable_instances = Path(install_root).expanduser() / "instances"
+        if portable_instances.is_dir():
+            roots.append(portable_instances)
     return roots
 
 
-def inspect_mo2_instances(prefix_root: Path) -> dict:
+def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -> dict:
     """Read-only inventory of MO2 instances stored in Wyrd's managed prefix.
 
     It deliberately does not follow MO2 custom paths or scan arbitrary disks.
@@ -740,7 +746,7 @@ def inspect_mo2_instances(prefix_root: Path) -> dict:
 
     discovered = []
     errors = []
-    for root in _instance_roots(prefix_root):
+    for root in _instance_roots(prefix_root, install_root):
         try:
             entries = sorted(root.iterdir(), key=lambda item: item.name.casefold())
         except OSError as error:
