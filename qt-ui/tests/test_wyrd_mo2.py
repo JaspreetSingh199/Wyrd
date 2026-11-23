@@ -396,7 +396,7 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(inventory["skyrim_instances"], inventory)
             result = inspect_skyrim_launch_targets(prefix, game)
             self.assertTrue(result["ok"], result)
-            self.assertEqual({item["title"] for item in result["targets"]}, {"Skyrim", "SKSE"})
+            self.assertEqual({item["title"] for item in result["targets"]}, {"SKSE"})
             self.assertEqual(ini.read_bytes(), before)
 
 
@@ -418,9 +418,9 @@ class WyrdMO2Tests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = inspect_skyrim_launch_targets(prefix, game, instance_name="Skyrim")
-            self.assertTrue(result["ok"], result)
-            self.assertEqual(result["targets"][0]["title"], "Skyrim")
-            self.assertEqual(Path(result["targets"][0]["binary"]), game / "SkyrimSE.exe")
+            self.assertFalse(result["ok"], result)
+            self.assertEqual(result["targets"], [])
+            self.assertIn("no configured Skyrim or SKSE executable entry", result["message"])
 
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -475,8 +475,9 @@ class WyrdMO2Tests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = inspect_skyrim_launch_targets(prefix, game)
-            self.assertTrue(result["ok"], result)
-            self.assertEqual([item["title"] for item in result["targets"]], ["Skyrim"])
+            self.assertFalse(result["ok"], result)
+            self.assertEqual(result["targets"], [])
+            self.assertIn("no configured Skyrim or SKSE executable entry", result["message"])
 
     def test_launch_mo2_never_injects_audio_experiment_override(self):
         with tempfile.TemporaryDirectory() as tmp:
