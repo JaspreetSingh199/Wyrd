@@ -299,8 +299,8 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             ini = instance / "ModOrganizer.ini"
             ini.write_text(
-                "[General]\\ngameName=Skyrim Special Edition\\n"
-                "selected_profile=@ByteArray(Default)\\n",
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "selected_profile=@ByteArray(Default)\n",
                 encoding="utf-8",
             )
             result = inspect_mo2_instances(prefix, install)
