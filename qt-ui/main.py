@@ -209,9 +209,12 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
-        self.launch_game_button = QPushButton("Launch Skyrim (Steam)")
-        self.launch_game_button.clicked.connect(self.start_skyrim_direct)
+        self.launch_game_button = QPushButton("Launch Skyrim (MO2)")
+        self.launch_game_button.clicked.connect(self.start_skyrim)
         self.launch_game_button.setEnabled(False)
+        self.launch_direct_button = QPushButton("Launch Unmodded (Steam)")
+        self.launch_direct_button.clicked.connect(self.start_skyrim_direct)
+        self.launch_direct_button.setEnabled(False)
         self.diagnostics_button = QPushButton("View launch log")
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         self.launch_status_button = QPushButton("Check launch status")
@@ -219,6 +222,7 @@ class MainWindow(QMainWindow):
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
         action_row.addWidget(self.launch_game_button)
+        action_row.addWidget(self.launch_direct_button)
         action_row.addWidget(self.diagnostics_button)
         action_row.addWidget(self.launch_status_button)
         action_row.addStretch(1)
@@ -406,6 +410,7 @@ class MainWindow(QMainWindow):
             # Launch Skyrim availability is based on the detected Steam game and Wyrd's
             # managed MO2 prefix, not on whether an MO2 instance already exists.
             self.launch_game_button.setEnabled(bool(self.game_state.get("found")))
+            self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
             self.install_button.setText("MO2 Ready" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
         else:
@@ -417,6 +422,7 @@ class MainWindow(QMainWindow):
             self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
+            self.launch_direct_button.setEnabled(False)
             self.install_button.setText("Install MO2")
             self._log("Wyrd MO2 inspection: " + description)
 
