@@ -120,19 +120,20 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.close()
 
 
-    def test_launch_is_disabled_when_instance_inspection_is_unavailable(self):
+    def test_launch_skyrim_enabled_when_game_detected_and_prefix_ready_without_instance(self):
         state = {
             "installed": True, "prefix_ready": True,
             "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
-            "metadata": {"version": "v2.5.2"},
+            "metadata": {"version": "v2.5.2", "game_path": "/games/Skyrim Special Edition"},
             "external_installations": [],
         }
         with patch("main.inspect_mo2_instances", return_value={
             "ok": False, "instances": [], "skyrim_instances": [],
-            "message": "Ownership marker is unreadable."
+            "message": "No MO2 instances found."
         }):
             window = self._window(state=state)
-            self.assertFalse(window.launch_button.isEnabled())
+            self.assertTrue(window.launch_button.isEnabled())
+            self.assertTrue(window.launch_game_button.isEnabled())
             window.close()
 
     def test_start_mo2_refuses_when_instance_inspection_is_unsafe(self):
