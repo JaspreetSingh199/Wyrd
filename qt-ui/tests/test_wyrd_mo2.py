@@ -318,7 +318,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 f"gamePath=Z:{game_path}\\\\SkyrimSE.exe\\n"
                 "[customExecutables]\\n"
                 "size=1\\n"
-                "[customExecutables\\\\1]\\n"
+                "[customExecutables\\1]\\n"
                 "title=SKSE\\n"
                 f"binary=Z:{game_path}\\\\Updater.exe\\n",
                 encoding="utf-8",
