@@ -1013,15 +1013,19 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
     for target in targets:
         key = (target["title"].casefold(), target["binary"].casefold())
         unique[key] = target
+    diagnostic = None if unique else ("unresolved_game_path" if warnings else "missing_executable_entry")
+    message = (
+        f"Verified {len(unique)} Skyrim/SKSE launch target(s) from MO2."
+        if unique else
+        ("No configured Skyrim or SKSE executable entry could be verified. "
+         "Check the MO2 instance's game path and executable entries.")
+    )
     return {
         "ok": bool(unique),
         "targets": list(unique.values()),
         "warnings": warnings,
-        "message": (
-            f"Verified {len(unique)} Skyrim/SKSE launch target(s) from MO2."
-            if unique else "No configured SkyrimSE.exe or SKSE executable could be verified. "
-                          "Check the MO2 instance's game path and executable entries."
-        ),
+        "diagnostic": diagnostic,
+        "message": message,
     }
 
 
