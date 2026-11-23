@@ -293,6 +293,7 @@ class WyrdMO2Tests(unittest.TestCase):
             install = Path(tmp) / "install"
             instance = install / "instances" / "Skyrim SE"
             instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").parent.mkdir(parents=True, exist_ok=True)
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
