@@ -651,7 +651,14 @@ def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
     arguments = [str(executable)]
     if pick_instance:
         arguments.append("--pick")
+    if audio_mode not in {"default", "xaudio2_compat"}:
+        return {"ok": False, "message": "Unknown audio compatibility test mode."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
+    if audio_mode == "xaudio2_compat":
+        existing = env.get("WINEDLLOVERRIDES", "")
+        entries = [item for item in existing.split(";") if item and not item.lower().startswith("xaudio2_7=")]
+        entries.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(entries)
     try:
         process = subprocess.Popen(
             [str(proton_path / "proton"), "run", *arguments],
@@ -965,7 +972,8 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
 
 def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
                           home: Path | None = None, log_path: Path | None = None,
-                          expected_binary: Path | str | None = None) -> dict:
+                          expected_binary: Path | str | None = None,
+                          audio_mode: str = "default") -> dict:
     """Start MO2's configured-executable handoff and retain a diagnostic log.
 
     A successful return means only that the Proton wrapper process was spawned.
@@ -1037,8 +1045,9 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         with diagnostics.open("a", encoding="utf-8") as log:
             log.write("\\n=== Wyrd Skyrim launch handoff ===\\n")
             log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
-            log.write(f"instance: {instance}\\nexecutable: {title}\\nbinary: {target_match['binary']}\\npid: pending\\n")
+            log.write(f"instance: {instance}\\nexecutable: {title}\\nbinary: {target_match['binary']}\\naudio_mode: {audio_mode}\\npid: pending\\n")
             log.write("command: " + json.dumps(command) + "\\n")
+            log.write("audio_override: " + ("WINEDLLOVERRIDES=" + env.get("WINEDLLOVERRIDES", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\\n")
             log.write("stdout/stderr are redirected to this diagnostic log.\\n")
             log.flush()
             process = subprocess.Popen(
