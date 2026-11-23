@@ -861,8 +861,8 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
                 if parser.has_section("customExecutables"):
                     section = parser["customExecutables"]
                     for candidate_key in (
-                        f"{index}\\\\{key}", f"{index}/{key}",
-                        f"\\\\{index}\\\\{key}", f"/{index}/{key}",
+                        f"{index}\\{key}", f"{index}/{key}",
+                        f"\\{index}\\{key}", f"/{index}/{key}",
                     ):
                         value = section.get(candidate_key)
                         if value is not None:
