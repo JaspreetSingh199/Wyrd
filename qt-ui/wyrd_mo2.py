@@ -140,6 +140,36 @@ def discover_proton_builds(home: Path | None = None,
     return sorted(found.values(), key=sort_key)
 
 
+def reset_mo2_compatdata(home: Path | None = None, confirmed: bool = False) -> dict:
+    """Delete only Wyrd's explicitly marked MO2 Proton prefix, never Steam compatdata."""
+    paths = managed_paths(home)
+    prefix = paths["prefix"]
+    marker = prefix / ".wyrd-managed.json"
+    if not confirmed:
+        return {"ok": False, "message": "Reset requires explicit confirmation.", "removed": False}
+    if not prefix.exists() and not prefix.is_symlink():
+        return {"ok": True, "message": "Wyrd MO2 compatdata is already absent.", "removed": False}
+    if prefix.is_symlink():
+        return {"ok": False, "message": "Refusing to reset a symlinked MO2 prefix.", "removed": False}
+    try:
+        resolved_prefix = prefix.resolve(strict=True)
+        resolved_root = paths["root"].resolve(strict=True)
+        resolved_prefix.relative_to(resolved_root)
+    except (OSError, ValueError, RuntimeError):
+        return {"ok": False, "message": "Refusing to reset a prefix outside Wyrd's managed directory.", "removed": False}
+    try:
+        metadata = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"ok": False, "message": "Wyrd ownership marker is missing or invalid; prefix left untouched.", "removed": False}
+    if metadata.get("managed_by") != "Wyrd":
+        return {"ok": False, "message": "Prefix is not marked as Wyrd-managed; left untouched.", "removed": False}
+    try:
+        shutil.rmtree(prefix)
+    except OSError as error:
+        return {"ok": False, "message": f"Could not remove Wyrd MO2 compatdata: {error}", "removed": False}
+    return {"ok": True, "message": "Wyrd MO2 compatdata was removed. MO2 installation files and Skyrim/Steam data were left untouched.", "removed": True}
+
+
 def inspect_wyrd_installation(home: Path | None = None) -> dict:
     paths = managed_paths(home)
     exe = paths["install"] / "ModOrganizer.exe"
