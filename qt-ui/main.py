@@ -22,7 +22,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
-    inspect_audio_compatibility, repair_audio_compatibility,
+    inspect_audio_compatibility,
 )
 @dataclass
 class LaunchSession:
@@ -194,11 +194,7 @@ class MainWindow(QMainWindow):
         audio_actions = QHBoxLayout()
         self.audio_check_button = QPushButton("Check Audio Libraries")
         self.audio_check_button.clicked.connect(self.check_audio_libraries)
-        self.audio_repair_button = QPushButton("Repair XACT libraries")
-        self.audio_repair_button.clicked.connect(self.repair_audio)
-        self.audio_repair_button.setEnabled(False)
         audio_actions.addWidget(self.audio_check_button)
-        audio_actions.addWidget(self.audio_repair_button)
         # V1 keeps Proton audio defaults; experimental DLL overrides are not exposed.
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
@@ -442,7 +438,6 @@ class MainWindow(QMainWindow):
         self.audio_report = report
         if not report.get("ok") or not report.get("safe"):
             self.audio_detail.setText("Audio inspection is fail-closed: " + report.get("message", "Wyrd prefix ownership could not be verified."))
-            self.audio_repair_button.setEnabled(False)
             return
         components = report.get("components", {})
         labels = [
@@ -454,7 +449,6 @@ class MainWindow(QMainWindow):
         lines = [f"{label}: {components.get(key, {}).get('state', 'unknown')}" for key, label in labels]
         lines += ["FAudio / FFmpeg support: UNKNOWN", "Dialogue audio: NOT VERIFIED (test an NPC conversation in Skyrim)"]
         self.audio_detail.setText("\n".join(lines))
-        self.audio_repair_button.setEnabled(bool(report.get("repair_available") and report.get("safe")))
 
     def check_audio_libraries(self) -> None:
         """Manually refresh the read-only inventory of audio libraries."""
@@ -473,33 +467,6 @@ class MainWindow(QMainWindow):
             self.audio_repair_button.setEnabled(False)
         finally:
             self.audio_check_button.setEnabled(True)
-
-    def repair_audio(self) -> None:
-        report = getattr(self, "audio_report", {})
-        if not report.get("ok") or not report.get("safe") or not report.get("repair_available"):
-            QMessageBox.warning(self, "Wyrd audio repair", "Repair is unavailable. A verified repair payload and safe prefix ownership are required.")
-            self.audio_repair_button.setEnabled(False)
-            return
-        answer = QMessageBox.question(
-            self, "Repair XACT libraries",
-            "Wyrd will install verified XACT libraries into its managed MO2 prefix only. Existing DLLs will not be overwritten. Dialogue audio will remain runtime-unverified. Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        self.audio_repair_button.setEnabled(False)
-        try:
-            result = repair_audio_compatibility(confirmed=True)
-            self._log("Audio repair: " + result.get("message", "completed"))
-            self._refresh_audio_status(inspect_audio_compatibility())
-            if not result.get("ok"):
-                QMessageBox.warning(self, "Wyrd audio repair", result.get("message", "Repair failed."))
-        except Exception as error:
-            self._log(f"Audio repair failed: {error}")
-            QMessageBox.warning(self, "Wyrd audio repair", str(error))
-        finally:
-            self.audio_repair_button.setEnabled(bool(getattr(self, "audio_report", {}).get("repair_available")))
 
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
