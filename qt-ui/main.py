@@ -553,7 +553,8 @@ class MainWindow(QMainWindow):
 
     def _instance_inspection(self) -> dict:
         """Return a fresh read-only inventory for the current managed prefix."""
-        return inspect_mo2_instances(managed_paths()["prefix"])
+        paths = managed_paths()
+        return inspect_mo2_instances(paths["prefix"], paths["install"])
 
     def _has_instance(self) -> bool:
         state = self._instance_inspection()
