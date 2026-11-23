@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 
 import steamcompat
+from wyrd_mo2 import inspect_mo2_instances
 
 
 def test_prefix_path_is_skyrim_appid():
@@ -69,3 +70,42 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     assert calls["env"]["SteamAppId"] == "489830"
     assert calls["command"][-2:] == ["--instance", "Skyrim Special Edition"]
     assert (prefix / "pfx/drive_c").is_dir()
+
+def test_external_prefix_inventory_is_not_labelled_wyrd_managed(tmp_path):
+    prefix = tmp_path / "compatdata/489830"
+    instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
+    instance.mkdir(parents=True)
+    (instance / "ModOrganizer.ini").write_text(
+        "[General]\ngameName=Skyrim Special Edition\nselected_profile=Default\n"
+        "[Settings]\nbase_directory=%BASE_DIR%\nprofiles_directory=%BASE_DIR%/profiles\n",
+        encoding="utf-8",
+    )
+    (instance / "profiles/Default").mkdir(parents=True)
+    (instance / "mods").mkdir()
+    (instance / "downloads").mkdir()
+    result = inspect_mo2_instances(prefix, require_managed=False)
+    assert result["ok"]
+    assert result["managed"] is False
+    found = result["skyrim_instances"][0]
+    assert found["storage"]["mods"]["status"] == "available"
+    assert found["storage"]["downloads"]["status"] == "available"
+    assert found["storage"]["profiles"]["status"] == "available"
+
+
+def test_inventory_reports_custom_external_storage_without_traversing_it(tmp_path):
+    prefix = tmp_path / "compatdata/489830"
+    instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
+    instance.mkdir(parents=True)
+    outside = tmp_path / "external-mods"
+    outside.mkdir()
+    (instance / "ModOrganizer.ini").write_text(
+        "[General]\ngameName=Skyrim Special Edition\n"
+        "[Settings]\nbase_directory=%BASE_DIR%\nmod_directory=" + str(outside) + "\n",
+        encoding="utf-8",
+    )
+    result = inspect_mo2_instances(prefix, require_managed=False)
+    assert result["ok"]
+    found = result["skyrim_instances"][0]
+    assert found["storage"]["mods"]["status"] == "available"
+    assert found["storage"]["mods"]["path"] == str(outside.resolve())
+
