@@ -74,6 +74,55 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(result["processes"][1]["audio_runtime_environment_readable"])
             self.assertIsNone(result["processes"][1]["audio_runtime_environment_error"])
 
+    def test_procfs_audio_module_mappings_report_loaded_and_not_observed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            entry = proc / "321"
+            entry.mkdir(parents=True)
+            (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
+            (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
+            (entry / "environ").write_bytes(b"STEAM_COMPAT_DATA_PATH=/managed/prefix\\0")
+            (entry / "maps").write_text(
+                "7f0000-7f1000 r-xp 0000 00:00 0 /drive_c/windows/system32/xaudio2_7.dll\\n"
+                "7f1000-7f2000 r-xp 0000 00:00 0 /drive_c/windows/system32/faudio.dll\\n",
+                encoding="utf-8",
+            )
+            with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+                result = detect_skyrim_processes(Path("/managed/prefix"), proc_root=proc)
+            self.assertTrue(result["ok"])
+            process = result["processes"][0]
+            self.assertTrue(process["audio_module_mappings_readable"])
+            self.assertIn("xaudio2_7.dll", process["audio_module_mappings"])
+            self.assertIn("faudio.dll", process["audio_module_mappings"])
+            self.assertIsNone(process["audio_module_mappings"]["xactengine3_7.dll"])
+            self.assertNotIn("audio_verified", process)
+
+
+    def test_procfs_audio_module_mappings_mark_permission_failure_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            entry = proc / "321"
+            entry.mkdir(parents=True)
+            (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
+            (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
+            (entry / "environ").write_bytes(b"")
+            original = Path.read_text
+
+            def guarded_read_text(path, *args, **kwargs):
+                if path.name == "maps":
+                    raise PermissionError("maps denied")
+                return original(path, *args, **kwargs)
+
+            with patch("pathlib.Path.read_text", new=guarded_read_text), patch(
+                "wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"
+            ):
+                result = detect_skyrim_processes(proc_root=proc)
+            process = result["processes"][0]
+            self.assertFalse(process["audio_module_mappings_readable"])
+            self.assertEqual(process["audio_module_mappings"], {})
+            self.assertIn("maps denied", process["audio_module_mappings_error"])
+
+
     def test_procfs_audio_environment_reports_unreadable_separately_from_unset(self):
         with tempfile.TemporaryDirectory() as tmp:
             proc = Path(tmp) / "proc"
