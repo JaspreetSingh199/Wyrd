@@ -26,7 +26,7 @@ from wyrd_mo2 import (
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
     inspect_audio_compatibility, reset_mo2_compatdata,
 )
-from steamcompat import launch_mo2_in_skyrim_prefix
+from steamcompat import launch_mo2_in_skyrim_prefix, inspect_skyrim_prefix_mo2_instances
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -649,7 +649,25 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        result = launch_mo2_in_skyrim_prefix()
+        inventory = inspect_skyrim_prefix_mo2_instances()
+        if not inventory.get("ok"):
+            self._log(inventory.get("message", "Could not inspect Skyrim-prefix MO2 instances."))
+            QMessageBox.warning(self, "Steam-prefix MO2", inventory.get("message", "Could not inspect MO2 instances."))
+            return
+        candidates = inventory.get("skyrim_instances", [])
+        if not candidates:
+            message = inventory.get("message", "No Skyrim MO2 instance exists in Skyrim's Proton prefix.")
+            self._log(message)
+            QMessageBox.warning(self, "Steam-prefix MO2", message)
+            return
+        names = [item["name"] for item in candidates]
+        instance_name, accepted = QInputDialog.getItem(
+            self, "MO2 instance in Skyrim prefix", "Select the Skyrim MO2 instance:",
+            names, 0, False,
+        )
+        if not accepted or not instance_name:
+            return
+        result = launch_mo2_in_skyrim_prefix(instance_name=instance_name)
         self._log(result.get("message", "Steam-prefix MO2 launch failed."))
         if result.get("ok"):
             self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
