@@ -444,15 +444,15 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             win_game = str(game).replace("/", "\\\\")
             (instance / "ModOrganizer.ini").write_text(
-                "[General]\\n"
-                "gameName=Skyrim Special Edition\\n"
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
                 f"gamePath=Z:{win_game}\\n"
-                "selected_profile=Default\\n"
-                "[customExecutables]\\n"
-                "size=2\\n"
-                "1\\\\title=Skyrim Special Edition\\n"
+                "selected_profile=Default\n"
+                "[customExecutables]\n"
+                "size=2\n"
+                "1\\\\title=Skyrim Special Edition\n"
                 f"1\\\\binary=Z:{win_game}\\\\SkyrimSE.exe\\n"
-                "2\\\\title=SKSE\\n"
+                "2\\\\title=SKSE\n"
                 f"2\\\\binary=Z:{win_game}\\\\skse64_loader.exe\\n",
                 encoding="utf-8",
             )
