@@ -17,7 +17,7 @@ def fake_proton(path: Path) -> Path:
     wine = path / "files/bin/wine"
     wine.parent.mkdir(parents=True)
     header = bytearray(20)
-    header[:4] = b"\\x7fELF"
+    header[:4] = b"\x7fELF"
     header[4] = 2
     header[5] = 1
     header[18:20] = (62).to_bytes(2, "little")
