@@ -287,6 +287,25 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             self.assertEqual(ini.read_bytes(), before)
 
+    def test_instance_profile_unwraps_qsettings_byte_array_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefix"
+            install = Path(tmp) / "install"
+            instance = install / "instances" / "Skyrim SE"
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\\ngameName=Skyrim Special Edition\\n"
+                "selected_profile=@ByteArray(Default)\\n",
+                encoding="utf-8",
+            )
+            result = inspect_mo2_instances(prefix, install)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["skyrim_instances"][0]["selected_profile"], "Default")
+
     def test_instance_inspection_refuses_unowned_or_unreadable_prefix(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp)
