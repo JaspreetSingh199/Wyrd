@@ -1029,7 +1029,17 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             ),
         }
     target_match = matching_targets[0]
+    if audio_mode not in {"default", "xaudio2_compat"}:
+        return {"ok": False, "message": "Unknown audio compatibility test mode."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
+    if audio_mode == "xaudio2_compat":
+        current_overrides = env.get("WINEDLLOVERRIDES", "")
+        overrides = [
+            item for item in current_overrides.split(";")
+            if item and not item.lower().startswith("xaudio2_7=")
+        ]
+        overrides.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(overrides)
     # MO2 parses global options before the command name. Keep --instance
     # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
     # game instance rather than becoming an unparsed subcommand argument.
