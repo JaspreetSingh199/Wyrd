@@ -248,6 +248,22 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(skyrim_state["executables"][0]["title"], "SKSE")
             self.assertEqual(ini.read_bytes(), before)
 
+    def test_read_only_instance_inspection_finds_portable_instances(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefix"
+            install = Path(tmp) / "install"
+            portable = install / "instances" / "Skyrim SE"
+            portable.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").parent.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            ini = portable / "ModOrganizer.ini"
+            ini.write_text("[General]\\ngameName=Skyrim Special Edition\\n", encoding="utf-8")
+            result = inspect_mo2_instances(prefix, install)
+            self.assertTrue(result["ok"])
+            self.assertEqual([item["name"] for item in result["skyrim_instances"]], ["Skyrim SE"])
+
     def test_instance_inspection_refuses_unowned_or_unreadable_prefix(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp)
