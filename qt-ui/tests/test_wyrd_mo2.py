@@ -94,6 +94,14 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(process["audio_module_mappings_readable"])
             self.assertIn("xaudio2_7.dll", process["audio_module_mappings"])
             self.assertIn("faudio.dll", process["audio_module_mappings"])
+            self.assertEqual(
+                process["audio_module_mappings"]["xaudio2_7.dll"],
+                "/drive_c/windows/system32/xaudio2_7.dll",
+            )
+            self.assertEqual(
+                process["audio_module_mappings"]["faudio.dll"],
+                "/drive_c/windows/system32/faudio.dll",
+            )
             self.assertIsNone(process["audio_module_mappings"]["xactengine3_7.dll"])
             self.assertNotIn("audio_verified", process)
 
