@@ -214,7 +214,6 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         self.launch_status_button = QPushButton("Check launch status")
         self.launch_status_button.clicked.connect(self.check_launch_status)
-        self.launch_status_button.setEnabled(False)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
         action_row.addWidget(self.launch_game_button)
@@ -653,7 +652,7 @@ class MainWindow(QMainWindow):
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
                 self._launch_monitor.start()
-            self.launch_status_button.setEnabled(bool(self.launch_session.wrapper_pid))
+            self.launch_status_button.setEnabled(True)
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
