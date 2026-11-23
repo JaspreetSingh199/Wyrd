@@ -651,14 +651,7 @@ def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
     arguments = [str(executable)]
     if pick_instance:
         arguments.append("--pick")
-    if audio_mode not in {"default", "xaudio2_compat"}:
-        return {"ok": False, "message": "Unknown audio compatibility test mode."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
-    if audio_mode == "xaudio2_compat":
-        existing = env.get("WINEDLLOVERRIDES", "")
-        entries = [item for item in existing.split(";") if item and not item.lower().startswith("xaudio2_7=")]
-        entries.append("xaudio2_7=n,b")
-        env["WINEDLLOVERRIDES"] = ";".join(entries)
     try:
         process = subprocess.Popen(
             [str(proton_path / "proton"), "run", *arguments],
