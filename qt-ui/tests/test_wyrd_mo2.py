@@ -83,8 +83,8 @@ class WyrdMO2Tests(unittest.TestCase):
             (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
             (entry / "environ").write_bytes(b"STEAM_COMPAT_DATA_PATH=/managed/prefix\\0")
             (entry / "maps").write_text(
-                "7f0000-7f1000 r-xp 0000 00:00 0 /drive_c/windows/system32/xaudio2_7.dll\\n"
-                "7f1000-7f2000 r-xp 0000 00:00 0 /drive_c/windows/system32/faudio.dll\\n",
+                "7f0000-7f1000 r-xp 0000 00:00 0 /drive_c/windows/system32/xaudio2_7.dll\n"
+                "7f1000-7f2000 r-xp 0000 00:00 0 /drive_c/windows/system32/faudio.dll\n",
                 encoding="utf-8",
             )
             with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
