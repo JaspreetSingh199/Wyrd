@@ -840,8 +840,11 @@ class MainWindow(QMainWindow):
 
         if not session.wrapper_pid:
             detail = (
-                "No Wyrd launch handoff has been recorded in this session.\\n\\n"
+                "No Wyrd launch handoff has been recorded in this session. "
+                "That is expected when Skyrim is launched directly from MO2.\\n\\n"
                 + process_scan.get("message", "Process detection unavailable.")
+                + "\\n\\nThis check detects currently running Skyrim/SKSE processes; "
+                "it cannot confirm a game that has already exited."
             )
             QMessageBox.information(self, "Launch status", detail)
             return
