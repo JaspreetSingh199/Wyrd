@@ -793,7 +793,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
             # QSettings stores selected_profile as a QByteArray. INI readers
             # may expose Qt's typed representation as @ByteArray(value).
             profile = general.get("selected_profile", "").strip()
-            byte_array = re.fullmatch(r"@ByteArray\\((.*)\\)", profile, flags=re.DOTALL)
+            byte_array = re.fullmatch(r"@ByteArray\((.*)\)", profile, flags=re.DOTALL)
             if byte_array:
                 profile = byte_array.group(1).strip()
 
