@@ -298,6 +298,34 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertEqual(result["targets"], [])
 
+    def test_launch_target_rejects_skse_title_for_unrelated_game_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            game = root / "game"
+            game.mkdir()
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            (game / "Updater.exe").write_bytes(b"unrelated")
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim"
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            game_path = str(game).replace("/", "\\\\")
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                f"gamePath=Z:{game_path}\\n"
+                "[customExecutables]\\nsize=1\\n"
+                "[customExecutables\\\\1]\\n"
+                "title=SKSE\\n"
+                f"binary=Z:{game_path}\\\\Updater.exe\\n",
+                encoding="utf-8",
+            )
+            result = inspect_skyrim_launch_targets(prefix, game)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual([item["title"] for item in result["targets"]], ["Skyrim"])
+
     def test_launch_handoff_uses_mo2_run_executable_and_prefix_environment(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
