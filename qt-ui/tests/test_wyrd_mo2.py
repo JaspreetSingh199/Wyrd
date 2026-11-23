@@ -422,6 +422,53 @@ class WyrdMO2Tests(unittest.TestCase):
             popen.assert_not_called()
 
 
+    def test_launch_handoff_selects_exact_binary_when_titles_are_duplicated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+                "managed_by": "Wyrd", "proton": str(proton), "game_path": str(game),
+                "steam_root": str(home / ".steam/steam"),
+            }), encoding="utf-8")
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            wanted = game / "skse64_loader.exe"
+            other = game / "skse_loader.exe"
+            wanted.write_bytes(b"skse")
+            other.write_bytes(b"other")
+            duplicate_targets = [
+                {"title": "SKSE", "binary": str(wanted)},
+                {"title": "SKSE", "binary": str(other)},
+            ]
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+                "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
+            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+                "ok": True, "targets": duplicate_targets
+            }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
+                "wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]
+            ):
+                popen.return_value.pid = 77
+                result = launch_skyrim_via_mo2(
+                    "SKSE", "Skyrim SE", home, expected_binary=wanted
+                )
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["command"][-2:], ["--executable", "SKSE"])
+            log_text = Path(result["log_path"]).read_text(encoding="utf-8")
+            self.assertIn(f"binary: {wanted.resolve()}", log_text)
+            self.assertNotIn(f"binary: {other}", log_text)
+
+
     def test_launch_handoff_rejects_stale_binary_identity_before_spawning(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
