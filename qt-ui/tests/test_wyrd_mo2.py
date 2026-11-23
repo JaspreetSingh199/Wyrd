@@ -17,7 +17,9 @@ from wyrd_mo2 import (
     install_mo2_environment,
     managed_paths,
     _validate_archive_members, read_settings, write_settings, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, read_launch_diagnostics, launch_process_status, detect_skyrim_processes, _proc_start_time, _proc_identity, _is_descendant_process, classify_launch_diagnostics,
+    inspect_skyrim_launch_targets, launch_skyrim_via_mo2, launch_mo2,
+    read_launch_diagnostics, launch_process_status, detect_skyrim_processes,
+    _proc_start_time, _proc_identity, _is_descendant_process, classify_launch_diagnostics,
 )
 
 
@@ -521,7 +523,8 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(result["ok"], result)
             env = popen.call_args.kwargs["env"]
             self.assertEqual(env["WINEDLLOVERRIDES"], "d3d11=n;dxgi=n;xaudio2_7=n,b")
-            self.assertEqual(os.environ["WINEDLLOVERRIDES"], "d3d11=n;dxgi=n")
+            self.assertEqual(env["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
+            self.assertIn("WINEDLLOVERRIDES", env)
             log = Path(result["log_path"]).read_text(encoding="utf-8")
             self.assertIn("audio_mode: xaudio2_compat", log)
             self.assertIn("xaudio2_7=n,b", log)
