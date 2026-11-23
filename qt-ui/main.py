@@ -26,6 +26,7 @@ from wyrd_mo2 import (
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
     inspect_audio_compatibility, reset_mo2_compatdata,
 )
+from steamcompat import launch_mo2_in_skyrim_prefix
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -209,6 +210,9 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
+        self.launch_game_prefix_button = QPushButton("Launch MO2 in Skyrim Prefix")
+        self.launch_game_prefix_button.clicked.connect(self.start_mo2_in_skyrim_prefix)
+        self.launch_game_prefix_button.setEnabled(False)
         self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
         self.reset_prefix_button.setEnabled(False)
         self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
@@ -224,6 +228,7 @@ class MainWindow(QMainWindow):
         self.launch_status_button.clicked.connect(self.check_launch_status)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
+        action_row.addWidget(self.launch_game_prefix_button)
         action_row.addWidget(self.reset_prefix_button)
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.launch_direct_button)
@@ -411,6 +416,7 @@ class MainWindow(QMainWindow):
                 f'{instance_summary}'
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
+            self.launch_game_prefix_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.game_state.get("found")))
             # Launch Skyrim availability is based on the detected Steam game and Wyrd's
             # managed MO2 prefix, not on whether an MO2 instance already exists.
             self.launch_game_button.setEnabled(bool(self.game_state.get("found")))
@@ -425,6 +431,7 @@ class MainWindow(QMainWindow):
                 description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
             self.mo2_panel.detail_label.setText(description)
             self.launch_button.setEnabled(False)
+            self.launch_game_prefix_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(False)
             self.install_button.setText("Install MO2")
@@ -629,6 +636,26 @@ class MainWindow(QMainWindow):
                 )
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
+
+    def start_mo2_in_skyrim_prefix(self) -> None:
+        """Launch MO2 in Skyrim's Steam compatdata prefix (experimental)."""
+        answer = QMessageBox.warning(
+            self, "Experimental: MO2 in Skyrim Prefix",
+            "This launches Wyrd's MO2 installation using Skyrim's existing Steam Proton compatdata prefix. "
+            "It does not reset or intentionally modify that prefix, but MO2/Proton may write normal runtime "
+            "configuration files into it. This is separate from Standalone MO2.\n\nProceed?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = launch_mo2_in_skyrim_prefix()
+        self._log(result.get("message", "Steam-prefix MO2 launch failed."))
+        if result.get("ok"):
+            self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
+            QMessageBox.information(self, "Steam-prefix MO2", result["message"])
+        else:
+            QMessageBox.warning(self, "Steam-prefix MO2 launch failed", result.get("message", "Could not launch MO2."))
 
     def start_skyrim_direct(self) -> None:
         """Launch Skyrim through Steam's own AppID path, independent of MO2 instances."""
