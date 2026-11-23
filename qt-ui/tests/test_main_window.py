@@ -212,6 +212,26 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
         self.assertFalse(window._launch_monitor.isActive())
 
+    def test_start_skyrim_default_audio_is_first_and_passed_unchanged(self):
+        window = self._window()
+        with patch("main.QInputDialog.getItem", side_effect=[
+            ("Skyrim", True), ("Skyrim", True), ("Default Proton audio", True)
+        ]), patch("main.QMessageBox.question", return_value=1), patch(
+            "main.inspect_skyrim_launch_targets", return_value={
+                "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
+            }
+        ), patch("main.launch_skyrim_via_mo2", return_value={
+            "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log", "message": "handoff"
+        }) as launch, patch("main._proc_start_time", return_value=123), patch(
+            "main.QMessageBox.information"
+        ):
+            window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
+            window.mo2_state = {"metadata": {"game_path": "/games/Skyrim"}}
+            window.start_skyrim()
+        self.assertEqual(launch.call_args.kwargs["audio_mode"], "default")
+        window.close()
+
+
     def test_launch_monitor_rejects_reused_wrapper_pid_for_tree_attribution(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
