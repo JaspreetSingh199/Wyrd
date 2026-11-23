@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 import steamcompat
-from wyrd_mo2 import inspect_mo2_instances
+from wyrd_mo2 import inspect_mo2_instances, copy_mo2_instance_to_prefix
 
 
 def test_prefix_path_is_skyrim_appid():
@@ -109,3 +109,75 @@ def test_inventory_reports_custom_external_storage_without_traversing_it(tmp_pat
     assert found["storage"]["mods"]["status"] == "available"
     assert found["storage"]["mods"]["path"] == str(outside.resolve())
 
+
+
+def make_source_instance(tmp_path, name="Skyrim Special Edition - G"):
+    source = tmp_path / "source" / name
+    (source / "profiles/Default").mkdir(parents=True)
+    (source / "mods/Example Mod").mkdir(parents=True)
+    (source / "downloads").mkdir()
+    (source / "ModOrganizer.ini").write_text(
+        "[General]\\ngameName=Skyrim Special Edition\\nselected_profile=Default\\n"
+        "[Settings]\\nbase_directory=%BASE_DIR%\\n"
+        "profiles_directory=%BASE_DIR%/profiles\\n"
+        "mod_directory=%BASE_DIR%/mods\\n"
+        "download_directory=%BASE_DIR%/downloads\\n",
+        encoding="utf-8",
+    )
+    return source
+
+
+def test_copy_instance_preserves_source_and_repoints_storage(tmp_path):
+    source = make_source_instance(tmp_path)
+    prefix = tmp_path / "Steam/steamapps/compatdata/489830"
+    (prefix / "pfx/drive_c/users").mkdir(parents=True)
+    result = copy_mo2_instance_to_prefix(source, prefix)
+    assert result["ok"]
+    assert result["status"] == "copied"
+    assert result["source_preserved"] is True
+    assert (source / "ModOrganizer.ini").is_file()
+    assert (source / "mods/Example Mod").is_dir()
+    copied = Path(result["destination"])
+    assert (copied / "profiles/Default").is_dir()
+    assert (copied / "mods/Example Mod").is_dir()
+    assert (copied / "downloads").is_dir()
+    config = copied / "ModOrganizer.ini"
+    import configparser
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(config, encoding="utf-8")
+    assert parser["Settings"]["base_directory"] == str(copied)
+    assert parser["Settings"]["mod_directory"] == "%BASE_DIR%/mods"
+
+
+def test_copy_instance_refuses_external_mod_storage(tmp_path):
+    source = make_source_instance(tmp_path)
+    external = tmp_path / "shared-mods"
+    external.mkdir()
+    config = source / "ModOrganizer.ini"
+    config.write_text(
+        "[General]\\ngameName=Skyrim Special Edition\\n"
+        "[Settings]\\nbase_directory=%BASE_DIR%\\n"
+        "mod_directory=" + str(external) + "\\n",
+        encoding="utf-8",
+    )
+    prefix = tmp_path / "Steam/steamapps/compatdata/489830"
+    (prefix / "pfx/drive_c/users").mkdir(parents=True)
+    result = copy_mo2_instance_to_prefix(source, prefix)
+    assert not result["ok"]
+    assert "outside" in result["message"].lower()
+    assert source.is_dir()
+    assert not (prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition - G").exists()
+
+
+def test_copy_instance_refuses_existing_destination_without_overwrite(tmp_path):
+    source = make_source_instance(tmp_path)
+    prefix = tmp_path / "Steam/steamapps/compatdata/489830"
+    users = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer"
+    users.mkdir(parents=True)
+    destination = users / source.name
+    destination.mkdir()
+    (destination / "keep.txt").write_text("keep")
+    result = copy_mo2_instance_to_prefix(source, prefix)
+    assert not result["ok"]
+    assert (destination / "keep.txt").read_text() == "keep"
+    assert source.is_dir()
