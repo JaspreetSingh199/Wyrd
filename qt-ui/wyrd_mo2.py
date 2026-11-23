@@ -760,6 +760,10 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
         except OSError as error:
             errors.append(f"{root}: {error}")
             continue
+        # A portable MO2 instance is the install directory itself, not a
+        # child directory. Inspect it alongside any named child instances.
+        if (root / "ModOrganizer.ini").is_file():
+            entries.insert(0, root)
         for directory in entries:
             if not directory.is_dir():
                 continue
