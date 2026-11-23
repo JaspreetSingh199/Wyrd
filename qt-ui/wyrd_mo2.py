@@ -716,6 +716,11 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
             user_dirs = []
         for user_dir in user_dirs:
             candidates = (
+                # MO2 global instances are direct children of ModOrganizer.
+                user_dir / "AppData/Local/ModOrganizer",
+                user_dir / "AppData/Roaming/ModOrganizer",
+                user_dir / "Documents/Modding/ModOrganizer",
+                # Legacy/alternate nested layouts remain inventory-only.
                 user_dir / "AppData/Local/ModOrganizer/instances",
                 user_dir / "AppData/Roaming/ModOrganizer/instances",
                 user_dir / "Documents/Modding/ModOrganizer/instances",
