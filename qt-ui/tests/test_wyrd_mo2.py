@@ -315,8 +315,9 @@ class WyrdMO2Tests(unittest.TestCase):
             (instance / "ModOrganizer.ini").write_text(
                 "[General]\\n"
                 "gameName=Skyrim Special Edition\\n"
-                f"gamePath=Z:{game_path}\\n"
-                "[customExecutables]\\nsize=1\\n"
+                f"gamePath=Z:{game_path}\\\\SkyrimSE.exe\\n"
+                "[customExecutables]\\n"
+                "size=1\\n"
                 "[customExecutables\\\\1]\\n"
                 "title=SKSE\\n"
                 f"binary=Z:{game_path}\\\\Updater.exe\\n",
