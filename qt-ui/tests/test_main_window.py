@@ -51,6 +51,26 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
+    def test_check_launch_status_logs_detected_audio_mapping_observations(self):
+        window = self._window()
+        process = {
+            "pid": 4321, "binary": "SkyrimSE.exe", "attributed_to_wyrd": True,
+            "start_time": 123, "audio_module_mappings_readable": True,
+            "audio_module_mappings": {"xaudio2_7.dll": "/prefix/xaudio2_7.dll", "faudio.dll": None},
+            "audio_runtime_environment": {"WINEDLLOVERRIDES": None, "PULSE_LATENCY_MSEC": "90"},
+        }
+        with patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [process], "wyrd_processes": [process],
+            "message": "Detected 1 Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
+        }), patch("main.QMessageBox.information"):
+            window.check_launch_status()
+        joined = "\\n".join(window.log_lines)
+        self.assertIn("candidate PID 4321", joined)
+        self.assertIn("Audio DLL mappings PID 4321: xaudio2_7.dll", joined)
+        self.assertIn("PULSE_LATENCY_MSEC='90'", joined)
+        window.close()
+
+
     def test_idle_launch_status_explains_manual_mo2_and_exited_game(self):
         window = self._window()
         with patch("main.detect_skyrim_processes", return_value={
