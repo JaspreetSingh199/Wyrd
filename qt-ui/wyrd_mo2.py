@@ -1158,8 +1158,34 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
             value = next((part.split("=", 1)[1] for part in env_parts
                          if part.startswith(key + "=")), None)
             audio_runtime[key] = value if env_readable else None
+        # Read-only observation of DLL mappings in the actual game process.
+        # A mapped library is not proof that its audio path works.
+        mapped_audio = {}
+        maps_readable = True
+        maps_error = None
+        try:
+            maps_text = (entry / "maps").read_text(encoding="utf-8", errors="replace")
+            map_paths = {
+                line.rsplit(None, 1)[-1].replace("\\040", " ")
+                for line in maps_text.splitlines()
+                if len(line.rsplit(None, 1)) == 6 and line.rsplit(None, 1)[-1].startswith("/")
+            }
+            normalized_maps = {Path(value).name.casefold(): value for value in map_paths}
+            for library in (
+                "xaudio2_7.dll", "xaudio2_8.dll", "xaudio2_9.dll",
+                "xactengine3_7.dll", "x3daudio1_7.dll", "xapofx1_5.dll",
+                "faudio.dll",
+            ):
+                mapped_audio[library] = normalized_maps.get(library)
+        except OSError as error:
+            maps_readable = False
+            maps_error = str(error)
+            mapped_audio = {}
         detected.append({
             "pid": int(entry.name), "binary": matches[0], "argv": argv,
+            "audio_module_mappings": mapped_audio,
+            "audio_module_mappings_readable": maps_readable,
+            "audio_module_mappings_error": maps_error,
             "start_time": _proc_start_time(int(entry.name), Path(proc_root)),
             "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
             "audio_runtime_environment": audio_runtime,
