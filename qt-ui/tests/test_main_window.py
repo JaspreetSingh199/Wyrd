@@ -476,6 +476,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window.game_state["found"])
         self.assertEqual(window.proton_combo.count(), 1)
         self.assertEqual(window.install_button.text(), "Install MO2")
+        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (Steam)")
         self.assertFalse(window.launch_button.isEnabled())
         self.assertFalse(hasattr(window, "nav"))
         window.close()
