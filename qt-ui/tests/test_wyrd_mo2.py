@@ -443,6 +443,58 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(popen.call_count, 1)
 
 
+    def test_launch_handoff_xaudio2_override_is_per_process_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+                "managed_by": "Wyrd", "proton": str(proton), "game_path": str(game),
+                "steam_root": str(home / ".steam/steam"),
+            }), encoding="utf-8")
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            instance = paths["prefix"] / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
+            instance.mkdir(parents=True)
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                "gamePath=Z:" + str(game).replace("/", "\\\\") + "\\n"
+                "[customExecutables]\\nsize=1\\n"
+                "1\\\\title=SKSE\\n"
+                "1\\\\binary=Z:" + str(game).replace("/", "\\\\") + "\\\\skse64_loader.exe\\n",
+                encoding="utf-8",
+            )
+            target = game / "skse64_loader.exe"
+            target.write_bytes(b"skse")
+            (game / "SkyrimSE.exe").write_bytes(b"game")
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+                "WINEDLLOVERRIDES": "d3d11=n;dxgi=n",
+            }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
+                "wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]
+            ):
+                popen.return_value.pid = 5678
+                result = launch_skyrim_via_mo2(
+                    "SKSE", "Skyrim SE", home, expected_binary=target,
+                    audio_mode="xaudio2_compat",
+                )
+            self.assertTrue(result["ok"], result)
+            env = popen.call_args.kwargs["env"]
+            self.assertEqual(env["WINEDLLOVERRIDES"], "d3d11=n;dxgi=n;xaudio2_7=n,b")
+            self.assertEqual(os.environ["WINEDLLOVERRIDES"], "d3d11=n;dxgi=n")
+            log = Path(result["log_path"]).read_text(encoding="utf-8")
+            self.assertIn("audio_mode: xaudio2_compat", log)
+            self.assertIn("xaudio2_7=n,b", log)
+
+
     def test_launch_handoff_rejects_ambiguous_duplicate_title_without_binary_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
