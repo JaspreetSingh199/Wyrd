@@ -9,7 +9,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from wyrd_mo2 import inspect_wyrd_installation, inspect_proton_build, _runtime_environment
+from wyrd_mo2 import inspect_wyrd_installation, inspect_proton_build, _runtime_environment, inspect_mo2_instances
 
 APP_ID = "489830"
 
@@ -18,7 +18,27 @@ def steam_compat_prefix(steam_root: Path) -> Path:
     return Path(steam_root).expanduser() / "steamapps/compatdata" / APP_ID
 
 
-def launch_mo2_in_skyrim_prefix(home: Path | None = None) -> dict:
+def inspect_skyrim_prefix_mo2_instances(home: Path | None = None) -> dict:
+    """Inventory Skyrim-specific MO2 instances in Skyrim's validated AppID prefix."""
+    state = inspect_wyrd_installation(home)
+    if not state.get("installed"):
+        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Wyrd-managed MO2 is not installed."}
+    metadata = state.get("metadata", {})
+    steam_root = Path(metadata.get("steam_root", "")).expanduser()
+    prefix = steam_compat_prefix(steam_root)
+    if prefix.is_symlink() or not prefix.is_dir():
+        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
+    try:
+        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
+    except (OSError, ValueError, RuntimeError):
+        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim compatdata prefix is outside the Steam root."}
+    if not (prefix / "pfx/drive_c/users").is_dir():
+        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim's Proton prefix is not initialized."}
+    return inspect_mo2_instances(prefix, require_managed=False)
+
+
+
+def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | None = None) -> dict
     """Start MO2 with Proton and STEAM_COMPAT_DATA_PATH set to Skyrim's AppID prefix."""
     state = inspect_wyrd_installation(home)
     if not state.get("installed"):
@@ -49,6 +69,19 @@ def launch_mo2_in_skyrim_prefix(home: Path | None = None) -> dict:
     executable = install / "ModOrganizer.exe"
     if not executable.is_file() or executable.is_symlink():
         return {"ok": False, "message": "Wyrd's verified MO2 executable is missing or unsafe."}
+    inventory = inspect_skyrim_prefix_mo2_instances(home)
+    if not inventory.get("ok"):
+        return {"ok": False, "message": inventory.get("message", "Could not inspect MO2 instances in Skyrim's prefix.")}
+    candidates = inventory.get("skyrim_instances", [])
+    if instance_name is None:
+        if len(candidates) == 1:
+            instance_name = candidates[0]["name"]
+        elif candidates:
+            return {"ok": False, "needs_instance_selection": True, "instances": [item["name"] for item in candidates], "message": "Choose an MO2 Skyrim instance before launching in Skyrim's prefix."}
+        else:
+            return {"ok": False, "message": "No Skyrim Special Edition MO2 instance was found in Skyrim's prefix. Create or copy one into this prefix first."}
+    if instance_name not in [item["name"] for item in candidates]:
+        return {"ok": False, "message": "The selected Skyrim MO2 instance is not verified in Skyrim's prefix."}
     env = _runtime_environment(proton, steam_root, prefix)
     env.update({
         "SteamAppId": APP_ID,
@@ -58,12 +91,13 @@ def launch_mo2_in_skyrim_prefix(home: Path | None = None) -> dict:
     })
     try:
         process = subprocess.Popen(
-            [str(proton / "proton"), "run", str(executable)],
+            [str(proton / "proton"), "run", str(executable), "--instance", instance_name],
             cwd=str(install), env=env, start_new_session=True,
         )
     except OSError as error:
         return {"ok": False, "message": f"Could not start MO2 in Skyrim's Proton prefix: {error}"}
     return {
         "ok": True, "pid": process.pid, "prefix": str(prefix.resolve()),
-        "message": "MO2 wrapper started in Skyrim's Steam compatdata prefix. MO2 window/process startup is not yet independently confirmed.",
+        "instance": instance_name,
+        "message": f"MO2 wrapper started in Skyrim's Steam compatdata prefix for instance '{instance_name}'. MO2 window/process startup is not yet independently confirmed.",
     }
