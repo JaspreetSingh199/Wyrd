@@ -932,7 +932,9 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
             if not title or not binary or not binary.is_file():
                 continue
             name = binary.name.casefold()
-            is_skse = name in {"skse64_loader.exe", "skse_loader.exe"} or "skse" in title.casefold()
+            # The configured title is user-editable metadata. Never treat a
+            # title containing "SKSE" as proof that the binary is SKSE.
+            is_skse = name in {"skse64_loader.exe", "skse_loader.exe"}
             is_skyrim = name == "skyrimse.exe"
             if not (is_skse or is_skyrim):
                 continue
