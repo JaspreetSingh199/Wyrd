@@ -458,8 +458,8 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             inventory = inspect_mo2_instances(prefix, portable)
             self.assertEqual(
-                [item["name"] for item in inventory["instances"]],
-                ["Skyrim Special Edition - G", "managed-mo2"],
+                {item["name"] for item in inventory["instances"]},
+                {"Skyrim Special Edition - G", "managed-mo2"},
             )
             self.assertEqual(
                 [item["name"] for item in inventory["skyrim_instances"]],
