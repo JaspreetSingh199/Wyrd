@@ -259,7 +259,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
             ini = portable / "ModOrganizer.ini"
-            ini.write_text("[General]\\ngameName=Skyrim Special Edition\\n", encoding="utf-8")
+            ini.write_text("[General]\ngameName=Skyrim Special Edition\n", encoding="utf-8")
             result = inspect_mo2_instances(prefix, install)
             self.assertTrue(result["ok"])
             self.assertEqual([item["name"] for item in result["skyrim_instances"]], ["Skyrim SE"])
@@ -275,7 +275,7 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             ini = install / "ModOrganizer.ini"
             ini.write_text(
-                "[General]\\ngameName=Skyrim Special Edition\\n",
+                "[General]\ngameName=Skyrim Special Edition\n",
                 encoding="utf-8",
             )
             before = ini.read_bytes()
