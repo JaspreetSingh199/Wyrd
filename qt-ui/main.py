@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
         self.launch_game_button = QPushButton("Launch Skyrim (Steam)")
-        self.launch_game_button.clicked.connect(self.start_skyrim_direct
+        self.launch_game_button.clicked.connect(self.start_skyrim_direct)
         self.launch_game_button.setEnabled(False)
         self.diagnostics_button = QPushButton("View launch log")
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
