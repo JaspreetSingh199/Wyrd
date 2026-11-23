@@ -34,7 +34,10 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
             game.mkdir(parents=True)
             (prefix / "pfx/drive_c").mkdir(parents=True)
             proton = fake_proton(home / "Proton")
-            with patch("steamcompat._steam_root_for_game", return_value=steam), patch(
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }), patch("steamcompat._steam_root_for_game", return_value=steam), patch(
                 "steamcompat._latest_mo2_archive", return_value=("2.5.2", "MO2.7z", "https://example.test/MO2.7z")
             ), patch("steamcompat._download_archive", side_effect=lambda url, dest, callback=None: dest.write_bytes(b"archive")), patch(
                 "steamcompat._extract_mo2", side_effect=lambda archive, stage, callback=None: (
