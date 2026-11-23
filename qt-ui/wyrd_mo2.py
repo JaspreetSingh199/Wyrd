@@ -964,7 +964,8 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
 
 
 def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
-                          home: Path | None = None, log_path: Path | None = None) -> dict:
+                          home: Path | None = None, log_path: Path | None = None,
+                          expected_binary: Path | str | None = None) -> dict:
     """Start MO2's configured-executable handoff and retain a diagnostic log.
 
     A successful return means only that the Proton wrapper process was spawned.
@@ -996,13 +997,30 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     ) if prefix_check.get("ok") else None
     if not instance_match:
         return {"ok": False, "message": "The selected Skyrim instance is no longer present in Wyrd's managed prefix."}
-    target_match = next(
-        (item for item in inspect_skyrim_launch_targets(
-            paths["prefix"], game_path, instance_name=instance
-        ).get("targets", []) if item["title"] == title), None
+    target_state = inspect_skyrim_launch_targets(
+        paths["prefix"], game_path, instance_name=instance
     )
-    if not target_match:
-        return {"ok": False, "message": "The selected Skyrim executable is no longer verified in this MO2 instance."}
+    expected_path = None
+    if expected_binary is not None:
+        try:
+            expected_path = Path(expected_binary).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            return {"ok": False, "message": "The selected Skyrim executable is no longer available at its verified path."}
+    matching_targets = [
+        item for item in target_state.get("targets", [])
+        if item["title"] == title
+        and (expected_path is None or Path(item["binary"]).resolve() == expected_path)
+    ]
+    if len(matching_targets) != 1:
+        return {
+            "ok": False,
+            "message": (
+                "The selected Skyrim executable is no longer verified at the selected path."
+                if expected_path is not None else
+                "The selected executable title is ambiguous or is no longer verified in this MO2 instance."
+            ),
+        }
+    target_match = matching_targets[0]
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
     # MO2 parses global options before the command name. Keep --instance
     # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
@@ -1019,7 +1037,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         with diagnostics.open("a", encoding="utf-8") as log:
             log.write("\\n=== Wyrd Skyrim launch handoff ===\\n")
             log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
-            log.write(f"instance: {instance}\\nexecutable: {title}\\npid: pending\\n")
+            log.write(f"instance: {instance}\\nexecutable: {title}\\nbinary: {target_match['binary']}\\npid: pending\\n")
             log.write("command: " + json.dumps(command) + "\\n")
             log.write("stdout/stderr are redirected to this diagnostic log.\\n")
             log.flush()
