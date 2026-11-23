@@ -51,6 +51,18 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
+    def test_idle_launch_status_explains_manual_mo2_and_exited_game(self):
+        window = self._window()
+        with patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "message": "No Skyrim/SKSE process was detected."
+        }), patch("main.QMessageBox.information") as message:
+            window.check_launch_status()
+        detail = message.call_args.args[2]
+        self.assertIn("expected when Skyrim is launched directly from MO2", detail)
+        self.assertIn("currently running", detail)
+        window.close()
+
+
     def test_check_launch_status_is_available_without_wyrd_launch_session(self):
         window = self._window()
         self.assertTrue(window.launch_status_button.isEnabled())
