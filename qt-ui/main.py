@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
+    QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
     QWidget,
 )
@@ -199,7 +199,10 @@ class MainWindow(QMainWindow):
         self.audio_check_button = QPushButton("Check Audio Libraries")
         self.audio_check_button.clicked.connect(self.check_audio_libraries)
         audio_actions.addWidget(self.audio_check_button)
-        # V1 keeps Proton audio defaults; experimental DLL overrides are not exposed.
+        self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
+        self.xaudio_override_checkbox.setChecked(bool(self._saved_settings.get("xaudio2_compat", False)))
+        self.xaudio_override_checkbox.toggled.connect(self._save_audio_option)
+        audio_actions.addWidget(self.xaudio_override_checkbox)
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         layout.addWidget(self.audio_panel)
@@ -473,13 +476,27 @@ class MainWindow(QMainWindow):
         if not proton or not game:
             return
         try:
-            write_settings(None, Path(proton), Path(game))
+            write_settings(None, Path(proton), Path(game),
+                           xaudio2_compat=self.xaudio_override_checkbox.isChecked())
             self._saved_settings = {
                 "proton": str(Path(proton).resolve()),
                 "game_path": str(Path(game).resolve()),
+                "xaudio2_compat": self.xaudio_override_checkbox.isChecked(),
             }
         except OSError as error:
             self._log(f"Could not save Wyrd settings: {error}")
+
+    def _save_audio_option(self, enabled: bool) -> None:
+        """Persist the optional XAudio2 override preference."""
+        self._saved_settings["xaudio2_compat"] = bool(enabled)
+        proton = self.proton_combo.currentData()
+        game = self.game_state.get("game_dir")
+        if proton and game:
+            try:
+                write_settings(None, Path(proton), Path(game), xaudio2_compat=bool(enabled))
+                self._log("XAudio2 compatibility override preference saved: " + ("enabled" if enabled else "disabled"))
+            except OSError as error:
+                self._log(f"Could not save XAudio2 compatibility preference: {error}")
 
     def _refresh_audio_status(self, report: dict | None = None) -> None:
         """Render a read-only audio library inventory."""
@@ -820,25 +837,7 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        audio_modes = ["Default Proton audio", "XAudio2 compatibility test (reversible)"]
-        audio_mode_label, accepted = QInputDialog.getItem(
-            self, "Skyrim audio test", "Launch audio mode:",
-            audio_modes, 0, False,
-        )
-        if not accepted:
-            return
-        audio_mode = "xaudio2_compat" if audio_mode_label == audio_modes[1] else "default"
-        if audio_mode == "xaudio2_compat":
-            confirm_audio = QMessageBox.question(
-                self, "Confirm XAudio2 compatibility test",
-                "This adds WINEDLLOVERRIDES=xaudio2_7=n,b only to this Wyrd-launched MO2/Proton process. "
-                "It does not change Steam settings, Proton files, the prefix, or future default launches. "
-                "Compare an NPC dialogue scene against Default Proton audio.\\n\\nContinue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if confirm_audio != QMessageBox.StandardButton.Yes:
-                return
+        audio_mode = "xaudio2_compat" if self.xaudio_override_checkbox.isChecked() else "default"
         self._log("Skyrim audio launch mode: " + audio_mode)
         result = launch_skyrim_via_mo2(
             selected, instance_name, expected_binary=selected_target["binary"],
