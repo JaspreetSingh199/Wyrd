@@ -298,14 +298,45 @@ class WyrdMO2Tests(unittest.TestCase):
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
             ini = instance / "ModOrganizer.ini"
+            profiles = instance / "profiles"
+            (profiles / "Default").mkdir(parents=True)
             ini.write_text(
                 "[General]\ngameName=Skyrim Special Edition\n"
-                "selected_profile=@ByteArray(Default)\n",
+                "selected_profile=@ByteArray(Default)\n\n"
+                "[Settings]\nprofiles_directory=%BASE_DIR%/profiles\n",
                 encoding="utf-8",
             )
             result = inspect_mo2_instances(prefix, install)
             self.assertTrue(result["ok"])
             self.assertEqual(result["skyrim_instances"][0]["selected_profile"], "Default")
+            self.assertEqual(
+                result["skyrim_instances"][0]["selected_profile_status"], "verified"
+            )
+
+    def test_instance_profile_outside_managed_root_is_not_reported_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            install = root / "install"
+            instance = install / "instances" / "Skyrim SE"
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            external_profiles = root / "external-profiles"
+            (external_profiles / "Default").mkdir(parents=True)
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "selected_profile=@ByteArray(Default)\n\n"
+                f"[Settings]\nprofiles_directory={external_profiles}\n",
+                encoding="utf-8",
+            )
+            result = inspect_mo2_instances(prefix, install)
+            selected = result["skyrim_instances"][0]
+            self.assertEqual(selected["selected_profile"], "")
+            self.assertEqual(selected["selected_profile_candidate"], "Default")
+            self.assertEqual(selected["selected_profile_status"], "unverified")
 
     def test_instance_inspection_refuses_unowned_or_unreadable_prefix(self):
         with tempfile.TemporaryDirectory() as tmp:
