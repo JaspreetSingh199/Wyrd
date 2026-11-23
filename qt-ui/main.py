@@ -26,7 +26,8 @@ from wyrd_mo2 import (
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
     inspect_audio_compatibility, reset_mo2_compatdata,
 )
-from steamcompat import launch_mo2_in_skyrim_prefix, inspect_skyrim_prefix_mo2_instances
+from steamcompat import (launch_mo2_in_skyrim_prefix, inspect_skyrim_prefix_mo2_instances,
+                         copy_wyrd_instance_to_skyrim_prefix)
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -213,6 +214,9 @@ class MainWindow(QMainWindow):
         self.launch_game_prefix_button = QPushButton("Launch MO2 in Skyrim Prefix")
         self.launch_game_prefix_button.clicked.connect(self.start_mo2_in_skyrim_prefix)
         self.launch_game_prefix_button.setEnabled(False)
+        self.copy_instance_button = QPushButton("Copy Existing Skyrim Instance")
+        self.copy_instance_button.clicked.connect(self.copy_instance_to_skyrim_prefix)
+        self.copy_instance_button.setEnabled(False)
         self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
         self.reset_prefix_button.setEnabled(False)
         self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
@@ -229,6 +233,7 @@ class MainWindow(QMainWindow):
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
         action_row.addWidget(self.launch_game_prefix_button)
+        action_row.addWidget(self.copy_instance_button)
         action_row.addWidget(self.reset_prefix_button)
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.launch_direct_button)
@@ -674,6 +679,56 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Steam-prefix MO2", result["message"])
         else:
             QMessageBox.warning(self, "Steam-prefix MO2 launch failed", result.get("message", "Could not launch MO2."))
+
+
+    def copy_instance_to_skyrim_prefix(self) -> None:
+        """Offer a non-destructive copy of an existing Wyrd Skyrim instance."""
+        state = inspect_wyrd_installation()
+        if not state.get("installed") or not state.get("prefix_ready"):
+            QMessageBox.warning(self, "MO2 instance copy", "Wyrd's managed MO2 prefix is not ready.")
+            return
+        source = inspect_mo2_instances(
+            Path(state["paths"]["prefix"]), Path(state["executable"]).parent
+        )
+        if not source.get("ok"):
+            QMessageBox.warning(self, "MO2 instance copy", source.get("message", "Could not inspect Wyrd MO2."))
+            return
+        candidates = source.get("skyrim_instances", [])
+        if not candidates:
+            QMessageBox.information(self, "MO2 instance copy", "No Skyrim Special Edition instance was found in Wyrd's MO2 prefix.")
+            return
+        names = [item["name"] for item in candidates]
+        name, accepted = QInputDialog.getItem(
+            self, "Copy Skyrim MO2 instance", "Choose the original Wyrd instance to copy:",
+            names, 0, False,
+        )
+        if not accepted or not name:
+            return
+        item = next(candidate for candidate in candidates if candidate["name"] == name)
+        storage = item.get("storage", {})
+        explanation = (
+            f"Original instance: {item['path']}\n"
+            f"Profile: {item.get('selected_profile_candidate') or 'not selected'}\n"
+            f"Profiles: {storage.get('profiles', {}).get('path', 'unknown')}\n"
+            f"Mods: {storage.get('mods', {}).get('path', 'unknown')}\n"
+            f"Downloads: {storage.get('downloads', {}).get('path', 'unknown')}\n\n"
+            "Wyrd will copy the instance into Skyrim's Proton prefix. The source remains untouched. "
+            "For safety, copies with external storage roots or symlinks are refused. Continue?"
+        )
+        answer = QMessageBox.warning(
+            self, "Confirm non-destructive instance copy", explanation,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = copy_wyrd_instance_to_skyrim_prefix(name)
+        self._log(result.get("message", "MO2 instance copy failed."))
+        if result.get("ok"):
+            self.progress_label.setText("MO2 instance copied; original Wyrd instance preserved.")
+            QMessageBox.information(self, "MO2 instance copy", result["message"])
+        else:
+            QMessageBox.warning(self, "MO2 instance copy refused", result.get("message", "Copy failed safely."))
 
     def start_skyrim_direct(self) -> None:
         """Launch Skyrim through Steam's own AppID path, independent of MO2 instances."""
