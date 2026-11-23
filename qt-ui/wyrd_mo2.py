@@ -693,28 +693,36 @@ def read_settings(home: Path | None = None) -> dict:
     return result
 
 def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list[Path]:
-    """Return known MO2 instance roots inside this managed Proton prefix."""
+    """Return known MO2 instance locations inside Wyrd's managed environment.
+
+    MO2 portable mode stores ModOrganizer.ini beside ModOrganizer.exe;
+    instance-manager layouts may also keep named instances under instances/.
+    """
     users = prefix_root / "pfx/drive_c/users"
     roots: list[Path] = []
-    if not users.is_dir():
-        return roots
-    try:
-        user_dirs = [entry for entry in users.iterdir() if entry.is_dir()]
-    except OSError:
-        return roots
-    for user_dir in user_dirs:
-        candidates = (
-            user_dir / "AppData/Local/ModOrganizer/instances",
-            user_dir / "AppData/Roaming/ModOrganizer/instances",
-            user_dir / "Documents/Modding/ModOrganizer/instances",
-        )
-        roots.extend(path for path in candidates if path.is_dir())
-    # MO2 portable instances are stored beside the executable in Wyrd's
-    # managed installation directory. Inspect this known path read-only.
+    if users.is_dir():
+        try:
+            user_dirs = [entry for entry in users.iterdir() if entry.is_dir()]
+        except OSError:
+            user_dirs = []
+        for user_dir in user_dirs:
+            candidates = (
+                user_dir / "AppData/Local/ModOrganizer/instances",
+                user_dir / "AppData/Roaming/ModOrganizer/instances",
+                user_dir / "Documents/Modding/ModOrganizer/instances",
+            )
+            roots.extend(path for path in candidates if path.is_dir())
+
+    # Restrict portable discovery to the explicitly supplied Wyrd-owned install
+    # root. The root itself may be the active portable instance; instances/
+    # is also supported for named portable instances. No arbitrary paths are read.
     if install_root is not None:
-        portable_instances = Path(install_root).expanduser() / "instances"
-        if portable_instances.is_dir():
-            roots.append(portable_instances)
+        install = Path(install_root).expanduser()
+        if install.is_dir():
+            roots.append(install)
+            portable_instances = install / "instances"
+            if portable_instances.is_dir():
+                roots.append(portable_instances)
     return roots
 
 
