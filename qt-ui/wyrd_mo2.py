@@ -985,16 +985,8 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
                         game_binary = None
             elif game_binary is None:
                 warnings.append(f"{instance['name']}: MO2 gamePath could not be resolved safely.")
-        if game_binary and game_binary.is_file() and game_binary.name.casefold() == "skyrimse.exe":
-            candidates.append({
-                "title": "Skyrim",
-                "binary": str(game_binary),
-                "arguments": "",
-                "working_directory": str(game_binary.parent),
-                "source": "MO2 gamePath" if raw_game_path else "detected Skyrim installation",
-                "verified": True,
-            })
-
+        # A detected game binary is not automatically a configured MO2 executable.
+        # MO2 run --executable resolves the title from customExecutables.
         targets.extend(candidates)
         for entry in instance.get("executables", []):
             title = entry.get("title", "").strip()
