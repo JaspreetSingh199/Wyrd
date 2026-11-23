@@ -481,6 +481,13 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(hasattr(window, "nav"))
         window.close()
 
+    def test_launch_skyrim_button_depends_only_on_game_detection(self):
+        state = {"installed": False, "prefix_ready": False, "external_installations": []}
+        window = self._window(state=state)
+        self.assertTrue(window.game_state["found"])
+        self.assertTrue(window.launch_game_button.isEnabled())
+        window.close()
+
     def test_install_is_enabled_only_when_game_and_proton_are_detected(self):
         window = self._window(builds=[])
         self.assertFalse(window.install_button.isEnabled())
