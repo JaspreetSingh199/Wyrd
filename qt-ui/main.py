@@ -404,7 +404,7 @@ class MainWindow(QMainWindow):
             ready
             and not (self.worker and self.worker.isRunning())
             and not (self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"))
-        ))
+        )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
 
     def _restore_saved_selection(self) -> None:
