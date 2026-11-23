@@ -808,6 +808,30 @@ class MainWindow(QMainWindow):
         session = self.launch_session
         process_scan = detect_skyrim_processes(managed_paths()["prefix"])
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
+        for item in process_scan.get("processes", []):
+            self._log(
+                f"Skyrim/SKSE candidate PID {item.get('pid')} ({item.get('binary')}): "
+                f"prefix attribution={item.get('attributed_to_wyrd')}; "
+                f"start_time={item.get('start_time')}"
+            )
+            mappings = item.get("audio_module_mappings", {})
+            if item.get("audio_module_mappings_readable"):
+                observed = [name for name, path in mappings.items() if path]
+                self._log(
+                    f"Audio DLL mappings PID {item.get('pid')}: "
+                    + (", ".join(observed) if observed else "none observed")
+                )
+            else:
+                self._log(
+                    f"Audio DLL mappings PID {item.get('pid')}: unavailable "
+                    f"({item.get('audio_module_mappings_error') or 'access denied'})"
+                )
+            env = item.get("audio_runtime_environment", {})
+            self._log(
+                f"Audio runtime environment PID {item.get('pid')}: "
+                f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')!r}; "
+                f"PULSE_LATENCY_MSEC={env.get('PULSE_LATENCY_MSEC')!r}"
+            )
 
         # First revalidate processes already attributed to this launch. This avoids
         # losing a still-running game when Proton's short-lived wrapper has exited.
