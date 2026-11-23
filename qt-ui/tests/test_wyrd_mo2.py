@@ -420,8 +420,69 @@ class WyrdMO2Tests(unittest.TestCase):
             result = inspect_skyrim_launch_targets(prefix, game, instance_name="Skyrim")
             self.assertFalse(result["ok"], result)
             self.assertEqual(result["targets"], [])
-            self.assertIn("no configured Skyrim or SKSE executable entry", result["message"])
+            self.assertIn("No configured Skyrim or SKSE executable entry", result["message"])
 
+
+    def test_global_instance_direct_child_layout_and_qsettings_array_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            game = root / "game"
+            game.mkdir()
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            (game / "skse64_loader.exe").write_bytes(b"skse")
+            users = prefix / "pfx/drive_c/users/steamuser"
+            instance = users / "AppData/Local/ModOrganizer/Skyrim Special Edition - G"
+            instance.mkdir(parents=True)
+            portable = root / "managed-mo2"
+            portable.mkdir()
+            (portable / "ModOrganizer.ini").write_text(
+                "[General]\\ngameName=Portable unrelated\\n", encoding="utf-8"
+            )
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            win_game = str(game).replace("/", "\\\\")
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                f"gamePath=Z:{win_game}\\n"
+                "selected_profile=Default\\n"
+                "[customExecutables]\\n"
+                "size=2\\n"
+                "1\\\\title=Skyrim Special Edition\\n"
+                f"1\\\\binary=Z:{win_game}\\\\SkyrimSE.exe\\n"
+                "2\\\\title=SKSE\\n"
+                f"2\\\\binary=Z:{win_game}\\\\skse64_loader.exe\\n",
+                encoding="utf-8",
+            )
+            inventory = inspect_mo2_instances(prefix, portable)
+            self.assertEqual(
+                [item["name"] for item in inventory["instances"]],
+                ["Skyrim Special Edition - G", "managed-mo2"],
+            )
+            self.assertEqual(
+                [item["name"] for item in inventory["skyrim_instances"]],
+                ["Skyrim Special Edition - G"],
+            )
+            discovered = inventory["skyrim_instances"][0]
+            self.assertEqual(discovered["selected_profile_candidate"], "Default")
+            self.assertEqual(
+                [(item["title"], Path(item["binary"]).name) for item in discovered["executables"]],
+                [
+                    ("Skyrim Special Edition", r"Z:" + win_game + r"\\SkyrimSE.exe"),
+                    ("SKSE", r"Z:" + win_game + r"\\skse64_loader.exe"),
+                ],
+            )
+            targets = inspect_skyrim_launch_targets(
+                prefix, game, instance_name="Skyrim Special Edition - G",
+                install_root=portable,
+            )
+            self.assertTrue(targets["ok"], targets)
+            self.assertEqual(
+                {item["title"] for item in targets["targets"]},
+                {"Skyrim Special Edition", "SKSE"},
+            )
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
@@ -477,7 +538,7 @@ class WyrdMO2Tests(unittest.TestCase):
             result = inspect_skyrim_launch_targets(prefix, game)
             self.assertFalse(result["ok"], result)
             self.assertEqual(result["targets"], [])
-            self.assertIn("no configured Skyrim or SKSE executable entry", result["message"])
+            self.assertIn("No configured Skyrim or SKSE executable entry", result["message"])
 
     def test_launch_mo2_never_injects_audio_experiment_override(self):
         with tempfile.TemporaryDirectory() as tmp:
