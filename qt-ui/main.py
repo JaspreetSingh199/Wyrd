@@ -633,9 +633,29 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self._log("Skyrim audio launch mode: default Proton audio environment")
+        audio_modes = ["Default Proton audio", "XAudio2 compatibility test (reversible)"]
+        audio_mode_label, accepted = QInputDialog.getItem(
+            self, "Skyrim audio test", "Launch audio mode:",
+            audio_modes, 0, False,
+        )
+        if not accepted:
+            return
+        audio_mode = "xaudio2_compat" if audio_mode_label == audio_modes[1] else "default"
+        if audio_mode == "xaudio2_compat":
+            confirm_audio = QMessageBox.question(
+                self, "Confirm XAudio2 compatibility test",
+                "This adds WINEDLLOVERRIDES=xaudio2_7=n,b only to this Wyrd-launched MO2/Proton process. "
+                "It does not change Steam settings, Proton files, the prefix, or future default launches. "
+                "Compare an NPC dialogue scene against Default Proton audio.\\n\\nContinue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if confirm_audio != QMessageBox.StandardButton.Yes:
+                return
+        self._log("Skyrim audio launch mode: " + audio_mode)
         result = launch_skyrim_via_mo2(
-            selected, instance_name, expected_binary=selected_target["binary"]
+            selected, instance_name, expected_binary=selected_target["binary"],
+            audio_mode=audio_mode,
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
