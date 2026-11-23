@@ -590,13 +590,24 @@ class MainWindow(QMainWindow):
             self._log(target_state.get("message", "No valid targets found."))
             return
         targets = target_state["targets"]
-        titles = [target["title"] for target in targets]
-        selected, accepted = QInputDialog.getItem(
+        # Include the binary basename when titles collide; keep the original
+        # MO2 title separately because that is what its CLI expects.
+        title_counts = {}
+        for target in targets:
+            title_counts[target["title"]] = title_counts.get(target["title"], 0) + 1
+        labels = [
+            (f"{target['title']} — {Path(target['binary']).name}"
+             if title_counts[target["title"]] > 1 else target["title"])
+            for target in targets
+        ]
+        selected_label, accepted = QInputDialog.getItem(
             self, "Launch Skyrim through MO2", "Configured Skyrim executable:",
-            titles, 0, False,
+            labels, 0, False,
         )
-        if not accepted or not selected:
+        if not accepted or not selected_label:
             return
+        selected_target = targets[labels.index(selected_label)]
+        selected = selected_target["title"]
         answer = QMessageBox.question(
             self, "Confirm Skyrim launch",
             f"MO2 will launch '{selected}' in instance '{instance_name}' "
@@ -607,7 +618,9 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         self._log("Skyrim audio launch mode: default Proton audio environment")
-        result = launch_skyrim_via_mo2(selected, instance_name)
+        result = launch_skyrim_via_mo2(
+            selected, instance_name, expected_binary=selected_target["binary"]
+        )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
             self.launch_session.wrapper_pid = result.get("pid")
