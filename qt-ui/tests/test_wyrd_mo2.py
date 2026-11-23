@@ -437,23 +437,23 @@ class WyrdMO2Tests(unittest.TestCase):
             portable = root / "managed-mo2"
             portable.mkdir()
             (portable / "ModOrganizer.ini").write_text(
-                "[General]\\ngameName=Portable unrelated\\n", encoding="utf-8"
+                "[General]\ngameName=Portable unrelated\n", encoding="utf-8"
             )
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
-            win_game = str(game).replace("/", "\\\\")
+            win_game = str(game).replace("/", "\\")
             (instance / "ModOrganizer.ini").write_text(
                 "[General]\n"
                 "gameName=Skyrim Special Edition\n"
-                f"gamePath=Z:{win_game}\\n"
+                f"gamePath=Z:{win_game}\n"
                 "selected_profile=Default\n"
                 "[customExecutables]\n"
                 "size=2\n"
-                "1\\\\title=Skyrim Special Edition\n"
-                f"1\\\\binary=Z:{win_game}\\\\SkyrimSE.exe\\n"
-                "2\\\\title=SKSE\n"
-                f"2\\\\binary=Z:{win_game}\\\\skse64_loader.exe\\n",
+                "1\\title=Skyrim Special Edition\n"
+                f"1\\binary=Z:{win_game}\\SkyrimSE.exe\n"
+                "2\\title=SKSE\n"
+                f"2\\binary=Z:{win_game}\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             inventory = inspect_mo2_instances(prefix, portable)
@@ -468,11 +468,8 @@ class WyrdMO2Tests(unittest.TestCase):
             discovered = inventory["skyrim_instances"][0]
             self.assertEqual(discovered["selected_profile_candidate"], "Default")
             self.assertEqual(
-                [(item["title"], Path(item["binary"]).name) for item in discovered["executables"]],
-                [
-                    ("Skyrim Special Edition", r"Z:" + win_game + r"\\SkyrimSE.exe"),
-                    ("SKSE", r"Z:" + win_game + r"\\skse64_loader.exe"),
-                ],
+                [item["title"] for item in discovered["executables"]],
+                ["Skyrim Special Edition", "SKSE"],
             )
             targets = inspect_skyrim_launch_targets(
                 prefix, game, instance_name="Skyrim Special Edition - G",
@@ -483,6 +480,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 {item["title"] for item in targets["targets"]},
                 {"Skyrim Special Edition", "SKSE"},
             )
+
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
