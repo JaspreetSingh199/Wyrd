@@ -772,31 +772,40 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
     return roots
 
 
-def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -> dict:
-    """Read-only inventory of MO2 instances stored in Wyrd's managed prefix.
+def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
+                          require_managed: bool = True) -> dict:
+    """Read-only inventory of MO2 instances in a known Proton prefix.
 
-    It deliberately does not follow MO2 custom paths or scan arbitrary disks.
-    A directory is reported only when it contains a parseable ModOrganizer.ini.
+    It does not follow MO2 custom paths or scan arbitrary disks. By default the
+    prefix must be Wyrd-owned. External-prefix mode is for a validated Steam
+    AppID prefix and only inspects its known Wine user directories.
     """
     prefix_root = Path(prefix_root).expanduser()
-    marker = prefix_root / ".wyrd-managed.json"
-    if not marker.is_file():
-        return {
-            "ok": False, "managed": False, "instances": [],
-            "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
-        }
-    try:
-        ownership = json.loads(marker.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {
-            "ok": False, "managed": False, "instances": [],
-            "message": "The Wyrd prefix ownership marker is unreadable; it was not inspected.",
-        }
-    if ownership.get("managed_by") != "Wyrd":
-        return {
-            "ok": False, "managed": False, "instances": [],
-            "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
-        }
+    if require_managed:
+        marker = prefix_root / ".wyrd-managed.json"
+        if not marker.is_file():
+            return {
+                "ok": False, "managed": False, "instances": [],
+                "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
+            }
+        try:
+            ownership = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {
+                "ok": False, "managed": False, "instances": [],
+                "message": "The Wyrd prefix ownership marker is unreadable; it was not inspected.",
+            }
+        if ownership.get("managed_by") != "Wyrd":
+            return {
+                "ok": False, "managed": False, "instances": [],
+                "message": "The Proton prefix is not marked as Wyrd-managed; it was not inspected.",
+            }
+    else:
+        if prefix_root.is_symlink() or not (prefix_root / "pfx/drive_c/users").is_dir():
+            return {
+                "ok": False, "managed": False, "instances": [],
+                "message": "The external Proton prefix is missing or unsafe; it was not inspected.",
+            }
 
     discovered = []
     errors = []
