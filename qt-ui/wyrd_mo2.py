@@ -1165,11 +1165,11 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         maps_error = None
         try:
             maps_text = (entry / "maps").read_text(encoding="utf-8", errors="replace")
-            map_paths = {
-                line.rsplit(None, 1)[-1].replace("\\040", " ")
-                for line in maps_text.splitlines()
-                if len(line.rsplit(None, 1)) == 6 and line.rsplit(None, 1)[-1].startswith("/")
-            }
+            map_paths = set()
+            for line in maps_text.splitlines():
+                fields = line.split(None, 5)
+                if len(fields) == 6 and fields[5].startswith("/"):
+                    map_paths.add(fields[5].replace("\\040", " "))
             normalized_maps = {Path(value).name.casefold(): value for value in map_paths}
             for library in (
                 "xaudio2_7.dll", "xaudio2_8.dll", "xaudio2_9.dll",
