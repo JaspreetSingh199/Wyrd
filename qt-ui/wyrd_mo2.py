@@ -151,6 +151,8 @@ def reset_mo2_compatdata(home: Path | None = None, confirmed: bool = False) -> d
         return {"ok": True, "message": "Wyrd MO2 compatdata is already absent.", "removed": False}
     if prefix.is_symlink():
         return {"ok": False, "message": "Refusing to reset a symlinked MO2 prefix.", "removed": False}
+    if paths["root"].is_symlink():
+        return {"ok": False, "message": "Refusing to reset through a symlinked Wyrd data root.", "removed": False}
     try:
         resolved_prefix = prefix.resolve(strict=True)
         resolved_root = paths["root"].resolve(strict=True)
