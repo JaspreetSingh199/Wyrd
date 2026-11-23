@@ -38,7 +38,7 @@ def inspect_skyrim_prefix_mo2_instances(home: Path | None = None) -> dict:
 
 
 
-def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | None = None) -> dict
+def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | None = None) -> dict:
     """Start MO2 with Proton and STEAM_COMPAT_DATA_PATH set to Skyrim's AppID prefix."""
     state = inspect_wyrd_installation(home)
     if not state.get("installed"):
