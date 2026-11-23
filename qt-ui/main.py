@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sys
 import time
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -207,8 +209,8 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
-        self.launch_game_button = QPushButton("Launch Skyrim")
-        self.launch_game_button.clicked.connect(self.start_skyrim)
+        self.launch_game_button = QPushButton("Launch Skyrim (Steam)")
+        self.launch_game_button.clicked.connect(self.start_skyrim_direct
         self.launch_game_button.setEnabled(False)
         self.diagnostics_button = QPushButton("View launch log")
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
@@ -581,6 +583,40 @@ class MainWindow(QMainWindow):
                 )
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
+
+    def start_skyrim_direct(self) -> None:
+        """Launch Skyrim through Steam's own AppID path, independent of MO2 instances."""
+        if not self.game_state.get("found"):
+            QMessageBox.warning(self, "Skyrim unavailable", "Skyrim Special Edition was not detected.")
+            return
+        steam = shutil.which("steam")
+        if not steam:
+            QMessageBox.warning(self, "Steam unavailable", "The Steam command was not found on PATH.")
+            return
+        answer = QMessageBox.question(
+            self, "Launch Skyrim through Steam",
+            "This launches Skyrim Special Edition directly through Steam, without MO2 or mods. "
+            "Use it for an unmodded audio baseline.\\n\\nContinue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            process = subprocess.Popen(
+                [steam, "-applaunch", "489830"],
+                stdin=None, stdout=None, stderr=None, start_new_session=True,
+            )
+        except OSError as error:
+            QMessageBox.warning(self, "Steam launch failed", f"Could not start Steam: {error}")
+            self._log(f"Direct Steam launch failed: {error}")
+            return
+        self._log(f"Direct Steam launch requested (AppID 489830), PID {process.pid}. This launch bypasses MO2.")
+        self.progress_label.setText("Direct Steam launch requested; game startup is not yet confirmed.")
+        QMessageBox.information(
+            self, "Steam launch requested",
+            "Steam was asked to launch Skyrim Special Edition directly. This is an unmodded launch and bypasses MO2.",
+        )
 
     def start_skyrim(self) -> None:
         instances = self.instance_state.get("skyrim_instances", [])
