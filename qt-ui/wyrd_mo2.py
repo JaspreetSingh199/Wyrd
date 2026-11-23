@@ -1101,6 +1101,9 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         ]
         overrides.append("xaudio2_7=n,b")
         env["WINEDLLOVERRIDES"] = ";".join(overrides)
+        # Skyrim's Proton audio workaround commonly pairs the XAudio override
+        # with PulseAudio latency tuning. Keep both scoped to this launch.
+        env["PULSE_LATENCY_MSEC"] = "90"
     # MO2 parses global options before the command name. Keep --instance
     # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
     # game instance rather than becoming an unparsed subcommand argument.
@@ -1119,6 +1122,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             log.write(f"instance: {instance}\\nexecutable: {title}\\nbinary: {target_match['binary']}\\naudio_mode: {audio_mode}\\npid: pending\\n")
             log.write("command: " + json.dumps(command) + "\\n")
             log.write("audio_override: " + ("WINEDLLOVERRIDES=" + env.get("WINEDLLOVERRIDES", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\\n")
+            log.write("audio_latency: " + ("PULSE_LATENCY_MSEC=" + env.get("PULSE_LATENCY_MSEC", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\\n")
             log.write("stdout/stderr are redirected to this diagnostic log.\\n")
             log.flush()
             process = subprocess.Popen(
