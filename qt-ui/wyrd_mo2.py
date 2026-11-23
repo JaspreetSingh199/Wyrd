@@ -935,9 +935,10 @@ def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Pat
     return resolved
 
 
-def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_name: str | None = None) -> dict:
-    """Validate Skyrim/SKSE executable targets from the first detected Skyrim instance."""
-    inventory = inspect_mo2_instances(prefix_root)
+def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_name: str | None = None,
+                                 install_root: Path | None = None) -> dict:
+    """Validate Skyrim/SKSE executable targets from a detected managed MO2 instance."""
+    inventory = inspect_mo2_instances(prefix_root, install_root)
     if not inventory.get("ok"):
         return {"ok": False, "targets": [], "message": inventory.get("message", "MO2 inspection failed.")}
     if not inventory.get("skyrim_instances"):
@@ -1063,7 +1064,8 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not instance_match:
         return {"ok": False, "message": "The selected Skyrim instance is no longer present in Wyrd's managed prefix."}
     target_state = inspect_skyrim_launch_targets(
-        paths["prefix"], game_path, instance_name=instance
+        paths["prefix"], game_path, instance_name=instance,
+        install_root=paths["install"],
     )
     expected_path = None
     if expected_binary is not None:
