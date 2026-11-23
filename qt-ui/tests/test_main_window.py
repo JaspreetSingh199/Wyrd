@@ -51,6 +51,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
+    def test_check_launch_status_is_available_without_wyrd_launch_session(self):
+        window = self._window()
+        self.assertTrue(window.launch_status_button.isEnabled())
+        window.close()
+
+
     def test_v1_does_not_expose_experimental_audio_override(self):
         window = self._window()
         self.assertFalse(hasattr(window, "native_xaudio2_checkbox"))
