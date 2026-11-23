@@ -638,6 +638,7 @@ class MainWindow(QMainWindow):
             managed_paths()["prefix"],
             Path(self.mo2_state.get("metadata", {}).get("game_path", "")),
             instance_name=instance_name,
+            install_root=managed_paths()["install"],
         )
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
