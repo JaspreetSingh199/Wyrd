@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
+    QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
     QWidget,
 )
@@ -432,7 +432,7 @@ class MainWindow(QMainWindow):
             self._log(f"Could not save Wyrd settings: {error}")
 
     def _refresh_audio_status(self, report: dict | None = None) -> None:
-        """Render the read-only audio inventory and gate repair on verified safety."""
+        """Render a read-only audio library inventory."""
         if report is None:
             report = inspect_audio_compatibility()
         self.audio_report = report
@@ -464,7 +464,6 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._log(f"Audio library check failed: {error}")
             self.audio_detail.setText(f"Audio inspection failed: {error}")
-            self.audio_repair_button.setEnabled(False)
         finally:
             self.audio_check_button.setEnabled(True)
 
