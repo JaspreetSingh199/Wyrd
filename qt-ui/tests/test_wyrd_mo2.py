@@ -367,7 +367,10 @@ class WyrdMO2Tests(unittest.TestCase):
                 with patch("wyrd_mo2.subprocess.Popen") as popen:
                     popen.return_value.pid = 1234
                     with patch("wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]):
-                        result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
+                        result = launch_skyrim_via_mo2(
+                            "SKSE", "Skyrim SE", home,
+                            expected_binary=game / "skse64_loader.exe",
+                        )
             self.assertTrue(result["ok"], result)
             command = popen.call_args.args[0]
             self.assertEqual(
@@ -376,10 +379,84 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             self.assertEqual(command[5:], ["run", "--executable", "SKSE"])
             self.assertEqual(command[-1], "SKSE")
+            self.assertIn(f"binary: {game / 'skse64_loader.exe'}", Path(result["log_path"]).read_text(encoding="utf-8"))
             environment = popen.call_args_list[0].kwargs["env"]
             self.assertEqual(environment["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
             self.assertNotIn("xaudio2_7=", environment.get("WINEDLLOVERRIDES", ""))
             self.assertEqual(popen.call_count, 1)
+
+
+    def test_launch_handoff_rejects_ambiguous_duplicate_title_without_binary_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+                "managed_by": "Wyrd", "proton": str(proton), "game_path": str(game),
+                "steam_root": str(home / ".steam/steam"),
+            }), encoding="utf-8")
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            duplicate_targets = [
+                {"title": "SKSE", "binary": str(game / "skse64_loader.exe")},
+                {"title": "SKSE", "binary": str(game / "skse_loader.exe")},
+            ]
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+                "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
+            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+                "ok": True, "targets": duplicate_targets
+            }), patch("wyrd_mo2.subprocess.Popen") as popen:
+                result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
+            self.assertFalse(result["ok"])
+            self.assertIn("ambiguous", result["message"])
+            popen.assert_not_called()
+
+
+    def test_launch_handoff_rejects_stale_binary_identity_before_spawning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            paths = managed_paths(home)
+            paths["install"].mkdir(parents=True)
+            paths["prefix"].mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            game = home / "Skyrim"
+            game.mkdir()
+            (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+            (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+                "managed_by": "Wyrd", "proton": str(proton), "game_path": str(game),
+                "steam_root": str(home / ".steam/steam"),
+            }), encoding="utf-8")
+            (paths["prefix"] / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (paths["prefix"] / "pfx/drive_c").mkdir(parents=True)
+            target = game / "skse64_loader.exe"
+            target.write_bytes(b"skse")
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+                "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
+            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+                "ok": True, "targets": [{"title": "SKSE", "binary": str(target)}]
+            }) as inspection, patch("wyrd_mo2.subprocess.Popen") as popen:
+                result = launch_skyrim_via_mo2(
+                    "SKSE", "Skyrim SE", home,
+                    expected_binary=game / "missing_skse_loader.exe",
+                )
+            self.assertFalse(result["ok"])
+            self.assertIn("no longer available", result["message"])
+            popen.assert_not_called()
 
 
     def test_launch_diagnostics_reads_tail_and_handles_missing_file(self):
