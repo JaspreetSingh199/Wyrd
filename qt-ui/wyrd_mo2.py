@@ -962,8 +962,7 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
 
 
 def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
-                          home: Path | None = None, log_path: Path | None = None,
-                          native_xaudio2_test: bool = False) -> dict:
+                          home: Path | None = None, log_path: Path | None = None) -> dict:
     """Start MO2's configured-executable handoff and retain a diagnostic log.
 
     A successful return means only that the Proton wrapper process was spawned.
@@ -1003,11 +1002,6 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not target_match:
         return {"ok": False, "message": "The selected Skyrim executable is no longer verified in this MO2 instance."}
     env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
-    if native_xaudio2_test:
-        overrides = env.get("WINEDLLOVERRIDES", "")
-        entries = [item for item in overrides.split(";") if item and not item.startswith("xaudio2_7=")]
-        entries.append("xaudio2_7=n,b")
-        env["WINEDLLOVERRIDES"] = ";".join(entries)
     # MO2 parses global options before the command name. Keep --instance
     # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
     # game instance rather than becoming an unparsed subcommand argument.
@@ -1025,9 +1019,6 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
             log.write(f"instance: {instance}\\nexecutable: {title}\\npid: pending\\n")
             log.write("command: " + json.dumps(command) + "\\n")
-            log.write(f"audio_test_native_xaudio2: {native_xaudio2_test}\\n")
-            if native_xaudio2_test:
-                log.write("WINEDLLOVERRIDES: xaudio2_7=n,b (temporary launch test)\\n")
             log.write("stdout/stderr are redirected to this diagnostic log.\\n")
             log.flush()
             process = subprocess.Popen(
