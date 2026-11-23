@@ -51,6 +51,19 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
+    def test_skyrim_launch_buttons_route_modded_and_unmodded_launches(self):
+        window = self._window()
+        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (MO2)")
+        self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded (Steam)")
+        with patch.object(window, "start_skyrim") as mo2_launch:
+            window.launch_game_button.click()
+            mo2_launch.assert_called_once()
+        with patch.object(window, "start_skyrim_direct") as direct_launch:
+            window.launch_direct_button.click()
+            direct_launch.assert_called_once()
+        window.close()
+
+
     def test_check_launch_status_logs_detected_audio_mapping_observations(self):
         window = self._window()
         process = {
