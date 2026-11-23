@@ -30,6 +30,15 @@ PREFIX_DIR_NAME = "compatdata/mo2-skyrim"
 ProgressCallback = Callable[[int, str], None]
 
 
+def _is_path_within(path: Path, root: Path) -> bool:
+    """Return whether path resolves beneath root without following a final symlink."""
+    try:
+        path.resolve(strict=True).relative_to(root.resolve(strict=True))
+        return True
+    except (OSError, ValueError, RuntimeError):
+        return False
+
+
 def _data_home(home: Path) -> Path:
     return Path(os.environ.get("XDG_DATA_HOME", home / ".local/share")).expanduser()
 
@@ -779,14 +788,42 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
                 continue
 
             general = parser["General"] if parser.has_section("General") else {}
+            settings = parser["Settings"] if parser.has_section("Settings") else {}
             game_path = general.get("gamePath", "").strip()
             # QSettings stores selected_profile as a QByteArray. INI readers
-            # may expose Qt's typed representation as @ByteArray(value);
-            # strip only that wrapper and preserve the actual UTF-8 profile name.
+            # may expose Qt's typed representation as @ByteArray(value).
             profile = general.get("selected_profile", "").strip()
             byte_array = re.fullmatch(r"@ByteArray\\((.*)\\)", profile, flags=re.DOTALL)
             if byte_array:
                 profile = byte_array.group(1).strip()
+
+            # MO2 resolves its profile directory from Settings:
+            # profiles_directory defaults to %BASE_DIR%/profiles, and
+            # base_directory defaults to the instance directory.
+            base_value = settings.get("base_directory", "").strip()
+            base_value = base_value or str(directory)
+            profiles_value = settings.get("profiles_directory", "").strip()
+            profiles_value = profiles_value or "%BASE_DIR%/profiles"
+            base_value = base_value.replace("%BASE_DIR%", str(directory))
+            profiles_value = profiles_value.replace("%BASE_DIR%", base_value)
+            profiles_root = Path(profiles_value).expanduser()
+            if not profiles_root.is_absolute():
+                profiles_root = Path(base_value).expanduser() / profiles_root
+            profile_dir = profiles_root / profile if profile else None
+            profile_verified = bool(
+                profile_dir and profile_dir.is_dir()
+                and not profile_dir.is_symlink()
+                and (
+                    _is_path_within(profile_dir, Path(install_root).expanduser())
+                    if install_root is not None else _is_path_within(profile_dir, prefix_root)
+                )
+            )
+            if profile_dir is not None and not profile_verified:
+                profile_status = "unverified"
+            elif profile:
+                profile_status = "verified"
+            else:
+                profile_status = "not-selected"
             game_name = general.get("gameName", "").strip()
 
             executables = []
@@ -851,7 +888,10 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
                 "config": str(ini),
                 "game_name": game_name,
                 "game_path": game_path,
-                "selected_profile": profile,
+                "selected_profile": profile if profile_verified else "",
+                "selected_profile_candidate": profile,
+                "selected_profile_path": str(profile_dir) if profile_dir else "",
+                "selected_profile_status": profile_status,
                 "is_skyrim_se": is_skyrim,
                 "executables": executables,
             })
