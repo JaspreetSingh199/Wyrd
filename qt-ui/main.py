@@ -399,7 +399,11 @@ class MainWindow(QMainWindow):
                 f'{instance_summary}'
             )
             self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
-            self.launch_game_button.setEnabled(bool(self.launch_target_state.get("ok")))
+            # Launch Skyrim availability is based on the detected Steam game and Wyrd's
+            # managed MO2 prefix, not on whether an MO2 instance already exists.
+            self.launch_game_button.setEnabled(bool(
+                self.game_state.get("found") and self.mo2_state.get("prefix_ready")
+            ))
             self.install_button.setText("MO2 Ready" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
             self._log("Wyrd MO2 inspection: verified " + version)
         else:
