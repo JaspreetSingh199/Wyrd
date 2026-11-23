@@ -780,7 +780,13 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None) -
 
             general = parser["General"] if parser.has_section("General") else {}
             game_path = general.get("gamePath", "").strip()
+            # QSettings stores selected_profile as a QByteArray. INI readers
+            # may expose Qt's typed representation as @ByteArray(value);
+            # strip only that wrapper and preserve the actual UTF-8 profile name.
             profile = general.get("selected_profile", "").strip()
+            byte_array = re.fullmatch(r"@ByteArray\\((.*)\\)", profile, flags=re.DOTALL)
+            if byte_array:
+                profile = byte_array.group(1).strip()
             game_name = general.get("gameName", "").strip()
 
             executables = []
