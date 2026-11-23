@@ -471,31 +471,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("XAPOFX 1.5 (64-bit): unknown", window.audio_detail.text())
         self.assertIn("FAudio / FFmpeg support: UNKNOWN", window.audio_detail.text())
         self.assertIn("NOT VERIFIED", window.audio_detail.text())
-        self.assertTrue(window.audio_repair_button.isEnabled())
-        window.close()
-
-    def test_audio_panel_disables_repair_when_prefix_ownership_is_uncertain(self):
-        with patch("main.inspect_audio_compatibility", return_value={
-            "ok": False, "safe": False, "components": {},
-            "repair_recommended": False,
-            "message": "Wyrd ownership marker is missing.",
-        }):
-            window = self._window()
-        self.assertIn("fail-closed", window.audio_detail.text())
-        self.assertFalse(window.audio_repair_button.isEnabled())
-        window.close()
-
-    def test_audio_repair_requires_confirmation_and_logs_outcome(self):
-        window = self._window()
-        with patch("main.inspect_audio_compatibility", return_value={
-            "ok": True, "safe": True,
-            "components": {"xact": {"state": "missing"}, "xact_x64": {"state": "missing"}},
-            "repair_recommended": True,
-        }), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.No), patch(
-            "main.repair_audio_compatibility"
-        ) as repair:
-            window.repair_audio()
-        repair.assert_not_called()
+        self.assertFalse(hasattr(window, "audio_repair_button"))
         window.close()
 
 if __name__ == "__main__":
