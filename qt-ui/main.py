@@ -268,6 +268,23 @@ class MainWindow(QMainWindow):
     def _log_audio_runtime_environment(self, processes: list[dict]) -> None:
         """Log the whitelisted audio environment read from actual game processes."""
         for item in processes:
+            modules = item.get("audio_module_mappings", {})
+            maps_readable = item.get("audio_module_mappings_readable")
+            if maps_readable is False:
+                reason = item.get("audio_module_mappings_error") or "access denied"
+                self._log(
+                    f"Audio DLL mappings from PID {item.get('pid')} ({item.get('binary')}): "
+                    f"<unavailable: {reason}>"
+                )
+            else:
+                observed = [name for name, path in modules.items() if path]
+                absent = [name for name, path in modules.items() if not path]
+                self._log(
+                    f"Audio DLL mappings from PID {item.get('pid')} ({item.get('binary')}): "
+                    f"observed={', '.join(observed) if observed else 'none'}; "
+                    f"not observed={', '.join(absent) if absent else 'none'} "
+                    "(not proof of audio functionality)"
+                )
             audio_env = item.get("audio_runtime_environment", {})
             readable = item.get("audio_runtime_environment_readable")
             if readable is False:
