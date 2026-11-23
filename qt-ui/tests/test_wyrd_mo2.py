@@ -311,16 +311,16 @@ class WyrdMO2Tests(unittest.TestCase):
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
-            game_path = str(game).replace("/", "\\\\")
+            win_game = str(game).replace("/", "\\\\")
             (instance / "ModOrganizer.ini").write_text(
-                "[General]\\n"
-                "gameName=Skyrim Special Edition\\n"
-                f"gamePath=Z:{game_path}\\\\SkyrimSE.exe\\n"
-                "[customExecutables]\\n"
-                "size=1\\n"
-                "[customExecutables\\1]\\n"
-                "title=SKSE\\n"
-                f"binary=Z:{game_path}\\\\Updater.exe\\n",
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                f"gamePath=Z:{win_game}\\\\SkyrimSE.exe\n"
+                "[customExecutables]\n"
+                "size=1\n"
+                "[customExecutables\\\\1]\n"
+                "title=SKSE\n"
+                f"binary=Z:{win_game}\\\\Updater.exe\n",
                 encoding="utf-8",
             )
             result = inspect_skyrim_launch_targets(prefix, game)
