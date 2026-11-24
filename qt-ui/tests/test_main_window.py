@@ -38,6 +38,8 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.detect_skyrim", return_value=game),
             patch("main.discover_proton_builds", return_value=builds),
             patch("main.inspect_wyrd_installation", return_value=state),
+            patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
+            patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("main.read_settings", return_value={}),
             patch("main.write_settings"),
             patch("main.inspect_mo2_instances", return_value={
@@ -494,11 +496,9 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(hasattr(window, "nav"))
         window.close()
 
-    def test_launch_skyrim_button_depends_only_on_game_detection(self):
-        state = {"installed": False, "prefix_ready": False, "external_installations": []}
-        window = self._window(state=state)
-        self.assertTrue(window.game_state["found"])
-        self.assertTrue(window.launch_game_button.isEnabled())
+    def test_launch_skyrim_button_requires_verified_steam_prefix_instance(self):
+        window = self._window()
+        self.assertFalse(window.launch_game_button.isEnabled())
         window.close()
 
     def test_install_is_enabled_only_when_game_and_proton_are_detected(self):
@@ -507,44 +507,18 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("No compatible Proton", window.runtime_status.text())
         window.close()
 
-    def test_external_mo2_is_reported_but_not_adopted(self):
-        state = {
-            "installed": False, "prefix_ready": False,
-            "external_installations": ["/home/test/Games/ModOrganizer"],
-            "message": "An MO2 installation exists elsewhere. Wyrd will not overwrite or adopt it.",
-        }
-        window = self._window(state=state)
-        self.assertIn("left untouched", window.mo2_panel.detail_label.text())
-        self.assertTrue(window.install_button.isEnabled())
+    def test_legacy_isolated_prefix_actions_are_hidden(self):
+        window = self._window()
+        self.assertFalse(window.launch_game_prefix_button.isVisible())
+        self.assertFalse(window.copy_instance_button.isVisible())
+        self.assertFalse(window.reset_prefix_button.isVisible())
         window.close()
 
-    def test_ready_mo2_disables_install_action_and_keeps_launch_separate(self):
-        state = {
-            "installed": True, "prefix_ready": True,
-            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
-            "metadata": {"version": "v2.5.2", "game_path": "/games/Skyrim Special Edition"},
-            "external_installations": [],
-        }
-        window = self._window(state=state)
-        self.assertEqual(window.install_button.text(), "MO2 Ready")
-        self.assertFalse(window.install_button.isEnabled())
-        self.assertTrue(window.launch_button.isEnabled())
+    def test_primary_install_description_uses_steam_prefix(self):
+        window = self._window()
+        self.assertIn("Steam", window.mo2_panel.detail_label.text())
+        self.assertEqual(window.install_button.text(), "Install MO2")
         window.close()
-
-    def test_incomplete_wyrd_prefix_offers_repair_not_launch(self):
-        state = {
-            "installed": True, "prefix_ready": False,
-            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
-            "metadata": {"version": "v2.5.2"},
-            "external_installations": [],
-        }
-        window = self._window(state=state)
-        self.assertEqual(window.install_button.text(), "Repair MO2 runtime")
-        self.assertTrue(window.install_button.isEnabled())
-        self.assertFalse(window.launch_button.isEnabled())
-        window.close()
-
-
 
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
         with patch("main.inspect_audio_compatibility", return_value={
