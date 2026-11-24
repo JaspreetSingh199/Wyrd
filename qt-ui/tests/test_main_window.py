@@ -623,3 +623,47 @@ class MainWindowSmokeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_external_mo2_is_shown_as_read_only_and_disables_install(self):
+        external = {
+            "installed": True, "managed": False,
+            "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
+            "prefix": "/steam/compatdata/489830",
+            "install": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2",
+            "steam_root": "/steam",
+            "message": "Existing externally managed MO2 installation found.",
+        }
+        inventory = {
+            "ok": True, "managed": False, "instances": [],
+            "skyrim_instances": [{
+                "name": "Skyrim Special Edition", "selected_profile": "Default"
+            }],
+            "message": "Read-only instance inventory.",
+        }
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \\
+             patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \\
+             patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory):
+            window = self._window()
+        self.assertFalse(window.install_button.isEnabled())
+        self.assertEqual(window.install_button.text(), "Use Existing MO2")
+        self.assertTrue(window.launch_button.isEnabled())
+        self.assertTrue(window.launch_game_button.isEnabled())
+        self.assertIn("External (read-only)", window.mo2_panel.detail_label.text())
+        self.assertIn("Default", window.mo2_panel.detail_label.text())
+        window.close()
+
+    def test_start_mo2_routes_external_install_to_external_launcher(self):
+        window = self._window()
+        window.mo2_state = {"installed": True, "managed": False}
+        inventory = {
+            "ok": True, "managed": False,
+            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+        }
+        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), \\
+             patch("main.QInputDialog.getItem", return_value=("Skyrim Special Edition", True)), \\
+             patch("main.launch_external_mo2_in_skyrim_prefix", return_value={"ok": True, "message": "started"} ) as launch, \\
+             patch("main.QMessageBox.information"):
+            window.start_mo2()
+        launch.assert_called_once()
+        window.close()
