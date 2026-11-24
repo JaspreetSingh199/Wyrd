@@ -494,23 +494,19 @@ class MainWindow(QMainWindow):
         self.mo2_library_button.setEnabled(bool(self.game_state.get("found")))
 
     def manage_mo2_library(self) -> None:
-        """Open the read-only MO2 discovery and explicit registration interface."""
-        game_path = self.game_state.get("game_dir")
-        if not game_path:
-            QMessageBox.warning(self, "MO2 Library", "Detect Skyrim Special Edition before managing MO2 instances.")
-            return
-        prefix = _steam_prefix_for_game_path(game_path)
+        """Open the MO2 library; existing registry entries work without current Skyrim detection."""
+        saved_game = self.game_state.get("game_dir")
+        prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
         if prefix is None:
-            QMessageBox.warning(self, "MO2 Library", "Could not resolve Skyrim's Steam compatdata prefix from the detected game path.")
-            return
-        install_path = self.mo2_state.get("install")
-        if not install_path and self.mo2_state.get("executable"):
+            prefix = Path("")
+        install_path = self.mo2_state.get("install") if saved_game else None
+        if not install_path and saved_game and self.mo2_state.get("executable"):
             install_path = str(Path(self.mo2_state["executable"]).parent)
         if not install_path:
-            install_path = str(prefix / "pfx/drive_c/Modding/MO2")
+            install_path = str(prefix / "pfx/drive_c/Modding/MO2") if str(prefix) else ""
         dialog = Mo2LibraryDialog(
-            self, prefix_path=prefix, install_path=install_path,
-            game_path=game_path, proton_path=self.proton_combo.currentData() or "",
+            self, prefix_path=prefix, install_path=install_path or "",
+            game_path=saved_game or "", proton_path=self.proton_combo.currentData() or "",
         )
         dialog.exec()
         if dialog.registered:
