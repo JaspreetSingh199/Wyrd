@@ -644,15 +644,15 @@ class WyrdMO2Tests(unittest.TestCase):
             (game / "SkyrimSE.exe").write_bytes(b"Skyrim")
             skse = game / "skse64_loader.exe"
             skse.write_bytes(b"SKSE")
-            win_game = str(game).replace("/", "\\")
+            win_game = str(game).replace("/", "\\\\")
             (instance / "ModOrganizer.ini").write_text(
                 "[General]\n"
                 "gameName=Skyrim Special Edition\n"
                 f"gamePath=Z:{win_game}\n"
                 "[customExecutables]\n"
                 "size=1\n"
-                "1\\title=SKSE\n"
-                f"1\\binary=Z:{win_game}\\skse64_loader.exe\n",
+                "1\\\\title=SKSE\n"
+                f"1\\\\binary=Z:{win_game}\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             log_path = root / "logs/skyrim-launch.log"
