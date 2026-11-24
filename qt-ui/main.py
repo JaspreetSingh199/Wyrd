@@ -555,8 +555,8 @@ class MainWindow(QMainWindow):
         settings = dict(self._saved_settings)
         settings["selected_mo2_instance_id"] = self.selected_mo2_instance_id
         self._saved_settings = settings
+        # The restore helper owns launch-button readiness; do not enable an incomplete association.
         self._restore_registered_instance()
-        self.launch_game_button.setEnabled(not (self.worker and self.worker.isRunning()))
         # Preserve the normal Proton/game/audio preferences while saving the
         # additional selection key using the same atomic settings-file pattern.
         import json, os, tempfile
