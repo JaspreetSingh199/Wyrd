@@ -159,7 +159,7 @@ class Mo2LibraryDialog(QDialog):
         root.addWidget(self.share_downloads_check)
         storage_actions = QHBoxLayout()
         self.apply_storage_button = QPushButton("Apply storage settings")
-        self.restore_storage_button = QPushButton("Restore latest INI backup")
+        self.restore_storage_button = QPushButton("Restore INI backup…")
         self.apply_storage_button.setEnabled(False)
         self.restore_storage_button.setEnabled(False)
         self.apply_storage_button.clicked.connect(self.apply_storage)
@@ -421,15 +421,30 @@ class Mo2LibraryDialog(QDialog):
             backups = record.get("config_backups", [])
             if not backups:
                 raise ValueError("No Wyrd-created ModOrganizer.ini backups are recorded.")
-            backup = Path(backups[-1]).expanduser()
+            backup_root = managed_paths()["config"] / "mo2-config-backups"
+            if backup_root.is_symlink() or not backup_root.is_dir():
+                raise ValueError("The Wyrd INI backup directory is missing or unsafe.")
+            choices = [Path(value).expanduser() for value in backups]
+            labels = [f"{path.name} — {path}" for path in reversed(choices)]
+            selected, accepted = QInputDialog.getItem(
+                self, "Choose INI backup", "Restore which Wyrd-created backup?",
+                labels, 0, False,
+            )
+            if not accepted or not selected:
+                return
+            backup = next(path for path in choices if f"{path.name} — {path}" == selected)
             config = Path(record.get("config", "")).expanduser()
             if backup.is_symlink() or not backup.is_file():
-                raise ValueError("The latest INI backup is missing or unsafe.")
+                raise ValueError("The selected INI backup is missing or unsafe.")
+            resolved_backup = backup.resolve(strict=True)
+            resolved_backup_root = backup_root.resolve(strict=True)
+            if resolved_backup.parent != resolved_backup_root:
+                raise ValueError("The selected backup is outside the managed INI backup directory.")
             if config.is_symlink() or not config.is_file():
                 raise ValueError("The current ModOrganizer.ini is missing or unsafe.")
             answer = QMessageBox.question(
                 self, "Restore ModOrganizer.ini",
-                f"Restore the latest Wyrd backup?\n\n{backup}\n\n"
+                f"Restore this Wyrd backup?\n\n{backup}\n\n"
                 "This restores configuration only. It does not restore, move, or delete mod files.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
