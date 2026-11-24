@@ -28,8 +28,9 @@ from wyrd_mo2 import (
 )
 from steamcompat import (
     install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
-    inspect_skyrim_prefix_mo2_instances, launch_mo2_in_skyrim_prefix,
-    steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
+    inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
+    inspect_any_skyrim_prefix_mo2_instances, launch_external_mo2_in_skyrim_prefix,
+    launch_mo2_in_skyrim_prefix, steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
 )
 @dataclass
 class LaunchSession:
@@ -1020,7 +1021,9 @@ class MainWindow(QMainWindow):
     def check_launch_status(self) -> None:
         """Report the current tracked game processes, even after Proton's wrapper exits."""
         session = self.launch_session
-        process_scan = detect_skyrim_processes(managed_paths()["prefix"])
+        game_dir = self.game_state.get("game_dir")
+        steam_prefix = steam_compat_prefix(Path(game_dir).parents[2]) if game_dir else None
+        process_scan = detect_skyrim_processes(steam_prefix)
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
         for item in process_scan.get("processes", []):
             self._log(
