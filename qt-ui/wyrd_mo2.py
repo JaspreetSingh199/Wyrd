@@ -1109,9 +1109,12 @@ def copy_mo2_instance_to_prefix(source_instance: Path, destination_prefix: Path,
 
 
 def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_name: str | None = None,
-                                 install_root: Path | None = None) -> dict:
-    """Validate Skyrim/SKSE executable targets from a detected managed MO2 instance."""
-    inventory = inspect_mo2_instances(prefix_root, install_root)
+                                 install_root: Path | None = None,
+                                 require_managed: bool = True) -> dict:
+    """Validate Skyrim/SKSE targets in a managed or explicitly supplied Steam prefix."""
+    inventory = inspect_mo2_instances(
+        prefix_root, install_root, require_managed=require_managed,
+    )
     if not inventory.get("ok"):
         return {"ok": False, "targets": [], "message": inventory.get("message", "MO2 inspection failed.")}
     if not inventory.get("skyrim_instances"):
@@ -1265,6 +1268,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         return {"ok": False, "message": "The selected Skyrim instance is no longer present in the selected MO2 prefix."}
     target_state = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance, install_root=install,
+        require_managed=not explicit_prefix,
     )
     expected_path = None
     if expected_binary is not None:
