@@ -507,22 +507,23 @@ class MainWindow(QMainWindow):
         self._restore_registered_instance()
 
     def _restore_registered_instance(self) -> dict | None:
-        """Resolve the saved primary instance from Wyrd's local registry."""
+        """Resolve the saved active instance and refresh the application's registry snapshot."""
         from wyrd_mo2_registry_service import RegistryService
         try:
             registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+            self.registered_instance_registry = registry
         except Exception as error:
             self._log(f"Could not load MO2 registry: {error}")
+            self.registered_instance_registry = None
             return None
         record = next((item for item in registry["instances"]
                        if item.get("id") == self.selected_mo2_instance_id), None)
-        if record is None:
-            self.active_instance_label.setText("Active MO2 instance: none selected")
+        if not record:
+            self.active_instance_label.setText(
+                f"Active MO2 instance: none selected · {len(registry['instances'])} registered"
+            )
             if hasattr(self, "launch_game_button"):
-                legacy_ready = bool(
-                    self.game_state.get("found")
-                    and self.instance_state.get("skyrim_instances")
-                )
+                legacy_ready = bool(self.game_state.get("found") and self.instance_state.get("skyrim_instances"))
                 busy = bool(self.worker and self.worker.isRunning())
                 self.launch_game_button.setEnabled(legacy_ready and not busy)
             return None
@@ -530,19 +531,35 @@ class MainWindow(QMainWindow):
         installations = {item["id"]: item for item in registry["installations"]}
         runtimes = {item["id"]: item for item in registry["runtimes"]}
         game = games.get(record.get("game_id"), {})
-        installation = installations.get(record.get("installation_id"), {})
+        install = installations.get(record.get("installation_id"), {})
         runtime = runtimes.get(record.get("runtime_id"), {})
-        label = Path(record.get("instance_path", "")).name
-        prefix_value = record.get("prefix_path") or installation.get("prefix_path")
+        prefix_value = record.get("prefix_path") or game.get("prefix_path") or install.get("prefix_path")
+        paths = {
+            "executable": Path(install.get("executable", "")).expanduser(),
+            "instance": Path(record.get("instance_path", "")).expanduser(),
+            "config": Path(record.get("config", "")).expanduser(),
+            "game": Path(game.get("path", "")).expanduser(),
+            "runtime": Path(runtime.get("path", "")).expanduser(),
+            "prefix": Path(prefix_value).expanduser() if prefix_value else None,
+        }
         ready = bool(
-            installation.get("executable") and Path(installation["executable"]).is_file()
-            and game.get("path") and Path(game["path"]).is_dir()
-            and runtime.get("path") and Path(runtime["path"]).is_dir()
-            and prefix_value and Path(prefix_value).is_dir()
+            install.get("owner") in ("wyrd", "external")
+            and paths["executable"].is_file()
+            and paths["instance"].is_dir()
+            and paths["config"].is_file()
+            and paths["game"].is_dir()
+            and paths["runtime"].is_dir()
+            and (paths["runtime"] / "proton").is_file()
+            and paths["prefix"] is not None
+            and paths["prefix"].is_dir()
+            and (paths["prefix"] / "pfx/drive_c/users").is_dir()
+            and all(not path.is_symlink() for path in paths.values() if path is not None)
         )
+        label = record.get("display_name") or paths["instance"].name
         self.active_instance_label.setText(
             f"Active MO2 instance: {label} · {game.get('name', 'unknown game')} · "
-            + ("Ready" if ready else "Association incomplete — edit game / Proton settings")
+            f"{runtime.get('name', 'no runtime')} · "
+            + ("Ready" if ready else "Association/path unavailable — open MO2 Library")
         )
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
@@ -582,42 +599,42 @@ class MainWindow(QMainWindow):
             raise
 
     def manage_mo2_library(self) -> None:
-        """Open the MO2 library; existing registry entries work without current Skyrim detection."""
+        """Manage all registered MO2 installations and persist the active instance."""
         saved_game = self.game_state.get("game_dir")
         prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
-        prefix_text = str(prefix) if prefix is not None else ""
         install_path = self.mo2_state.get("install") if saved_game else None
         if not install_path and saved_game and self.mo2_state.get("executable"):
             install_path = str(Path(self.mo2_state["executable"]).parent)
         if not install_path and prefix is not None:
             install_path = str(prefix / "pfx/drive_c/Modding/MO2")
         dialog = Mo2LibraryDialog(
-            self, prefix_path=prefix_text, install_path=install_path or "",
-            game_path=saved_game or "", proton_path=self.proton_combo.currentData() or "",
+            self, prefix_path=str(prefix) if prefix else "",
+            install_path=install_path or "", game_path=saved_game or "",
+            proton_path=self.proton_combo.currentData() or "",
             selected_instance_id=self.selected_mo2_instance_id,
         )
         dialog.exec()
-        if getattr(dialog, "selected_instance_record", None):
-            self._set_active_instance(dialog.selected_instance_record)
+        selected = getattr(dialog, "selected_instance_record", None)
+        if selected:
+            self._set_active_instance(selected)
+        elif getattr(dialog, "selection_changed", False):
+            self._set_active_instance(None)
         else:
-            # An unregister operation can invalidate the persisted primary ID.
-            # Clear it immediately instead of leaving a dead selection in settings.
             try:
                 from wyrd_mo2_registry_service import RegistryService
                 registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
-                still_registered = any(
-                    item.get("id") == self.selected_mo2_instance_id
-                    for item in registry["instances"]
-                )
-                if self.selected_mo2_instance_id and not still_registered:
+                if self.selected_mo2_instance_id and not any(
+                    item.get("id") == self.selected_mo2_instance_id for item in registry["instances"]
+                ):
                     self._set_active_instance(None)
             except Exception as error:
-                self._log(f"Could not reconcile the saved MO2 selection after library changes: {error}")
+                self._log(f"Could not reconcile active MO2 instance after library changes: {error}")
         if dialog.registered:
             self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
-        if dialog.launch_requested and dialog.selected_instance_record:
-            result = self._launch_registered_instance(dialog.selected_instance_record)
-            self._log(result.get("message", "Registered launch did not start."))
+        self._restore_registered_instance()
+        if dialog.launch_requested and selected:
+            result = self._launch_registered_instance(selected)
+            self._log(result.get("message", "MO2 launch did not start."))
             if result.get("ok"):
                 self.progress_label.setText("Selected registered MO2 instance started.")
                 QMessageBox.information(self, "MO2 launch", result["message"])
@@ -647,6 +664,7 @@ class MainWindow(QMainWindow):
             write_settings(None, Path(proton), Path(game),
                            xaudio2_compat=self.xaudio_override_checkbox.isChecked())
             self._saved_settings = {
+                **self._saved_settings,
                 "proton": str(Path(proton).resolve()),
                 "game_path": str(Path(game).resolve()),
                 "xaudio2_compat": self.xaudio_override_checkbox.isChecked(),
