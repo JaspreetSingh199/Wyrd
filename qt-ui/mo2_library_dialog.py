@@ -44,14 +44,18 @@ class Mo2LibraryDialog(QDialog):
 
         form = QFormLayout()
         self.prefix_edit = QLineEdit(str(prefix_path))
-        self.prefix_edit.setReadOnly(True)
         self.install_edit = QLineEdit(str(install_path))
         install_row = QHBoxLayout()
         install_row.addWidget(self.install_edit, 1)
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._browse_install)
         install_row.addWidget(browse)
-        form.addRow("Steam compatdata prefix:", self.prefix_edit)
+        prefix_row = QHBoxLayout()
+        prefix_row.addWidget(self.prefix_edit, 1)
+        prefix_browse = QPushButton("Browse prefix…")
+        prefix_browse.clicked.connect(self._browse_prefix)
+        prefix_row.addWidget(prefix_browse)
+        form.addRow("Steam compatdata / Proton prefix:", prefix_row)
         form.addRow("MO2 installation folder:", install_row)
 
         self.game_name_edit = QLineEdit("Skyrim Special Edition")
@@ -126,9 +130,6 @@ class Mo2LibraryDialog(QDialog):
         self.register_button = QPushButton("Register discovered instance")
         self.register_button.setEnabled(False)
         self.register_button.clicked.connect(self.register_selected)
-        self.launch_selected_button = QPushButton("Launch registered instance")
-        self.launch_selected_button.setEnabled(False)
-        self.launch_selected_button.clicked.connect(self.launch_selected)
         close = QPushButton("Close")
         close.clicked.connect(self.accept)
         footer.addWidget(self.register_button)
@@ -172,7 +173,7 @@ class Mo2LibraryDialog(QDialog):
         record = item.data(Qt.ItemDataRole.UserRole) if item else None
         if not isinstance(record, dict):
             self.selected_instance_record = None
-            self.launch_selected_button.setEnabled(False)
+            self._launch_existing_button.setEnabled(False)
             self._launch_existing_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             return
@@ -322,6 +323,13 @@ class Mo2LibraryDialog(QDialog):
         if answer == QMessageBox.StandardButton.Yes:
             self.launch_requested = True
             self.accept()
+
+    def _browse_prefix(self) -> None:
+        selected = QFileDialog.getExistingDirectory(
+            self, "Select initialized Proton prefix", self.prefix_edit.text()
+        )
+        if selected:
+            self.prefix_edit.setText(selected)
 
     def _browse_install(self) -> None:
         selected = QFileDialog.getExistingDirectory(
