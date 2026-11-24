@@ -237,7 +237,12 @@ def test_external_launch_uses_skyrim_prefix_and_does_not_write_marker(monkeypatc
     proton = tmp_path / "Proton"
     (proton / "files/bin").mkdir(parents=True)
     (proton / "proton").write_text("#!/bin/sh\\n")
-    (proton / "files/bin/wine").write_bytes(b"wine")
+    header = bytearray(20)
+    header[:4] = b"\\x7fELF"
+    header[4] = 2
+    header[5] = 1
+    header[18:20] = (62).to_bytes(2, "little")
+    (proton / "files/bin/wine").write_bytes(header)
     instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
     instance.mkdir(parents=True)
     (instance / "ModOrganizer.ini").write_text(
