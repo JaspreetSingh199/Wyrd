@@ -86,6 +86,17 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
 
+    def test_check_launch_status_scans_detected_skyrim_steam_prefix(self):
+        window = self._window()
+        with patch("main.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
+             patch("main.detect_skyrim_processes", return_value={
+                 "ok": True, "processes": [], "message": "No Skyrim processes detected."
+             }), patch("main.QMessageBox.information"):
+            window.check_launch_status()
+        prefix.assert_called_once()
+        self.assertEqual(prefix.call_args.args[0], Path("/games/Skyrim Special Edition").parents[2])
+        window.close()
+
     def test_idle_launch_status_explains_manual_mo2_and_exited_game(self):
         window = self._window()
         with patch("main.detect_skyrim_processes", return_value={
