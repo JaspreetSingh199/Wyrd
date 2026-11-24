@@ -305,12 +305,6 @@ class MainWindow(QMainWindow):
         game_actions.addStretch(1)
         setup_layout.addLayout(game_actions)
 
-        management_row = QHBoxLayout()
-        self.reset_mo2_button = QPushButton("Reset MO2")
-        self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
-        management_row.addWidget(self.reset_mo2_button)
-        management_row.addStretch(1)
-        setup_layout.addLayout(management_row)
 
         self.progress_label = QLabel("Ready")
         self.progress_label.setObjectName("muted")
@@ -338,6 +332,16 @@ class MainWindow(QMainWindow):
         mo2_advanced_help.setWordWrap(True)
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
+
+        maintenance_row = QHBoxLayout()
+        self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
+        self.reset_mo2_button.setToolTip(
+            "Resets only a verified Wyrd-managed installation. External MO2 installations are never reset."
+        )
+        self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
+        maintenance_row.addWidget(self.reset_mo2_button)
+        maintenance_row.addStretch(1)
+        advanced_layout.addLayout(maintenance_row)
 
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
