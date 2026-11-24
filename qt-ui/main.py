@@ -544,7 +544,6 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
-        self.mo2_library_button.setEnabled(True)
         # Registered instances own their own game/runtime selections and can
         # launch even when Skyrim detection is empty.
         self._restore_registered_instance()
