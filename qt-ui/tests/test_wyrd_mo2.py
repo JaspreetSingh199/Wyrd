@@ -78,6 +78,52 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(result["processes"][1]["audio_runtime_environment_readable"])
             self.assertIsNone(result["processes"][1]["audio_runtime_environment_error"])
 
+    def test_procfs_unreadable_environment_never_claims_wyrd_attribution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            entry = proc / "321"
+            entry.mkdir(parents=True)
+            (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
+            (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
+            original_read_bytes = Path.read_bytes
+
+            def guarded_read_bytes(path):
+                if path.name == "environ":
+                    raise PermissionError("environment denied")
+                return original_read_bytes(path)
+
+            with patch("pathlib.Path.read_bytes", new=guarded_read_bytes), patch(
+                "wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"
+            ):
+                result = detect_skyrim_processes(
+                    Path("/managed/prefix"), proc_root=proc
+                )
+            self.assertTrue(result["ok"])
+            process = result["processes"][0]
+            self.assertFalse(process["audio_runtime_environment_readable"])
+            self.assertFalse(process["prefix_attributed"])
+            self.assertFalse(process["attributed_to_wyrd"])
+            self.assertEqual(result["wyrd_processes"], [])
+
+    def test_procfs_requires_exact_prefix_match_not_prefix_substring(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            entry = proc / "322"
+            entry.mkdir(parents=True)
+            (entry / "cmdline").write_bytes(b"SkyrimSE.exe\\0")
+            (entry / "comm").write_text("SkyrimSE.exe", encoding="utf-8")
+            (entry / "environ").write_bytes(
+                b"STEAM_COMPAT_DATA_PATH=/managed/prefix-extra\\0WYRD_LAUNCHED=1\\0"
+            )
+            with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+                result = detect_skyrim_processes(
+                    Path("/managed/prefix"), proc_root=proc
+                )
+            process = result["processes"][0]
+            self.assertFalse(process["prefix_attributed"])
+            self.assertFalse(process["attributed_to_wyrd"])
+            self.assertEqual(result["wyrd_processes"], [])
+
     def test_procfs_audio_module_mappings_report_loaded_and_not_observed(self):
         with tempfile.TemporaryDirectory() as tmp:
             proc = Path(tmp) / "proc"
