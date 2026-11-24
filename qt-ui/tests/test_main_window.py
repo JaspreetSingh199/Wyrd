@@ -640,11 +640,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("No compatible Proton", window.runtime_status.text())
         window.close()
 
-    def test_legacy_isolated_prefix_actions_are_hidden(self):
+    def test_legacy_isolated_prefix_actions_are_not_created(self):
         window = self._window()
-        self.assertFalse(window.launch_game_prefix_button.isVisible())
-        self.assertFalse(window.copy_instance_button.isVisible())
-        self.assertFalse(window.reset_prefix_button.isVisible())
+        self.assertFalse(hasattr(window, "launch_game_prefix_button"))
+        self.assertFalse(hasattr(window, "copy_instance_button"))
+        self.assertFalse(hasattr(window, "reset_prefix_button"))
+        self.assertTrue(hasattr(window, "reset_mo2_button"))
         window.close()
 
     def test_primary_install_description_uses_steam_prefix(self):
