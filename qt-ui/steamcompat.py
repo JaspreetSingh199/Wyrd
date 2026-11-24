@@ -129,8 +129,9 @@ def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = 
         install = prefix / "pfx/drive_c/Modding/MO2"
         proton_prefix = prefix / "pfx"
         wine_drive = proton_prefix / "drive_c"
+        modding_root = wine_drive / "Modding"
         if (proton_prefix.is_symlink() or wine_drive.is_symlink()
-                or (prefix / "pfx/drive_c/Modding").is_symlink()):
+                or modding_root.is_symlink()):
             return {"installed": False, "prefix": str(prefix), "install": str(install),
                     "message": "Skyrim's Proton prefix path contains a symlink and was not inspected."}
         if not wine_drive.is_dir():
