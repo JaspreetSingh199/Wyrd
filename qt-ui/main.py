@@ -531,7 +531,7 @@ class MainWindow(QMainWindow):
             self.install_button.setEnabled(False)
             self.launch_button.setEnabled(True)
             self.launch_game_button.setEnabled(bool(skyrim_instances))
-                self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
+            self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
