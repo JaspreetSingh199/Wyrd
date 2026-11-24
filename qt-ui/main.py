@@ -955,10 +955,13 @@ class MainWindow(QMainWindow):
         if record.get("instance_type") == "portable":
             if instance_path.resolve() != executable.parent.resolve():
                 return {"ok": False, "message": "Portable instance root does not match its MO2 installation root."}
-            # MO2's supported portable-instance selector is an explicitly empty
-            # -i value. --portable is not a MO2 command-line option and can fall
-            # through to the previously selected global instance.
-            command.extend(["-i", ""])
+            # MO2 selects a portable instance when the explicit instance name
+            # is empty. Keep the empty value in the same argv token: Proton's
+            # launcher can discard a standalone empty argv element, causing MO2
+            # to fall back to GlobalSettings.currentInstance() instead.
+            # Boost.Program_options accepts --instance= as an explicit empty
+            # value, which survives Proton's shell wrapper.
+            command.append("--instance=")
             cwd = str(instance_path)
         else:
             command.extend(["--instance", instance_path.name])
