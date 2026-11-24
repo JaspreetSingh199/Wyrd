@@ -13,7 +13,7 @@ from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
-    QWidget,
+    QWidget, QTabWidget, QScrollArea,
 )
 
 from skyrim_detection import detect_skyrim
@@ -74,20 +74,26 @@ class GameProcess:
 
 
 STYLE = """
-QWidget { background: #15171b; color: #e5e7eb; font-size: 14px; }
+QWidget { background: #17191b; color: #e7dfc8; font-size: 14px; }
+QMainWindow, QScrollArea, QTabWidget::pane { background: #17191b; }
 QLabel { background: transparent; border: none; }
-QFrame#panel { background: #20232a; border: 1px solid #343943; border-radius: 12px; }
-QLabel#heading { font-size: 28px; font-weight: 700; padding: 2px 0; }
-QLabel#section { font-size: 16px; font-weight: 650; color: #f0f2f5; }
-QLabel#muted { color: #a2aab6; }
-QPushButton { background: #354255; border: 1px solid #526176; border-radius: 8px; padding: 10px 14px; min-height: 20px; }
-QPushButton:hover { background: #40516a; border-color: #71849c; }
-QPushButton:pressed { background: #2c394b; }
-QPushButton:disabled { color: #818995; background: #262a31; border-color: #353b45; }
-QComboBox { background: #252a33; border: 1px solid #414a58; border-radius: 7px; padding: 8px 10px; min-height: 20px; }
-QProgressBar { background: #252a33; border: 1px solid #343943; border-radius: 6px; height: 14px; text-align: center; }
-QProgressBar::chunk { background: #5b8def; border-radius: 5px; }
-QPlainTextEdit { background: #111318; border: 1px solid #303641; border-radius: 8px; padding: 6px; }
+QFrame#panel { background: #202326; border: 1px solid #665b43; border-radius: 5px; }
+QLabel#heading { color: #e9dfc3; font-family: Georgia, serif; font-size: 31px; font-weight: 600; letter-spacing: 2px; padding: 3px 0; }
+QLabel#section { color: #d9c28b; font-family: Georgia, serif; font-size: 17px; font-weight: 600; }
+QLabel#muted { color: #aaa18d; }
+QPushButton { background: #292d30; color: #e7dfc8; border: 1px solid #756746; border-radius: 3px; padding: 10px 16px; min-height: 20px; }
+QPushButton:hover { background: #39434a; color: #fff3cf; border-color: #c2a76b; }
+QPushButton:pressed { background: #202629; }
+QPushButton:disabled { color: #716d62; background: #242627; border-color: #454239; }
+QComboBox { background: #24282a; color: #e7dfc8; border: 1px solid #756746; border-radius: 3px; padding: 8px 10px; min-height: 20px; }
+QComboBox QAbstractItemView { background: #202326; color: #e7dfc8; selection-background-color: #43515a; }
+QTabWidget::pane { border: 1px solid #665b43; top: -1px; }
+QTabBar::tab { background: #202326; color: #aaa18d; border: 1px solid #514a3a; padding: 10px 22px; margin-right: 4px; }
+QTabBar::tab:selected { background: #343a3b; color: #e9dfc3; border-bottom: 2px solid #c2a76b; }
+QTabBar::tab:hover { color: #fff3cf; }
+QProgressBar { background: #24282a; border: 1px solid #665b43; border-radius: 3px; height: 13px; text-align: center; color: #e7dfc8; }
+QProgressBar::chunk { background: #8c7546; }
+QPlainTextEdit { background: #111416; color: #cfc6ad; border: 1px solid #514a3a; border-radius: 3px; padding: 6px; }
 QScrollArea { border: none; background: transparent; }
 """
 
@@ -185,35 +191,44 @@ class MainWindow(QMainWindow):
         self._restoring_selection = True
 
         root = QWidget()
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(12)
+        outer = QVBoxLayout(root)
+        outer.setContentsMargins(24, 20, 24, 20)
+        outer.setSpacing(14)
 
-        heading = QLabel("Wyrd")
+        heading = QLabel("WYRD")
         heading.setObjectName("heading")
-        subtitle = QLabel("A focused Skyrim Special Edition + Mod Organizer 2 setup for Linux")
+        subtitle = QLabel("THE ELDER SCROLLS • SKYRIM SPECIAL EDITION")
         subtitle.setObjectName("muted")
-        layout.addWidget(heading)
-        layout.addWidget(subtitle)
+        outer.addWidget(heading)
+        outer.addWidget(subtitle)
 
-        self.game_panel = panel("1. Skyrim Special Edition", "Detecting Steam libraries…")
-        layout.addWidget(self.game_panel)
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        outer.addWidget(self.tabs, 1)
+
+        setup_page = QWidget()
+        setup_layout = QVBoxLayout(setup_page)
+        setup_layout.setContentsMargins(12, 16, 12, 12)
+        setup_layout.setSpacing(12)
+
+        self.game_panel = panel("SKYRIM SPECIAL EDITION", "Detecting Steam libraries…")
+        setup_layout.addWidget(self.game_panel)
 
         runtime_panel = QFrame()
         runtime_panel.setObjectName("panel")
         runtime_layout = QVBoxLayout(runtime_panel)
         runtime_layout.setContentsMargins(17, 15, 17, 15)
-        runtime_heading = QLabel("2. Proton runtime")
+        runtime_heading = QLabel("PROTON RUNTIME")
         runtime_heading.setObjectName("section")
-        runtime_detail = QLabel("Wyrd uses the selected Proton build to run MO2 inside Skyrim’s existing Steam AppID 489830 prefix. The prefix is shared with Steam; Wyrd does not create or reset it.")
+        runtime_detail = QLabel("Choose the compatibility runtime used to launch MO2 and Skyrim.")
         runtime_detail.setObjectName("muted")
         runtime_detail.setWordWrap(True)
         runtime_layout.addWidget(runtime_heading)
         runtime_layout.addWidget(runtime_detail)
         runtime_row = QHBoxLayout()
         self.proton_combo = QComboBox()
-        self.proton_combo.setMinimumWidth(420)
-        self.refresh_button = QPushButton("Refresh detection")
+        self.proton_combo.setMinimumWidth(320)
+        self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.refresh_all)
         self.proton_combo.currentIndexChanged.connect(self._save_selection)
         runtime_row.addWidget(self.proton_combo, 1)
@@ -222,31 +237,10 @@ class MainWindow(QMainWindow):
         self.runtime_status = QLabel("Looking for Proton…")
         self.runtime_status.setObjectName("muted")
         runtime_layout.addWidget(self.runtime_status)
-        layout.addWidget(runtime_panel)
+        setup_layout.addWidget(runtime_panel)
 
-        self.mo2_panel = panel("3. Mod Organizer 2", "Checking Wyrd's managed installation…")
-        layout.addWidget(self.mo2_panel)
-
-        self.audio_panel = panel(
-            "4. Audio compatibility",
-            "The library check below is legacy-only: it inspects Wyrd’s old isolated MO2 prefix, not Skyrim’s Steam prefix. Skyrim audio must be verified in an actual game launch.",
-        )
-        audio_layout = self.audio_panel.layout()
-        self.audio_detail = QLabel("Audio library inventory will be checked during detection.")
-        self.audio_detail.setObjectName("muted")
-        self.audio_detail.setWordWrap(True)
-        audio_layout.addWidget(self.audio_detail)
-        audio_actions = QHBoxLayout()
-        self.audio_check_button = QPushButton("Inspect Legacy Audio Libraries")
-        self.audio_check_button.clicked.connect(self.check_audio_libraries)
-        audio_actions.addWidget(self.audio_check_button)
-        self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
-        self.xaudio_override_checkbox.setChecked(bool(self._saved_settings.get("xaudio2_compat", False)))
-        self.xaudio_override_checkbox.toggled.connect(self._save_audio_option)
-        audio_actions.addWidget(self.xaudio_override_checkbox)
-        audio_actions.addStretch(1)
-        audio_layout.addLayout(audio_actions)
-        layout.addWidget(self.audio_panel)
+        self.mo2_panel = panel("MOD ORGANIZER 2", "Checking Wyrd's managed installation…")
+        setup_layout.addWidget(self.mo2_panel)
 
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
@@ -264,67 +258,99 @@ class MainWindow(QMainWindow):
         self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
         self.reset_prefix_button.setEnabled(False)
         self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
-        self.launch_game_button = QPushButton("Launch Active Game (MO2)")
+        self.launch_game_button = QPushButton("Launch Modded Skyrim")
         self.launch_game_button.clicked.connect(self.start_active_game)
         self.launch_game_button.setEnabled(False)
-        self.launch_direct_button = QPushButton("Launch Unmodded (Steam)")
+        self.launch_direct_button = QPushButton("Launch Unmodded")
         self.launch_direct_button.clicked.connect(self.start_skyrim_direct)
         self.launch_direct_button.setEnabled(False)
         self.diagnostics_button = QPushButton("View launch log")
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         self.launch_status_button = QPushButton("Check launch status")
         self.launch_status_button.clicked.connect(self.check_launch_status)
-        self.active_instance_label = QLabel("Active MO2 instance: none selected")
+        self.active_instance_label = QLabel("Active instance: none selected")
         self.active_instance_label.setObjectName("muted")
-        layout.addWidget(self.active_instance_label)
-        self.mo2_library_button = QPushButton("MO2 Library / Instances")
+        setup_layout.addWidget(self.active_instance_label)
+
+        primary_actions = QHBoxLayout()
+        primary_actions.addWidget(self.install_button)
+        primary_actions.addWidget(self.launch_button)
+        primary_actions.addStretch(1)
+        setup_layout.addLayout(primary_actions)
+
+        game_actions = QHBoxLayout()
+        game_actions.addWidget(self.launch_game_button)
+        game_actions.addWidget(self.launch_direct_button)
+        game_actions.addStretch(1)
+        setup_layout.addLayout(game_actions)
+
+        management_row = QHBoxLayout()
+        self.mo2_library_button = QPushButton("Manage MO2")
         self.mo2_library_button.clicked.connect(self.manage_mo2_library)
         self.mo2_library_button.setEnabled(False)
-        action_row.addWidget(self.install_button)
-        action_row.addWidget(self.launch_button)
-        self.launch_game_prefix_button.hide()
-        self.copy_instance_button.hide()
-        self.reset_prefix_button.hide()
-        action_row.addWidget(self.launch_game_button)
-        action_row.addWidget(self.launch_direct_button)
-        action_row.addWidget(self.diagnostics_button)
-        action_row.addWidget(self.launch_status_button)
-        action_row.addStretch(1)
-        layout.addLayout(action_row)
-        library_row = QHBoxLayout()
-        library_row.addWidget(self.mo2_library_button)
-        library_hint = QLabel("Inspect existing MO2 installs, review storage paths, and register instances.")
-        library_hint.setObjectName("muted")
-        library_row.addWidget(library_hint, 1)
-        layout.addLayout(library_row)
+        management_row.addWidget(self.mo2_library_button)
+        management_hint = QLabel("Instances, storage and registration")
+        management_hint.setObjectName("muted")
+        management_row.addWidget(management_hint, 1)
+        setup_layout.addLayout(management_row)
 
         self.progress_label = QLabel("Ready")
         self.progress_label.setObjectName("muted")
-        layout.addWidget(self.progress_label)
+        setup_layout.addWidget(self.progress_label)
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
-        layout.addWidget(self.progress)
+        setup_layout.addWidget(self.progress)
+        setup_layout.addStretch(1)
+        self.tabs.addTab(setup_page, "SETUP")
 
-        instructions = panel(
-            "5. Launch the active registered game",
-            "Choose an instance in MO2 Library / Instances to make it active. Wyrd uses that instance's "
-            "registered MO2 installation, game association, Proton runtime, and prefix. It lists the "
-            "executables configured in that instance and launches the selected target through MO2's virtual "
-            "filesystem. Skyrim Special Edition continues to use the dedicated Skyrim/SKSE launch and audio diagnostics.",
+        advanced_page = QWidget()
+        advanced_layout = QVBoxLayout(advanced_page)
+        advanced_layout.setContentsMargins(12, 16, 12, 12)
+        advanced_layout.setSpacing(12)
+
+        self.audio_panel = panel(
+            "AUDIO COMPATIBILITY",
+            "Advanced diagnostics only. A library inventory cannot prove in-game audio; verify dialogue and music in Skyrim.",
         )
-        layout.addWidget(instructions)
+        audio_layout = self.audio_panel.layout()
+        self.audio_detail = QLabel("Audio diagnostics will be checked during detection.")
+        self.audio_detail.setObjectName("muted")
+        self.audio_detail.setWordWrap(True)
+        audio_layout.addWidget(self.audio_detail)
+        audio_actions = QHBoxLayout()
+        self.audio_check_button = QPushButton("Inspect audio libraries")
+        self.audio_check_button.clicked.connect(self.check_audio_libraries)
+        audio_actions.addWidget(self.audio_check_button)
+        self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
+        self.xaudio_override_checkbox.setChecked(bool(self._saved_settings.get("xaudio2_compat", False)))
+        self.xaudio_override_checkbox.toggled.connect(self._save_audio_option)
+        audio_actions.addWidget(self.xaudio_override_checkbox)
+        audio_actions.addStretch(1)
+        audio_layout.addLayout(audio_actions)
+        advanced_layout.addWidget(self.audio_panel)
 
-        logs_heading = QLabel("Setup log")
+        diagnostic_row = QHBoxLayout()
+        diagnostic_row.addWidget(self.diagnostics_button)
+        diagnostic_row.addWidget(self.launch_status_button)
+        diagnostic_row.addStretch(1)
+        advanced_layout.addLayout(diagnostic_row)
+
+        logs_heading = QLabel("SETUP LOG")
         logs_heading.setObjectName("section")
-        layout.addWidget(logs_heading)
+        advanced_layout.addWidget(logs_heading)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(400)
         self.log_view.setPlaceholderText("Detection and installation progress will appear here.")
-        self.log_view.setMinimumHeight(130)
-        self.log_view.setMaximumHeight(190)
-        layout.addWidget(self.log_view)
+        self.log_view.setMinimumHeight(220)
+        advanced_layout.addWidget(self.log_view)
+        advanced_layout.addStretch(1)
+        self.tabs.addTab(advanced_page, "ADVANCED")
+
+        self.launch_game_prefix_button.hide()
+        self.copy_instance_button.hide()
+        self.reset_prefix_button.hide()
 
         from PySide6.QtWidgets import QScrollArea
         scroll = QScrollArea()
