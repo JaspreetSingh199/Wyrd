@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from steamcompat import install_mo2_into_skyrim_prefix, steam_compat_prefix
+from steamcompat import (install_mo2_into_skyrim_prefix, steam_compat_prefix,\n                          inspect_skyrim_prefix_mo2_installation)
 
 
 def fake_proton(path: Path) -> Path:
@@ -88,6 +88,72 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
                     install_mo2_into_skyrim_prefix(proton, game, home)
                 release.assert_not_called()
             self.assertEqual(sentinel.read_text(), "untouched")
+
+    def test_inspection_verifies_marker_only_in_mo2_install_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            prefix = steam / "steamapps/compatdata/489830"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            install = prefix / "pfx/drive_c/Modding/MO2"
+            game.mkdir(parents=True)
+            install.mkdir(parents=True)
+            (prefix / "pfx/drive_c/users").mkdir()
+            (install / "ModOrganizer.exe").write_bytes(b"MO2")
+            (install / ".wyrd-managed.json").write_text(json.dumps({
+                "managed_by": "Wyrd", "game_app_id": "489830",
+                "installation_mode": "skyrim-steam-prefix",
+                "install": str(install),
+            }))
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertTrue(state["installed"], state)
+            self.assertEqual(Path(state["executable"]), install / "ModOrganizer.exe")
+            self.assertFalse((prefix / ".wyrd-managed.json").exists())
+
+    def test_inspection_rejects_mismatched_install_path_and_unowned_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            prefix = steam / "steamapps/compatdata/489830"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            install = prefix / "pfx/drive_c/Modding/MO2"
+            game.mkdir(parents=True)
+            install.mkdir(parents=True)
+            (prefix / "pfx/drive_c/users").mkdir()
+            exe = install / "ModOrganizer.exe"
+            exe.write_bytes(b"keep")
+            marker = install / ".wyrd-managed.json"
+            marker.write_text(json.dumps({
+                "managed_by": "Wyrd", "game_app_id": "489830",
+                "installation_mode": "skyrim-steam-prefix",
+                "install": str(install / "elsewhere"),
+            }))
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertEqual(exe.read_bytes(), b"keep")
+            marker.unlink()
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertEqual(exe.read_bytes(), b"keep")
+
+    def test_inspection_fails_closed_for_symlinked_install_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            prefix = steam / "steamapps/compatdata/489830"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            (prefix / "pfx/drive_c/Modding").mkdir(parents=True)
+            outside = home / "outside"
+            outside.mkdir()
+            (prefix / "pfx/drive_c/Modding/MO2").symlink_to(outside, target_is_directory=True)
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertIn("symlink", state["message"].lower())
 
 
 if __name__ == "__main__":
