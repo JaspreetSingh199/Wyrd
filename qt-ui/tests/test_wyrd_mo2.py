@@ -20,6 +20,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, launch_mo2,
     read_launch_diagnostics, launch_process_status, detect_skyrim_processes,
     _proc_start_time, _proc_identity, _is_descendant_process, classify_launch_diagnostics,
+    inspect_mo2_storage,
 )
 
 
@@ -533,6 +534,118 @@ class WyrdMO2Tests(unittest.TestCase):
                 {item["title"] for item in targets["targets"]},
                 {"Skyrim Special Edition", "SKSE"},
             )
+
+    def test_storage_inspection_reports_six_paths_and_preserves_ini(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            install = root / "install"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim"
+            instance.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            base = root / "storage"
+            for name in ("mods", "downloads", "webcache", "profiles", "overwrite"):
+                (base / name).mkdir(parents=True)
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "[Settings]\n"
+                f"base_directory={base}\n"
+                "mod_directory=%BASE_DIR%/mods\n"
+                "download_directory=%BASE_DIR%/downloads\n"
+                "cache_directory=%BASE_DIR%/webcache\n"
+                "profiles_directory=%BASE_DIR%/profiles\n"
+                "overwrite_directory=%BASE_DIR%/overwrite\n",
+                encoding="utf-8",
+            )
+            before = ini.read_bytes()
+            report = inspect_mo2_storage(prefix, install)
+            self.assertTrue(report["ok"], report)
+            paths = report["instances"][0]["paths"]
+            self.assertEqual(set(paths), {
+                "base", "mods", "downloads", "cache", "profiles", "overwrite"
+            })
+            self.assertTrue(all(info["status"] == "available" for info in paths.values()))
+            self.assertEqual(ini.read_bytes(), before)
+
+    def test_storage_inspection_classifies_external_path_and_does_not_claim_ownership(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install = root / "prefix", root / "install"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim"
+            instance.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            external = root / "external-mods"
+            external.mkdir()
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "[Settings]\n"
+                f"mod_directory={external}\n", encoding="utf-8"
+            )
+            info = inspect_mo2_storage(prefix, install)["instances"][0]["paths"]["mods"]
+            self.assertEqual(info["status"], "available")
+            self.assertEqual(info["ownership_scope"], "external")
+            self.assertEqual(info["path"], str(external))
+
+    def test_storage_inspection_reports_missing_symlink_and_out_of_prefix_c_drive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install = root / "prefix", root / "install"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim"
+            instance.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            base = root / "storage"
+            base.mkdir()
+            target = root / "target"
+            target.mkdir()
+            (base / "link").symlink_to(target, target_is_directory=True)
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "[Settings]\n"
+                f"base_directory={base}\n"
+                "mod_directory=%BASE_DIR%/missing\n"
+                "download_directory=%BASE_DIR%/link\n"
+                "cache_directory=C:\\\\outside\\\\cache\n", encoding="utf-8"
+            )
+            paths = inspect_mo2_storage(prefix, install)["instances"][0]["paths"]
+            self.assertEqual(paths["mods"]["status"], "missing")
+            self.assertEqual(paths["downloads"]["status"], "symlink")
+            self.assertEqual(paths["cache"]["status"], "outside-prefix")
+
+    def test_storage_inspection_detects_shared_roots_between_instances(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install = root / "prefix", root / "install"
+            users = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer"
+            users.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            shared = root / "shared-mods"
+            shared.mkdir()
+            for name in ("Skyrim", "Skyrim Test"):
+                instance = users / name
+                instance.mkdir()
+                (instance / "ModOrganizer.ini").write_text(
+                    "[General]\ngameName=Skyrim Special Edition\n"
+                    "[Settings]\n"
+                    f"mod_directory={shared}\n", encoding="utf-8"
+                )
+            report = inspect_mo2_storage(prefix, install)
+            self.assertTrue(any(
+                entry["path"] == str(shared) and len(entry["references"]) == 2
+                for entry in report["shared_paths"]
+            ))
 
     def test_launch_target_inspection_rejects_binary_outside_detected_game(self):
         with tempfile.TemporaryDirectory() as tmp:

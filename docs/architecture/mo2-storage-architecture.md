@@ -136,3 +136,8 @@ Migration is opt-in per instance and per storage category. Require a preview and
 4. Registry load/save validation tests, atomic writes, schema versioning, duplicate-ID/path detection and no implicit adoption.
 5. Qt GUI inventory/preview tests under PySide6; GUI tests must execute (not skip) in the CI environment.
 6. No data migration, directory creation, INI rewrite, or prefix change in this phase.
+
+
+## Read-only inventory API refinement
+
+The first implementation exposes \`inspect_mo2_storage()\`, a read-only view over known instance INIs. It reports Base, Mods, Downloads, Cache, Profiles, and Overwrite independently; distinguishes Wine C: paths outside the supplied prefix, symlinks, missing directories, and external paths; and identifies directory aliases referenced by multiple instances. It does not walk storage trees, calculate sizes, create directories, change INI values, or change ownership. Migration preview UI remains future work.
