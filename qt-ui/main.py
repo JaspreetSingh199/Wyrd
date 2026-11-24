@@ -418,6 +418,11 @@ class MainWindow(QMainWindow):
         self._saved_settings["first_run_completed"] = True
 
         game_ready = bool(self.game_state.get("found"))
+        # On first launch, ignore any stale saved community runtime choice and
+        # use the highest-ranked discovered Proton. Manual choices remain valid
+        # after onboarding has been completed.
+        if game_ready and self.proton_combo.count():
+            self.proton_combo.setCurrentIndex(0)
         proton_ready = bool(self.proton_combo.currentData())
         if game_ready and proton_ready:
             answer = QMessageBox.question(
