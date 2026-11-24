@@ -653,8 +653,8 @@ if __name__ == "__main__":
             }],
             "message": "Read-only instance inventory.",
         }
-        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \\
-             patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \\
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \
+             patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \
              patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory):
             window = self._window()
         self.assertFalse(window.install_button.isEnabled())
@@ -672,9 +672,9 @@ if __name__ == "__main__":
             "ok": True, "managed": False,
             "skyrim_instances": [{"name": "Skyrim Special Edition"}],
         }
-        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), \\
-             patch("main.QInputDialog.getItem", return_value=("Skyrim Special Edition", True)), \\
-             patch("main.launch_external_mo2_in_skyrim_prefix", return_value={"ok": True, "message": "started"} ) as launch, \\
+        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), \
+             patch("main.QInputDialog.getItem", return_value=("Skyrim Special Edition", True)), \
+             patch("main.launch_external_mo2_in_skyrim_prefix", return_value={"ok": True, "message": "started"} ) as launch, \
              patch("main.QMessageBox.information"):
             window.start_mo2()
         launch.assert_called_once()
