@@ -766,10 +766,7 @@ class Mo2LibraryDialog(QDialog):
                     break
             QMessageBox.information(
                 self, "Storage settings saved",
-                f"All six storage paths were saved. ModOrganizer.ini backup:
-{backup}
-
-"
+                f"All six storage paths were saved. ModOrganizer.ini backup:\n{backup}\n\n"
                 "No existing data was moved, copied, merged, or deleted."
             )
         except Exception as error:
