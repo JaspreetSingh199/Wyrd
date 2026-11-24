@@ -128,6 +128,37 @@ class RegistryService:
                 return validated
         raise RegistryError("registered MO2 instance was not found")
 
+    def unregister_instance(self, instance_id: str) -> dict[str, Any]:
+        """Remove one Wyrd registry reference without touching MO2 or game files."""
+        current = self.load()
+        original_count = len(current["instances"])
+        current["instances"] = [
+            item for item in current["instances"] if item.get("id") != instance_id
+        ]
+        if len(current["instances"]) == original_count:
+            raise RegistryError(f"registered MO2 instance not found: {instance_id}")
+        used_games = {item.get("game_id") for item in current["instances"]}
+        used_runtimes = {item.get("runtime_id") for item in current["instances"]}
+        current["games"] = [item for item in current["games"] if item.get("id") in used_games]
+        current["runtimes"] = [item for item in current["runtimes"] if item.get("id") in used_runtimes]
+        validated = validate_registry(current)
+        save_registry(self.registry_path, validated)
+        return validated
+
+    def unregister_installation(self, installation_id: str) -> dict[str, Any]:
+        """Remove an unused installation reference; never delete its executable or files."""
+        current = self.load()
+        if not any(item.get("id") == installation_id for item in current["installations"]):
+            raise RegistryError(f"registered MO2 installation not found: {installation_id}")
+        if any(item.get("installation_id") == installation_id for item in current["instances"]):
+            raise RegistryError("Cannot unregister this installation while registered instances still reference it.")
+        current["installations"] = [
+            item for item in current["installations"] if item.get("id") != installation_id
+        ]
+        validated = validate_registry(current)
+        save_registry(self.registry_path, validated)
+        return validated
+
     def update_associations(
         self, instance_id: str, *, game: dict[str, Any], runtime: dict[str, Any]
     ) -> dict[str, Any]:
