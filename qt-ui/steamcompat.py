@@ -472,7 +472,9 @@ def reset_wyrd_mo2(home: Path | None = None) -> dict:
                 try:
                     if root.is_symlink():
                         continue
-                    instance_dir.resolve(strict=True).relative_to(root.resolve(strict=False))
+                    resolved_root = root.resolve(strict=False)
+                    resolved_root.relative_to(resolved_prefix)
+                    instance_dir.resolve(strict=True).relative_to(resolved_root)
                     config_file.resolve(strict=True).relative_to(instance_dir.resolve(strict=True))
                     valid_root = config_file.name.casefold() == "modorganizer.ini"
                     if valid_root:
