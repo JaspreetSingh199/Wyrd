@@ -84,8 +84,8 @@ class WyrdMO2ResetTests(unittest.TestCase):
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "prefix stays")
             self.assertEqual((custom / "keep.txt").read_text(encoding="utf-8"), "keep")
             cleaned = json.loads((settings.parent / "mo2-registry.json").read_text(encoding="utf-8"))
-            self.assertEqual(cleaned["installations"], [])
-            self.assertEqual(cleaned["instances"], [])
+            self.assertEqual([x["id"] for x in cleaned["installations"]], ["external-install"])
+            self.assertEqual([x["id"] for x in cleaned["instances"]], ["external-instance"])
             saved = json.loads(settings.read_text(encoding="utf-8"))
             self.assertNotIn("selected_mo2_instance_id", saved)
 
