@@ -47,6 +47,9 @@ class LaunchSession:
     detected_processes: list[dict] = field(default_factory=list)
     process_identities: dict[int, int | None] = field(default_factory=dict)
     game_processes: list[GameProcess] = field(default_factory=list)
+    prefix_root: str | None = None
+    game_path: str | None = None
+    app_id: str | None = None
     state: str = "idle"
 
 
@@ -327,6 +330,7 @@ class MainWindow(QMainWindow):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidget(root)
         self.setCentralWidget(scroll)
+        self._restore_registered_instance()
         self.refresh_all()
         self._restoring_selection = False
         self._restore_saved_selection()
@@ -563,6 +567,7 @@ class MainWindow(QMainWindow):
         dialog = Mo2LibraryDialog(
             self, prefix_path=prefix_text, install_path=install_path or "",
             game_path=saved_game or "", proton_path=self.proton_combo.currentData() or "",
+            selected_instance_id=self.selected_mo2_instance_id,
         )
         dialog.exec()
         if getattr(dialog, "selected_instance_record", None):
@@ -1210,6 +1215,9 @@ class MainWindow(QMainWindow):
             self.launch_session.detected_processes = []
             self.launch_session.process_identities = {}
             self.launch_session.game_processes = []
+            self.launch_session.prefix_root = str(prefix.resolve())
+            self.launch_session.game_path = str(game_path.resolve())
+            self.launch_session.app_id = "489830"
             self.launch_session.state = "handoff"
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
@@ -1248,7 +1256,12 @@ class MainWindow(QMainWindow):
             self.launch_session.wrapper_start_time is None
             or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
-        process_scan = detect_skyrim_processes(_steam_prefix_for_game_path(self.game_state['game_dir']))
+        scan_prefix = (
+            Path(self.launch_session.prefix_root)
+            if self.launch_session.prefix_root else
+            _steam_prefix_for_game_path(self.game_state.get("game_dir"))
+        )
+        process_scan = detect_skyrim_processes(scan_prefix)
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
@@ -1340,8 +1353,11 @@ class MainWindow(QMainWindow):
     def check_launch_status(self) -> None:
         """Report the current tracked game processes, even after Proton's wrapper exits."""
         session = self.launch_session
-        game_dir = self.game_state.get("game_dir")
-        steam_prefix = _steam_prefix_for_game_path(game_dir)
+        game_dir = session.game_path or self.game_state.get("game_dir")
+        steam_prefix = (
+            Path(session.prefix_root) if session.prefix_root
+            else _steam_prefix_for_game_path(game_dir)
+        )
         process_scan = detect_skyrim_processes(steam_prefix)
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
         for item in process_scan.get("processes", []):
