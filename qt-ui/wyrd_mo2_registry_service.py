@@ -63,8 +63,8 @@ class RegistryService:
             install_managed, _ = self._marker_owner(install)
         except RegistryError as error:
             return self._failure(str(error))
-        if prefix_managed and prefix_app_id not in (None, "489830"):
-            return self._failure("Wyrd prefix marker belongs to a different game.")
+        # Wyrd-managed Proton prefixes may belong to any registered game AppID.
+        # The registry association, not a Skyrim-specific constant, binds the game.
         owner = "wyrd" if install_managed else "external"
         inventory = inspect_mo2_storage(prefix, install_root=install, require_managed=prefix_managed)
         if not inventory.get("ok"):
