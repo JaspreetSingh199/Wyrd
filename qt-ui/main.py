@@ -323,6 +323,18 @@ class MainWindow(QMainWindow):
         advanced_layout.setContentsMargins(12, 16, 12, 12)
         advanced_layout.setSpacing(12)
 
+        mo2_advanced_heading = QLabel("MO2 CONFIGURATION")
+        mo2_advanced_heading.setObjectName("section")
+        advanced_layout.addWidget(mo2_advanced_heading)
+        mo2_advanced_help = QLabel(
+            "Change MO2 paths, game or Proton links, and storage options here. "
+            "Most people can leave these settings as they are."
+        )
+        mo2_advanced_help.setObjectName("muted")
+        mo2_advanced_help.setWordWrap(True)
+        advanced_layout.addWidget(mo2_advanced_help)
+        advanced_layout.addWidget(self.mo2_library_widget.advanced_page)
+
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
             "Advanced diagnostics only. A library inventory cannot prove in-game audio; verify dialogue and music in Skyrim.",
