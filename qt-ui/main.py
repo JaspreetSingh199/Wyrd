@@ -516,6 +516,14 @@ class MainWindow(QMainWindow):
         if dialog.registered:
             self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
             self.refresh_all()
+        if dialog.launch_requested and dialog.selected_instance_record:
+            result = self._launch_registered_instance(dialog.selected_instance_record)
+            self._log(result.get("message", "Registered launch did not start."))
+            if result.get("ok"):
+                self.progress_label.setText("Selected registered MO2 instance started.")
+                QMessageBox.information(self, "MO2 launch", result["message"])
+            else:
+                QMessageBox.warning(self, "MO2 launch refused", result.get("message", "Could not launch selected instance."))
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
@@ -718,6 +726,95 @@ class MainWindow(QMainWindow):
             return {"ok": False, "instances": [], "skyrim_instances": [],
                     "message": "Skyrim Special Edition was not detected."}
         return inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
+
+    def _launch_registered_instance(self, record: dict) -> dict:
+        """Launch the exact registered installation/instance/game/runtime association."""
+        import subprocess
+        from wyrd_mo2 import inspect_proton_build, _runtime_environment
+        from wyrd_mo2_registry_service import RegistryService
+
+        registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+        installations = {item["id"]: item for item in registry["installations"]}
+        games = {item["id"]: item for item in registry["games"]}
+        runtimes = {item["id"]: item for item in registry["runtimes"]}
+        installation = installations.get(record.get("installation_id"))
+        game = games.get(record.get("game_id"))
+        runtime = runtimes.get(record.get("runtime_id"))
+        if not installation or not game or not runtime:
+            return {"ok": False, "message": "This registry entry needs an installation, game, and Proton runtime association."}
+
+        executable = Path(installation.get("executable", "")).expanduser()
+        instance_path = Path(record.get("instance_path", "")).expanduser()
+        config = Path(record.get("config", "")).expanduser()
+        game_path = Path(game.get("path", "")).expanduser()
+        proton = Path(runtime.get("path", "")).expanduser()
+        prefix_value = record.get("prefix_path") or installation.get("prefix_path")
+        if not prefix_value:
+            return {"ok": False, "message": "No Proton prefix was recorded for this instance. Re-discover it with the correct prefix before launching."}
+        prefix = Path(prefix_value).expanduser()
+
+        if installation.get("owner") not in ("wyrd", "external"):
+            return {"ok": False, "message": "Installation ownership is not classified; launch refused."}
+        if executable.is_symlink() or not executable.is_file():
+            return {"ok": False, "message": "Registered ModOrganizer.exe is missing or symlinked."}
+        if instance_path.is_symlink() or not instance_path.is_dir():
+            return {"ok": False, "message": "Registered MO2 instance path is missing or symlinked."}
+        if config.is_symlink() or not config.is_file():
+            return {"ok": False, "message": "Registered instance INI is missing or symlinked."}
+        if game_path.is_symlink() or not game_path.is_dir():
+            return {"ok": False, "message": "Registered game directory is missing or symlinked."}
+        if prefix.is_symlink() or not (prefix / "pfx/drive_c/users").is_dir():
+            return {"ok": False, "message": "Associated Proton prefix is missing or unsafe."}
+        validation = inspect_proton_build(proton)
+        if not validation.get("ok"):
+            return {"ok": False, "message": validation.get("message", "The associated Proton runtime is unavailable.")}
+
+        try:
+            executable.resolve(strict=True).relative_to(executable.parent.resolve(strict=True))
+            config.resolve(strict=True).relative_to(instance_path.resolve(strict=True))
+        except (OSError, ValueError, RuntimeError):
+            return {"ok": False, "message": "Registered executable or INI escaped its installation/instance boundary."}
+
+        steam_root_value = game.get("steam_root")
+        if steam_root_value:
+            steam_root = Path(steam_root_value).expanduser()
+        else:
+            # Do not infer a different game's Steam prefix from the current UI.
+            from wyrd_mo2 import _steam_root_for_game
+            try:
+                steam_root = _steam_root_for_game(game_path)
+            except Exception as error:
+                return {"ok": False, "message": f"Could not resolve the registered game's Steam root: {error}"}
+        if not steam_root.is_dir():
+            return {"ok": False, "message": "Registered game's Steam root is not available."}
+
+        env = _runtime_environment(proton, steam_root, prefix)
+        app_id = str(game.get("app_id") or "489830")
+        env.update({
+            "SteamAppId": app_id, "SteamGameId": app_id,
+            "STEAM_COMPAT_APP_ID": app_id,
+            "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
+        })
+        if self.xaudio_override_checkbox.isChecked() and app_id == "489830":
+            current = env.get("WINEDLLOVERRIDES", "")
+            overrides = [item for item in current.split(";")
+                         if item and not item.lower().startswith("xaudio2_7=")]
+            overrides.append("xaudio2_7=n,b")
+            env["WINEDLLOVERRIDES"] = ";".join(overrides)
+        try:
+            process = subprocess.Popen(
+                [str(proton / "proton"), "run", str(executable),
+                 "--instance", instance_path.name],
+                cwd=str(executable.parent), env=env, start_new_session=True,
+            )
+        except OSError as error:
+            return {"ok": False, "message": f"Could not start registered MO2 instance: {error}"}
+        return {
+            "ok": True, "pid": process.pid, "instance": instance_path.name,
+            "game": game.get("name"), "runtime": runtime.get("name"),
+            "installation_owner": installation.get("owner"),
+            "message": f"Started registered MO2 instance '{instance_path.name}' through {runtime.get('name', 'Proton')}.",
+        }
 
     def start_mo2(self) -> None:
         game_path = Path(self.game_state.get("game_dir", ""))
