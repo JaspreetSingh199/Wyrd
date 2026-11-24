@@ -128,6 +128,28 @@ class RegistryService:
                 return validated
         raise RegistryError("registered MO2 instance was not found")
 
+    def rename_instance(self, instance_id: str, display_name: str) -> dict[str, Any]:
+        """Update a Wyrd-only display label without changing any MO2 files."""
+        if not isinstance(display_name, str):
+            raise RegistryError("instance display name must be text")
+        display_name = display_name.strip()
+        if len(display_name) > 80 or any(ord(char) < 32 for char in display_name):
+            raise RegistryError("instance display name must be 80 characters or fewer and contain no control characters")
+        current = self.load()
+        for index, instance in enumerate(current["instances"]):
+            if instance.get("id") != instance_id:
+                continue
+            updated = dict(instance)
+            if display_name:
+                updated["display_name"] = display_name
+            else:
+                updated.pop("display_name", None)
+            current["instances"][index] = updated
+            validated = validate_registry(current)
+            save_registry(self.registry_path, validated)
+            return validated
+        raise RegistryError(f"registered MO2 instance not found: {instance_id}")
+
     def unregister_instance(self, instance_id: str) -> dict[str, Any]:
         """Remove one Wyrd registry reference without touching MO2 or game files."""
         current = self.load()
