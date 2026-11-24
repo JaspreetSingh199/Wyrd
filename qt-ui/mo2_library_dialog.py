@@ -203,7 +203,6 @@ class Mo2LibraryDialog(QDialog):
         ready = bool(installation.get("executable") and game.get("path") and runtime.get("path")
                      and record.get("prefix_path"))
         self._launch_existing_button.setEnabled(ready)
-        self._launch_existing_button.setEnabled(ready)
         self.apply_storage_button.setEnabled(bool(record.get("config")))
 
     def _choose_shared(self, category: str) -> None:
