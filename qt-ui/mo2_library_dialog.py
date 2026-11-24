@@ -40,24 +40,12 @@ class Mo2LibraryDialog(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        self.tabs = QTabWidget(self)
-        setup_scroll = QScrollArea(self)
-        setup_scroll.setWidgetResizable(True)
-        setup_page = QWidget()
-        setup_layout = QVBoxLayout(setup_page)
-        setup_layout.setContentsMargins(10, 10, 10, 10)
+        setup_layout = root
         setup_layout.setSpacing(10)
-        setup_scroll.setWidget(setup_page)
-        advanced_scroll = QScrollArea(self)
-        advanced_scroll.setWidgetResizable(True)
-        advanced_page = QWidget()
-        advanced_layout = QVBoxLayout(advanced_page)
+        self.advanced_page = QWidget()
+        advanced_layout = QVBoxLayout(self.advanced_page)
         advanced_layout.setContentsMargins(10, 10, 10, 10)
         advanced_layout.setSpacing(8)
-        advanced_scroll.setWidget(advanced_page)
-        self.tabs.addTab(setup_scroll, "Instances")
-        self.tabs.addTab(advanced_scroll, "Advanced")
-        root.addWidget(self.tabs, 1)
 
         intro = QLabel(
             "Discover MO2 installations and instances in a known Proton prefix. "
@@ -120,7 +108,7 @@ class Mo2LibraryDialog(QWidget):
         form.addRow("Optional Steam AppID:", self.game_appid_edit)
         form.addRow("Game directory:", game_row)
         form.addRow("Proton runtime:", runtime_row)
-        advanced_layout.addWidget(QLabel("Paths and game settings"))
+        advanced_layout.addWidget(QLabel("MO2 paths and game settings"))
         advanced_layout.addLayout(form)
 
         actions = QHBoxLayout()
