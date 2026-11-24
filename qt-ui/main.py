@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, QTimer
+from PySide6.QtCore import QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
