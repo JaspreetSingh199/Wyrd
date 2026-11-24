@@ -1641,8 +1641,15 @@ class MainWindow(QMainWindow):
         self._game_watch_timer.stop()
         self.launch_session.game_processes = []
         self.launch_session.state = "game-exited"
-        self.progress_label.setText("Skyrim/SKSE processes exited; launch session ended.")
-        self._log("Detected Skyrim/SKSE process identities are no longer present. Game exit recorded.")
+        is_skyrim = self.launch_session.app_id == "489830"
+        self.progress_label.setText(
+            "Skyrim/SKSE processes exited; launch session ended."
+            if is_skyrim else "Registered game process exited; launch session ended."
+        )
+        self._log(
+            "Detected Skyrim/SKSE process identities are no longer present. Game exit recorded."
+            if is_skyrim else "Detected registered game process identities are no longer present. Game exit recorded."
+        )
 
     def check_launch_status(self) -> None:
         """Report the current tracked game processes, even after Proton's wrapper exits."""
@@ -1754,10 +1761,16 @@ class MainWindow(QMainWindow):
         )
 
         session_processes = []
-        if process_scan.get("ok") and wrapper_matches:
-            for item in process_scan.get("processes", []):
-                if _is_descendant_process(item["pid"], session.wrapper_pid):
-                    session_processes.append(item)
+        if process_scan.get("ok"):
+            if session.app_id == "489830" or (session.wrapper_pid is None and session.app_id is None):
+                if wrapper_matches and session.wrapper_pid:
+                    for item in process_scan.get("processes", []):
+                        if _is_descendant_process(item["pid"], session.wrapper_pid):
+                            session_processes.append(item)
+            elif session.wrapper_pid and session.target_binary:
+                # Generic scanner has already validated the exact launch token,
+                # registered prefix, and original wrapper identity.
+                session_processes = list(process_scan.get("processes", []))
 
         if session_processes:
             tracked = [
