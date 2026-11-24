@@ -74,7 +74,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
         self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded")
         window.launch_game_button.setEnabled(True)
-        with patch.object(window, "start_skyrim") as mo2_launch:
+        with patch.object(window, "start_active_game") as mo2_launch:
             window.launch_game_button.click()
             mo2_launch.assert_called_once()
         with patch.object(window, "start_skyrim_direct") as direct_launch:
@@ -529,9 +529,11 @@ class MainWindowSmokeTests(unittest.TestCase):
             "wyrd_processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "message": "Detected Skyrim in Wyrd prefix.",
         }
-        with patch("main.launch_process_status", return_value={
-            "state": "exited", "message": "wrapper exited"
-        }), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+            "main.launch_process_status", return_value={
+                "state": "exited", "message": "wrapper exited"
+            }
+        ), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
             "main._is_descendant_process", return_value=False
         ), patch("main.QMessageBox.information"):
             window.check_launch_status()
