@@ -825,7 +825,7 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        result = reset_wyrd_mo2()
+        result = reset_wyrd_mo2(game_path=Path(self.game_state["game_dir"]))
         self._log(result.get("message", "MO2 reset attempted."))
         if result.get("ok"):
             self.selected_mo2_instance_id = ""
