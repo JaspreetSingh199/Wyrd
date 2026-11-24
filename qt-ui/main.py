@@ -86,6 +86,16 @@ QScrollArea { border: none; background: transparent; }
 """
 
 
+def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
+    """Resolve the Steam root only when the game path has the expected library depth."""
+    if not game_path:
+        return None
+    path = Path(game_path)
+    if len(path.parents) <= 2:
+        return None
+    return steam_compat_prefix(path.parents[2])
+
+
 def panel(title: str, description: str) -> QFrame:
     frame = QFrame()
     frame.setObjectName("panel")
@@ -953,7 +963,7 @@ class MainWindow(QMainWindow):
             self.launch_session.wrapper_start_time is None
             or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
-        process_scan = detect_skyrim_processes(steam_compat_prefix(Path(self.game_state['game_dir']).parents[2]))
+        process_scan = detect_skyrim_processes(_steam_prefix_for_game_path(self.game_state['game_dir']))
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
@@ -1046,7 +1056,7 @@ class MainWindow(QMainWindow):
         """Report the current tracked game processes, even after Proton's wrapper exits."""
         session = self.launch_session
         game_dir = self.game_state.get("game_dir")
-        steam_prefix = steam_compat_prefix(Path(game_dir).parents[2]) if game_dir else None
+        steam_prefix = _steam_prefix_for_game_path(game_dir)
         process_scan = detect_skyrim_processes(steam_prefix)
         self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
         for item in process_scan.get("processes", []):

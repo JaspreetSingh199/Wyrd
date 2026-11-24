@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,7 +8,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QMessageBox, QLabel
     from main import MainWindow, GameProcess
 except ImportError:
     QApplication = None
@@ -21,11 +22,16 @@ class MainWindowSmokeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def _window(self, state=None, game=None, builds=None, steam_mo2=None):
-        game = game or {
-            "found": True, "game_dir": "/games/Skyrim Special Edition",
-            "steam_root": "/home/test/.steam/steam", "library": "/home/test/.steam/steam/steamapps",
-        }
+    def _window(self, state=None, game=None, builds=None, steam_mo2=None, settings=None, inventory=None):
+        if game is None:
+            temporary_game_root = tempfile.TemporaryDirectory()
+            self.addCleanup(temporary_game_root.cleanup)
+            game_dir = Path(temporary_game_root.name) / ".steam/steam/steamapps/common/Skyrim Special Edition"
+            game_dir.mkdir(parents=True)
+            game = {
+                "found": True, "game_dir": str(game_dir),
+                "steam_root": str(game_dir.parents[2]), "library": str(game_dir.parents[1]),
+            }
         builds = builds if builds is not None else [{
             "name": "Proton Test", "path": "/home/test/.steam/steam/steamapps/common/Proton Test",
             "architecture": "x86_64",
@@ -40,7 +46,10 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.inspect_wyrd_installation", return_value=state),
             patch("main.inspect_skyrim_prefix_mo2_installation", return_value=steam_mo2 or {"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
             patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
-            patch("main.read_settings", return_value={}),
+            patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "managed": False, "message": "No external MO2 installation was found in Skyrim's Steam prefix."}),
+            patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory or {"ok": False, "instances": [], "skyrim_instances": [], "message": "No MO2 instance was found."}),
+            patch("main.inspect_audio_compatibility", return_value={"ok": False, "safe": False, "message": "Legacy audio prefix is unavailable."}),
+            patch("main.read_settings", return_value=settings or {}),
             patch("main.write_settings"),
             # Default-deny dialogs keep offscreen tests deterministic. Individual
             # tests may override these mocks when asserting a specific interaction.
@@ -64,6 +73,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (MO2)")
         self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded (Steam)")
+        window.launch_game_button.setEnabled(True)
         with patch.object(window, "start_skyrim") as mo2_launch:
             window.launch_game_button.click()
             mo2_launch.assert_called_once()
@@ -95,13 +105,14 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_check_launch_status_scans_detected_skyrim_steam_prefix(self):
         window = self._window()
+        expected_steam_root = Path(window.game_state["game_dir"]).parents[2]
         with patch("main.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
              patch("main.detect_skyrim_processes", return_value={
                  "ok": True, "processes": [], "message": "No Skyrim processes detected."
              }), patch("main.QMessageBox.information"):
             window.check_launch_status()
         prefix.assert_called_once()
-        self.assertEqual(prefix.call_args.args[0], Path("/games/Skyrim Special Edition").parents[2])
+        self.assertEqual(prefix.call_args.args[0], expected_steam_root)
         window.close()
 
     def test_idle_launch_status_explains_manual_mo2_and_exited_game(self):
@@ -131,42 +142,45 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_saved_proton_is_restored_and_selection_is_persisted(self):
         build_a = "/home/test/Proton A"
         build_b = "/home/test/Proton B"
-        with patch("main.read_settings", return_value={
-            "proton": build_b, "game_path": "/games/Skyrim Special Edition"
-        }), patch("main.write_settings") as save:
-            window = self._window(builds=[
-                {"name": "Proton A", "path": build_a, "architecture": "x86_64"},
-                {"name": "Proton B", "path": build_b, "architecture": "x86_64"},
-            ])
-            self.assertEqual(window.proton_combo.currentData(), build_b)
+        window = self._window(settings={
+            "proton": build_b, "game_path": "/missing/Skyrim"
+        }, builds=[
+            {"name": "Proton A", "path": build_a, "architecture": "x86_64"},
+            {"name": "Proton B", "path": build_b, "architecture": "x86_64"},
+        ])
+        self.assertEqual(window.proton_combo.currentData(), build_b)
+        with patch("main.write_settings") as save:
             window.proton_combo.setCurrentIndex(0)
             save.assert_called()
             self.assertEqual(save.call_args.args[1], Path(build_a))
-            window.close()
+        window.close()
 
     def test_missing_saved_game_path_does_not_override_detection(self):
-        with patch("main.read_settings", return_value={
+        window = self._window(settings={
             "proton": "/missing/Proton", "game_path": "/missing/Skyrim"
-        }):
-            window = self._window()
-            self.assertEqual(window.game_state["game_dir"], "/games/Skyrim Special Edition")
-            window.close()
+        })
+        self.assertNotEqual(window.game_state["game_dir"], "/missing/Skyrim")
+        window.close()
 
 
     def test_launch_skyrim_enabled_when_game_detected_and_prefix_ready_without_instance(self):
         state = {
             "installed": True, "prefix_ready": True,
             "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
-            "metadata": {"version": "v2.5.2", "game_path": "/games/Skyrim Special Edition"},
+            "metadata": {"version": "v2.5.2", "game_path": "/home/test/.steam/steam/steamapps/common/Skyrim Special Edition"},
             "external_installations": [],
         }
         with patch("main.inspect_mo2_instances", return_value={
             "ok": False, "instances": [], "skyrim_instances": [],
             "message": "No MO2 instances found."
         }):
-            window = self._window(state=state)
+            window = self._window(steam_mo2={
+                "installed": True, "managed": True,
+                "executable": "/test/MO2/ModOrganizer.exe",
+                "prefix": "/test/compatdata/489830", "install": "/test/MO2",
+            })
             self.assertTrue(window.launch_button.isEnabled())
-            self.assertTrue(window.launch_game_button.isEnabled())
+            self.assertFalse(window.launch_game_button.isEnabled())
             window.close()
 
     def test_start_mo2_refuses_when_instance_inspection_is_unsafe(self):
@@ -249,8 +263,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         with patch("main.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True)
-        ]), patch("main.QMessageBox.question", return_value=1), patch(
-            "main.inspect_skyrim_launch_targets", return_value={
+        ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
+            "main.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
+                "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
+            }
+        ), patch("main.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
         ), patch("main.launch_skyrim_via_mo2", return_value={
@@ -260,7 +278,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
-            window.mo2_state = {"metadata": {"game_path": "/games/Skyrim"}}
+            window.mo2_state = {"metadata": {"game_path": window.game_state["game_dir"]}}
             window.start_skyrim()
         self.assertEqual(window.launch_session.wrapper_pid, 501)
         self.assertEqual(window.launch_session.wrapper_start_time, 123)
@@ -272,8 +290,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         with patch("main.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True), ("Default Proton audio", True)
-        ]), patch("main.QMessageBox.question", return_value=1), patch(
-            "main.inspect_skyrim_launch_targets", return_value={
+        ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
+            "main.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
+                "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
+            }
+        ), patch("main.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
         ), patch("main.launch_skyrim_via_mo2", return_value={
@@ -282,7 +304,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
-            window.mo2_state = {"metadata": {"game_path": "/games/Skyrim"}}
+            window.mo2_state = {"metadata": {"game_path": window.game_state["game_dir"]}}
             window.start_skyrim()
         self.assertEqual(launch.call_args.kwargs["audio_mode"], "default")
         window.close()
@@ -554,7 +576,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window.game_state["found"])
         self.assertEqual(window.proton_combo.count(), 1)
         self.assertEqual(window.install_button.text(), "Install MO2")
-        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (Steam)")
+        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (MO2)")
         self.assertFalse(window.launch_button.isEnabled())
         self.assertFalse(hasattr(window, "nav"))
         window.close()
@@ -639,6 +661,16 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("NOT VERIFIED", window.audio_detail.text())
         self.assertFalse(hasattr(window, "audio_repair_button"))
         window.close()
+
+    def test_check_launch_status_handles_unexpected_shallow_game_path(self):
+        window = self._window()
+        window.game_state["game_dir"] = "/games/Skyrim"
+        with patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [], "message": "No Skyrim processes detected."
+        }), patch("main.QMessageBox.information"):
+            window.check_launch_status()
+        window.close()
+
 
 if __name__ == "__main__":
     unittest.main()
