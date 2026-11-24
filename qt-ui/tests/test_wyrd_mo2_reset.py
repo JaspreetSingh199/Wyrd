@@ -89,7 +89,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
             saved = json.loads(settings.read_text(encoding="utf-8"))
             self.assertNotIn("selected_mo2_instance_id", saved)
 
-    def test_reset_without_registry_still_removes_verified_install(self):
+    def test_reset_without_registry_or_settings_still_removes_verified_install(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             _steam, prefix, install, _instance, game, _custom, sentinel = self._managed_layout(home)
@@ -121,6 +121,48 @@ class WyrdMO2ResetTests(unittest.TestCase):
             self.assertTrue(install.exists())
             self.assertTrue(sentinel.exists())
             self.assertTrue((outside / "ModOrganizer.ini").exists())
+
+    def test_symlinked_global_instance_parent_is_refused_before_deletion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
+            self._registry(home, install, instance)
+            appdata = instance.parents[2]
+            real_appdata = home / "real-appdata"
+            real_appdata.mkdir()
+            (real_appdata / "Local").mkdir()
+            (real_appdata / "Local/ModOrganizer").mkdir()
+            (real_appdata / "Local/ModOrganizer/Skyrim").mkdir()
+            (real_appdata / "Local/ModOrganizer/Skyrim/ModOrganizer.ini").write_text("[General]\\n", encoding="utf-8")
+            import shutil
+            shutil.rmtree(appdata)
+            appdata.symlink_to(real_appdata, target_is_directory=True)
+            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "install": str(install), "prefix": str(prefix),
+            }):
+                result = reset_wyrd_mo2(home, game)
+            self.assertFalse(result["ok"])
+            self.assertTrue(install.exists())
+            self.assertTrue(sentinel.exists())
+
+    def test_duplicate_registered_instance_target_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
+            self._registry(home, install, instance)
+            registry_path = managed_paths(home)["config"] / "mo2-registry.json"
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            duplicate = dict(registry["instances"][0], id="duplicate-instance")
+            registry["instances"].append(duplicate)
+            save_registry(registry_path, registry)
+            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "install": str(install), "prefix": str(prefix),
+            }):
+                result = reset_wyrd_mo2(home, game)
+            self.assertFalse(result["ok"])
+            self.assertTrue(install.exists())
+            self.assertTrue(instance.exists())
+            self.assertTrue(sentinel.exists())
 
     def test_malformed_registry_refuses_reset_before_deletion(self):
         with tempfile.TemporaryDirectory() as tmp:
