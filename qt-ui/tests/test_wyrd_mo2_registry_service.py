@@ -118,6 +118,30 @@ class RegistryServiceTests(unittest.TestCase):
             self.assertEqual(saved["instances"][0]["runtime_id"], "proton-ge")
             self.assertEqual(ini.read_text(encoding="utf-8"), "[General]\ngameName=Skyrim Special Edition\n")
 
+    def test_ui_display_classification_does_not_mutate_fresh_proposal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install, instance, ini = self._roots(root)
+            service = RegistryService(root / "registry.json")
+            with patch("wyrd_mo2.inspect_mo2_storage", return_value=self._inventory(instance, ini)):
+                found = service.discover(prefix, install)
+
+            proposal = found["proposals"][0]
+            registered_paths = set()
+            identity = os.path.normcase(os.path.realpath(proposal["instance_path"]))
+            already_registered = identity in registered_paths
+            # The UI keeps duplicate/display state outside of the service proposal.
+            display_state = {"already_registered": already_registered}
+
+            self.assertFalse(display_state["already_registered"])
+            self.assertEqual(proposal["registration_status"], "discovered-not-registered")
+            saved = service.register(
+                found["installation"], proposal,
+                {"id": "skyrim-se", "app_id": "489830"},
+                {"id": "proton-ge", "path": "/runtime"},
+            )
+            self.assertEqual(len(saved["instances"]), 1)
+
     def test_registration_rejects_proposal_for_different_installation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
