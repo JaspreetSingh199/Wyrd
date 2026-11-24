@@ -580,7 +580,7 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
         if settings_payload is not None:
             settings_payload.pop("selected_mo2_instance_id", None)
             temporary = settings_path.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(settings_payload, indent=2) + "\\n", encoding="utf-8")
+            temporary.write_text(json.dumps(settings_payload, indent=2) + "\n", encoding="utf-8")
             os.replace(temporary, settings_path)
     except Exception as error:
         return {"ok": False, "message": f"MO2 files were removed but Wyrd metadata cleanup failed: {error}", "removed": removed}
