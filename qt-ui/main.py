@@ -422,7 +422,9 @@ class MainWindow(QMainWindow):
         # use the highest-ranked discovered Proton. Manual choices remain valid
         # after onboarding has been completed.
         if game_ready and self.proton_combo.count():
+            self.proton_combo.blockSignals(True)
             self.proton_combo.setCurrentIndex(0)
+            self.proton_combo.blockSignals(False)
         proton_ready = bool(self.proton_combo.currentData())
         if game_ready and proton_ready:
             answer = QMessageBox.question(
