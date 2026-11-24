@@ -96,7 +96,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "message": "Detected 1 Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
         }), patch("main.QMessageBox.information"):
             window.check_launch_status()
-        joined = "\\n".join(window.log_lines)
+        joined = window.log_view.toPlainText()
         self.assertIn("candidate PID 4321", joined)
         self.assertIn("Audio DLL mappings PID 4321: xaudio2_7.dll", joined)
         self.assertIn("PULSE_LATENCY_MSEC='90'", joined)
@@ -190,17 +190,17 @@ class MainWindowSmokeTests(unittest.TestCase):
             "metadata": {"version": "v2.5.2"},
             "external_installations": [],
         }
+        window = self._window(state=state)
         with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value={
             "ok": False, "instances": [], "skyrim_instances": [],
             "message": "The Steam prefix could not be safely inspected."
         }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2_in_skyrim_prefix") as launch, patch("main.launch_external_mo2_in_skyrim_prefix") as external_launch, patch("main.launch_mo2") as legacy_launch:
-            window = self._window(state=state)
             window.start_mo2()
             warning.assert_called_once()
             launch.assert_not_called()
             external_launch.assert_not_called()
             legacy_launch.assert_not_called()
-            window.close()
+        window.close()
 
     def test_primary_launch_mo2_uses_verified_steam_prefix_launcher(self):
         window = self._window()
@@ -395,9 +395,11 @@ class MainWindowSmokeTests(unittest.TestCase):
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "wyrd_processes": [],
         }
-        with patch("main.launch_process_status", return_value={
-            "state": "exited", "message": "wrapper exited"
-        }), patch("main.detect_skyrim_processes", return_value=scan), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "main.launch_process_status", return_value={
+                "state": "exited", "message": "wrapper exited"
+            }
+        ), patch("main.detect_skyrim_processes", return_value=scan), patch(
             "main._is_descendant_process", return_value=True
         ):
             window._poll_launch_status()
@@ -439,7 +441,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "wyrd_processes": [],
         }), patch("main._is_descendant_process", return_value=False):
             window._poll_launch_status()
-        self.assertEqual(window.launch_session.state, "idle")
+        self.assertEqual(window.launch_session.state, "waiting")
         self.assertEqual(window.launch_session.game_processes, [])
         self.assertTrue(window._launch_monitor.isActive())
         self.assertNotIn("detected-unconfirmed", window.launch_session.state)
@@ -489,9 +491,11 @@ class MainWindowSmokeTests(unittest.TestCase):
             ],
             "message": "Detected Skyrim processes in Wyrd prefix.",
         }
-        with patch("main.launch_process_status", return_value={
-            "state": "exited", "message": "wrapper exited"
-        }), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "main.launch_process_status", return_value={
+                "state": "exited", "message": "wrapper exited"
+            }
+        ), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
             "main._is_descendant_process", side_effect=lambda pid, ancestor: pid == 701
         ), patch("main.QMessageBox.information") as info:
             window.check_launch_status()
@@ -642,6 +646,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
+        window = self._window()
         with patch("main.inspect_audio_compatibility", return_value={
             "ok": True, "safe": True, "prefix": "/home/test/.local/share/wyrd/compatdata/mo2-skyrim",
             "components": {
@@ -653,7 +658,7 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "x3daudio_x64": {"state": "present"},
             }, "repair_recommended": True, "repair_available": True,
         }):
-            window = self._window()
+            window._refresh_audio_status() 
         self.assertIn("XACT (32-bit): missing", window.audio_detail.text())
         self.assertIn("X3DAudio 1.7 (32-bit): present", window.audio_detail.text())
         self.assertIn("XAPOFX 1.5 (64-bit): unknown", window.audio_detail.text())
