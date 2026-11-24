@@ -71,10 +71,10 @@ class Mo2LibraryDialog(QDialog):
         actions.addStretch(1)
         root.addLayout(actions)
 
-        root.addWidget(QLabel("Already registered with Wyrd"))
+        root.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
         self.registered_instances = QListWidget()
-        self.registered_instances.setMaximumHeight(120)
-        root.addWidget(self.registered_instances)
+        self.registered_instances.currentRowChanged.connect(self._select_registered)
+        root.addWidget(self.registered_instances, 1)
         self._refresh_registered()
 
         root.addWidget(QLabel("Discovered instances"))
@@ -89,13 +89,44 @@ class Mo2LibraryDialog(QDialog):
         self.details.setPlaceholderText("Choose Discover MO2 to inspect the selected installation.")
         root.addWidget(self.details)
 
+        storage_box = QGroupBox("Selected instance storage")
+        storage_form = QFormLayout(storage_box)
+        self.storage_fields = {}
+        for key, label in (("base", "Base"), ("mods", "Mods"), ("downloads", "Downloads"),
+                           ("cache", "Cache"), ("profiles", "Profiles"), ("overwrite", "Overwrite")):
+            field = QLineEdit()
+            field.setReadOnly(True)
+            self.storage_fields[key] = field
+            storage_form.addRow(label, field)
+        root.addWidget(storage_box)
+
+        self.share_mods_check = QCheckBox("Explicitly share Mods directory")
+        self.share_downloads_check = QCheckBox("Explicitly share Downloads directory")
+        root.addWidget(self.share_mods_check)
+        root.addWidget(self.share_downloads_check)
+        storage_actions = QHBoxLayout()
+        self.choose_mods_button = QPushButton("Choose shared Mods…")
+        self.choose_downloads_button = QPushButton("Choose shared Downloads…")
+        self.apply_storage_button = QPushButton("Apply storage settings")
+        for control in (self.choose_mods_button, self.choose_downloads_button, self.apply_storage_button):
+            control.setEnabled(False)
+            storage_actions.addWidget(control)
+        self.choose_mods_button.clicked.connect(lambda: self._choose_shared("mods"))
+        self.choose_downloads_button.clicked.connect(lambda: self._choose_shared("downloads"))
+        self.apply_storage_button.clicked.connect(self.apply_storage)
+        root.addLayout(storage_actions)
+
         footer = QHBoxLayout()
-        self.register_button = QPushButton("Register selected instance")
+        self.register_button = QPushButton("Register discovered instance")
         self.register_button.setEnabled(False)
         self.register_button.clicked.connect(self.register_selected)
+        self.launch_selected_button = QPushButton("Launch registered instance")
+        self.launch_selected_button.setEnabled(False)
+        self.launch_selected_button.clicked.connect(self.launch_selected)
         close = QPushButton("Close")
         close.clicked.connect(self.accept)
         footer.addWidget(self.register_button)
+        footer.addWidget(self.launch_selected_button)
         footer.addStretch(1)
         footer.addWidget(close)
         root.addLayout(footer)
@@ -121,6 +152,171 @@ class Mo2LibraryDialog(QDialog):
                 f"{instance.get('instance_type', 'unknown')} · {game} · {owner}\n"
                 f"{instance.get('instance_path', '')}"
             )
+
+    def _registry_maps(self):
+        registry = self.service.load()
+        installations = {x["id"]: x for x in registry["installations"]}
+        games = {x["id"]: x for x in registry["games"]}
+        runtimes = {x["id"]: x for x in registry["runtimes"]}
+        return registry, installations, games, runtimes
+
+    def _refresh_registered(self) -> None:
+        self.registered_instances.clear()
+        self.selected_instance_record = None
+        try:
+            registry, installations, games, _runtimes = self._registry_maps()
+        except Exception as error:
+            self.registered_instances.addItem(f"Registry unavailable: {error}")
+            return
+        if not registry["instances"]:
+            self.registered_instances.addItem("No instances registered yet.")
+            return
+        for record in registry["instances"]:
+            installation = installations.get(record.get("installation_id"), {})
+            game = games.get(record.get("game_id"), {})
+            item = QListWidgetItem(
+                f"{game.get('name', 'Unknown game')} · {record.get('instance_type')} · "
+                f"{installation.get('owner', 'unknown')}\n{record.get('instance_path')}"
+            )
+            item.setData(Qt.ItemDataRole.UserRole, record)
+            self.registered_instances.addItem(item)
+
+    def _select_registered(self, row: int) -> None:
+        item = self.registered_instances.item(row) if row >= 0 else None
+        record = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if not isinstance(record, dict):
+            self.selected_instance_record = None
+            self.launch_selected_button.setEnabled(False)
+            self.apply_storage_button.setEnabled(False)
+            return
+        self.selected_instance_record = record
+        try:
+            _registry, installations, games, runtimes = self._registry_maps()
+            install = installations[record["installation_id"]]
+            game = games[record["game_id"]]
+            runtime = runtimes.get(record.get("runtime_id"), {})
+        except Exception as error:
+            self.details.setPlainText(f"Registry entry is incomplete: {error}")
+            self.launch_selected_button.setEnabled(False)
+            return
+        self.details.setPlainText(
+            f"Instance: {record.get('instance_path')}\n"
+            f"Installation: {install.get('executable')} ({install.get('owner')})\n"
+            f"Game: {game.get('name')} — {game.get('path')}\n"
+            f"Proton: {runtime.get('path') or 'Not associated'}\n"
+            f"Config: {record.get('config')}"
+        )
+        paths = record.get("storage_paths", {})
+        for key, field in self.storage_fields.items():
+            field.setText(str(paths.get(key, {}).get("path", "Not recorded")))
+        policy = record.get("storage_policy", {})
+        self.share_mods_check.setChecked(policy.get("mods") == "shared")
+        self.share_downloads_check.setChecked(policy.get("downloads") == "shared")
+        self.launch_selected_button.setEnabled(bool(install.get("executable") and game.get("path") and runtime.get("path")))
+        self.apply_storage_button.setEnabled(bool(record.get("config")))
+
+    def _choose_shared(self, category: str) -> None:
+        path = QFileDialog.getExistingDirectory(
+            self, f"Choose shared {category} directory", self.storage_fields[category].text()
+        )
+        if path:
+            self.storage_fields[category].setText(path)
+            (self.share_mods_check if category == "mods" else self.share_downloads_check).setChecked(True)
+
+    def apply_storage(self) -> None:
+        record = self.selected_instance_record
+        if not record:
+            return
+        try:
+            registry, installations, _games, _runtimes = self._registry_maps()
+            if installations[record["installation_id"]].get("owner") != "wyrd":
+                QMessageBox.warning(self, "External MO2 is read-only",
+                                    "Wyrd will not rewrite ModOrganizer.ini for external installations.")
+                return
+            config = Path(record.get("config", ""))
+            if config.is_symlink() or not config.is_file():
+                raise ValueError("ModOrganizer.ini is missing or unsafe.")
+            choices = {
+                "mods": self.share_mods_check.isChecked(),
+                "downloads": self.share_downloads_check.isChecked(),
+            }
+            paths = {key: self.storage_fields[key].text().strip() for key in ("mods", "downloads")}
+            for category, enabled in choices.items():
+                if not enabled:
+                    continue
+                candidate = Path(paths[category]).expanduser()
+                if candidate.is_symlink() or not candidate.is_dir():
+                    raise ValueError(f"Shared {category} must be an existing non-symlink directory.")
+                canonical = candidate.resolve(strict=True)
+                if canonical == config.parent.resolve() or config.parent.resolve() in canonical.parents:
+                    raise ValueError(f"Shared {category} cannot be inside the instance folder.")
+                for other in registry["instances"]:
+                    if other["id"] == record["id"]:
+                        continue
+                    used = other.get("storage_paths", {}).get(category, {}).get("path")
+                    if used and os.path.normcase(os.path.realpath(used)) == os.path.normcase(str(canonical)):
+                        raise ValueError(f"Shared {category} directory collides with another registered instance.")
+            answer = QMessageBox.question(
+                self, "Apply storage settings",
+                "Update only this MO2 instance's path settings? No files will be moved or deleted. "
+                "Profiles and Overwrite remain instance-local. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            import configparser
+            import tempfile
+            parser = configparser.ConfigParser(interpolation=None)
+            with config.open("r", encoding="utf-8-sig") as stream:
+                parser.read_file(stream)
+            if not parser.has_section("Settings"):
+                parser.add_section("Settings")
+            base_info = record.get("storage_paths", {}).get("base", {})
+            base = Path(base_info.get("path") or record["instance_path"]).expanduser()
+            if base.is_symlink() or not base.is_dir():
+                raise ValueError("Base directory is unavailable or unsafe.")
+            parser["Settings"]["base_directory"] = str(base)
+            parser["Settings"]["mod_directory"] = paths["mods"] if choices["mods"] else str(base / "mods")
+            parser["Settings"]["download_directory"] = paths["downloads"] if choices["downloads"] else str(base / "downloads")
+            parser["Settings"]["profiles_directory"] = str(record.get("storage_paths", {}).get("profiles", {}).get("path") or base / "profiles")
+            parser["Settings"]["cache_directory"] = str(record.get("storage_paths", {}).get("cache", {}).get("path") or base / "webcache")
+            parser["Settings"]["overwrite_directory"] = str(record.get("storage_paths", {}).get("overwrite", {}).get("path") or base / "overwrite")
+            fd, temporary = tempfile.mkstemp(prefix=".wyrd-mo2-", suffix=".ini", dir=str(config.parent))
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                    parser.write(stream)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, config)
+            except Exception:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
+                raise
+            record["storage_policy"]["mods"] = "shared" if choices["mods"] else "instance-local"
+            record["storage_policy"]["downloads"] = "shared" if choices["downloads"] else "instance-local"
+            record["storage_paths"]["mods"] = {"path": paths["mods"] if choices["mods"] else str(base / "mods"), "status": "available"}
+            record["storage_paths"]["downloads"] = {"path": paths["downloads"] if choices["downloads"] else str(base / "downloads"), "status": "available"}
+            self.service.replace_instance(record)
+            self._refresh_registered()
+            QMessageBox.information(self, "Storage settings saved", "MO2 paths updated. No content was moved.")
+        except Exception as error:
+            QMessageBox.warning(self, "Storage settings", str(error))
+
+    def launch_selected(self) -> None:
+        if not self.selected_instance_record:
+            return
+        answer = QMessageBox.question(
+            self, "Launch MO2 instance",
+            "Launch using this instance's registered installation, game and Proton runtime?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.launch_requested = True
+            self.accept()
 
     def _browse_install(self) -> None:
         selected = QFileDialog.getExistingDirectory(
