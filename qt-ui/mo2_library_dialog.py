@@ -365,7 +365,7 @@ class Mo2AdvancedSettings(QWidget):
             button.clicked.connect(lambda: self._browse_directory(title, field))
             row.addWidget(button)
             return row
-        form.addRow("Proton prefix:", browse_row(self.prefix_edit,"Select Proton prefix"))
+        form.addRow("Skyrim Steam compatdata:", browse_row(self.prefix_edit,"Select Skyrim Steam compatdata folder"))
         form.addRow("MO2 folder:", browse_row(self.install_edit,"Select MO2 folder"))
         form.addRow("Game folder:", browse_row(self.game_path_edit,"Select game folder"))
         form.addRow("Proton runtime:", browse_row(self.proton_edit,"Select Proton runtime"))
@@ -377,6 +377,20 @@ class Mo2AdvancedSettings(QWidget):
         identity_box.setToolTip("Reference values used when Wyrd links an MO2 instance to Skyrim.")
         locations_layout.addWidget(paths_box)
         locations_layout.addWidget(identity_box)
+
+        install_box = QGroupBox("MO2 installation")
+        install_layout = QVBoxLayout(install_box)
+        self.install_mo2_button = QPushButton("Install MO2 in Skyrim's Proton prefix")
+        self.install_mo2_button.clicked.connect(self._install_mo2_from_advanced)
+        install_help = QLabel(
+            "MO2 is installed inside Skyrim's existing Steam compatdata prefix. "
+            "This does not reset the prefix or change Skyrim saves."
+        )
+        install_help.setObjectName("muted")
+        install_help.setWordWrap(True)
+        install_layout.addWidget(install_help)
+        install_layout.addWidget(self.install_mo2_button, 0, Qt.AlignmentFlag.AlignLeft)
+        locations_layout.addWidget(install_box)
 
         scan_row = QHBoxLayout()
         self.scan_button = QPushButton("Scan for MO2 instances")
@@ -468,6 +482,12 @@ class Mo2AdvancedSettings(QWidget):
         self.category_list.setCurrentRow(0)
         self._refresh_registered()
 
+    def _install_mo2_from_advanced(self):
+        parent = self.parent()
+        installer = getattr(parent, "install_mo2", None)
+        if callable(installer):
+            installer()
+
     def scan_locations(self):
         """Read-only scan from the paths shown in Advanced settings."""
         prefix = Path(self.prefix_edit.text()).expanduser()
@@ -510,6 +530,12 @@ class Mo2AdvancedSettings(QWidget):
         self.proton_edit.setText(str(proton_path or ""))
         ready = bool(prefix_path and install_path)
         self.scan_button.setEnabled(ready)
+        parent = self.parent()
+        installed = bool(getattr(parent, "mo2_state", {}).get("installed"))
+        self.install_mo2_button.setVisible(not installed)
+        self.install_mo2_button.setEnabled(
+            bool(game_path and proton_path and not installed)
+        )
         if ready:
             self.scan_status.setText("Search these locations for MO2 instances.")
         else:
