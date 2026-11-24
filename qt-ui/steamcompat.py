@@ -185,38 +185,25 @@ def copy_wyrd_instance_to_skyrim_prefix(instance_name: str, home: Path | None = 
     return copy_mo2_instance_to_prefix(Path(source["path"]), steam_compat_prefix(steam_root))
 
 
-def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | None = None) -> dict:
-    """Start MO2 with Proton and STEAM_COMPAT_DATA_PATH set to Skyrim's AppID prefix."""
-    state = inspect_wyrd_installation(home)
-    if not state.get("installed"):
-        return {"ok": False, "message": "Wyrd-managed MO2 is not installed and verified."}
-    metadata = state.get("metadata", {})
-    proton = Path(metadata.get("proton", "")).expanduser()
-    steam_root = Path(metadata.get("steam_root", "")).expanduser()
-    game_path = Path(metadata.get("game_path", "")).expanduser()
-    install = Path(state.get("executable", "")).expanduser().parent
-    if not proton.is_dir() or not game_path.is_dir() or not install.is_dir():
-        return {"ok": False, "message": "The saved Proton, Skyrim, or MO2 installation path is unavailable."}
+def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
+                                home: Path | None = None,
+                                instance_name: str | None = None,
+                                xaudio2_compat: bool = False) -> dict:
+    """Launch verified MO2 using Skyrim's Steam AppID prefix and selected Proton."""
+    home = (home or Path.home()).expanduser()
+    proton = Path(proton_path).expanduser()
+    game = Path(game_path).expanduser()
     validation = inspect_proton_build(proton)
     if not validation.get("ok"):
-        return {"ok": False, "message": validation.get("message", "Saved Proton build is invalid.")}
-    if not steam_root.is_dir():
-        return {"ok": False, "message": "Saved Steam root is unavailable."}
-    prefix = steam_compat_prefix(steam_root)
-    if prefix.is_symlink():
-        return {"ok": False, "message": "Refusing to launch through a symlinked Skyrim compatdata prefix."}
-    try:
-        resolved_prefix = prefix.resolve(strict=True)
-        resolved_steam = steam_root.resolve(strict=True)
-        resolved_prefix.relative_to(resolved_steam)
-    except (OSError, ValueError, RuntimeError):
-        return {"ok": False, "message": "Skyrim's Steam compatdata prefix is missing or outside the saved Steam root."}
-    if not (prefix / "pfx/drive_c").is_dir():
-        return {"ok": False, "message": "Skyrim's Proton prefix is not initialized. Launch Skyrim once through Steam first."}
-    executable = install / "ModOrganizer.exe"
-    if not executable.is_file() or executable.is_symlink():
-        return {"ok": False, "message": "Wyrd's verified MO2 executable is missing or unsafe."}
-    inventory = inspect_skyrim_prefix_mo2_instances(home)
+        return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+    state = inspect_skyrim_prefix_mo2_installation(game, home)
+    if not state.get("installed"):
+        return {"ok": False, "message": state.get("message", "Wyrd-managed MO2 is not installed.")}
+    steam_root = Path(state["steam_root"])
+    prefix = Path(state["prefix"])
+    install = Path(state["install"])
+    executable = Path(state["executable"])
+    inventory = inspect_mo2_instances(prefix, install)
     if not inventory.get("ok"):
         return {"ok": False, "message": inventory.get("message", "Could not inspect MO2 instances in Skyrim's prefix.")}
     candidates = inventory.get("skyrim_instances", [])
@@ -224,18 +211,25 @@ def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | N
         if len(candidates) == 1:
             instance_name = candidates[0]["name"]
         elif candidates:
-            return {"ok": False, "needs_instance_selection": True, "instances": [item["name"] for item in candidates], "message": "Choose an MO2 Skyrim instance before launching in Skyrim's prefix."}
+            return {"ok": False, "needs_instance_selection": True,
+                    "instances": [item["name"] for item in candidates],
+                    "message": "Choose an MO2 Skyrim instance before launching."}
         else:
-            return {"ok": False, "message": "No Skyrim Special Edition MO2 instance was found in Skyrim's prefix. Create or copy one into this prefix first."}
+            return {"ok": False, "message": "No Skyrim Special Edition MO2 instance was found. Create one in MO2 first."}
     if instance_name not in [item["name"] for item in candidates]:
         return {"ok": False, "message": "The selected Skyrim MO2 instance is not verified in Skyrim's prefix."}
     env = _runtime_environment(proton, steam_root, prefix)
     env.update({
-        "SteamAppId": APP_ID,
-        "SteamGameId": APP_ID,
+        "SteamAppId": APP_ID, "SteamGameId": APP_ID,
         "STEAM_COMPAT_APP_ID": APP_ID,
         "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
     })
+    if xaudio2_compat:
+        current = env.get("WINEDLLOVERRIDES", "")
+        overrides = [item for item in current.split(";")
+                     if item and not item.lower().startswith("xaudio2_7=")]
+        overrides.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(overrides)
     try:
         process = subprocess.Popen(
             [str(proton / "proton"), "run", str(executable), "--instance", instance_name],
@@ -246,5 +240,5 @@ def launch_mo2_in_skyrim_prefix(home: Path | None = None, instance_name: str | N
     return {
         "ok": True, "pid": process.pid, "prefix": str(prefix.resolve()),
         "instance": instance_name,
-        "message": f"MO2 wrapper started in Skyrim's Steam compatdata prefix for instance '{instance_name}'. MO2 window/process startup is not yet independently confirmed.",
+        "message": f"Started the Proton wrapper for MO2 instance '{instance_name}' in Skyrim's Steam prefix. MO2 process startup is not yet independently confirmed.",
     }
