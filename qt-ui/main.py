@@ -531,16 +531,14 @@ class MainWindow(QMainWindow):
             self.install_button.setEnabled(False)
             self.launch_button.setEnabled(True)
             self.launch_game_button.setEnabled(bool(skyrim_instances))
-            self.launch_game_prefix_button.setEnabled(False)
-            self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
+                self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
             self.launch_button.setEnabled(False)
             self.launch_game_button.setEnabled(False)
-            self.launch_game_prefix_button.setEnabled(False)
-        self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
+            self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
         self._refresh_audio_status()
         prefix_path = managed_paths()['prefix']
