@@ -539,7 +539,7 @@ def reset_wyrd_mo2(home: Path | None = None) -> dict:
             if isinstance(settings, dict):
                 settings.pop("selected_mo2_instance_id", None)
                 temporary = settings_path.with_suffix(".json.tmp")
-                temporary.write_text(json.dumps(settings, indent=2) + "\\n", encoding="utf-8")
+                temporary.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
                 os.replace(temporary, settings_path)
         except (OSError, ValueError):
             return {"ok": False, "message": "MO2 files were removed, but saved selection could not be cleared.", "removed": removed}
