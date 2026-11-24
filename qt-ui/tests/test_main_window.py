@@ -674,6 +674,33 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window._saved_settings["first_run_completed"])
         window.close()
 
+    def test_first_launch_overrides_saved_community_runtime_with_preferred_official_proton(self):
+        official = {
+            "name": "Proton - Experimental",
+            "path": "/steam/steamapps/common/Proton - Experimental",
+            "architecture": "x86_64",
+        }
+        cachyos = {
+            "name": "Proton-CachyOS Latest",
+            "path": "/steam/compatibilitytools.d/Proton-CachyOS Latest",
+            "architecture": "x86_64",
+        }
+        window = self._window(
+            builds=[official, cachyos],
+            settings={"proton": cachyos["path"]},
+        )
+        yes = QMessageBox.StandardButton.Yes
+        with patch("main.mark_first_run_completed"), patch(
+            "main.QMessageBox.question", side_effect=[yes, yes]
+        ), patch.object(window, "_save_selection") as save, patch.object(
+            window, "manage_mo2_library"
+        ), patch.object(window, "install_mo2") as install:
+            window._run_first_launch_setup()
+        self.assertEqual(window.proton_combo.currentData(), official["path"])
+        save.assert_called_once()
+        install.assert_called_once_with(confirm=False)
+        window.close()
+
     def test_first_launch_can_skip_mo2_install_and_keep_unmodded_path(self):
         window = self._window()
         yes = QMessageBox.StandardButton.Yes
