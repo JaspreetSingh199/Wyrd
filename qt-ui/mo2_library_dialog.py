@@ -425,6 +425,7 @@ class Mo2LibraryDialog(QDialog):
         item = self.instances.currentItem()
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
         installation = self.discovery.get("installation")
+        prefix_path = Path(self.prefix_edit.text()).expanduser()
         if not proposal or not installation or proposal.get("registration_status") == "registered":
             return
         game_id = self.game_id_edit.text().strip()
@@ -432,6 +433,9 @@ class Mo2LibraryDialog(QDialog):
         game_path = self.game_path_edit.text().strip()
         if not game_id or not game_name or not game_path:
             QMessageBox.warning(self, "Register MO2 instance", "Game name, association ID, and game directory are required.")
+            return
+        if prefix_path.is_symlink() or not (prefix_path / "pfx/drive_c/users").is_dir():
+            QMessageBox.warning(self, "Register MO2 instance", "Select a valid initialized Proton prefix before registering.")
             return
         answer = QMessageBox.question(
             self, "Register MO2 instance",
@@ -447,6 +451,7 @@ class Mo2LibraryDialog(QDialog):
         game = {
             "id": game_id, "name": game_name, "app_id": "489830",
             "path": game_path, "steam_root": str(Path(game_path).parents[2]),
+            "prefix_path": str(prefix_path.resolve(strict=True)),
         }
         runtime = None
         proton_path = self.proton_edit.text().strip()
