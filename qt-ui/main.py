@@ -955,7 +955,10 @@ class MainWindow(QMainWindow):
         if record.get("instance_type") == "portable":
             if instance_path.resolve() != executable.parent.resolve():
                 return {"ok": False, "message": "Portable instance root does not match its MO2 installation root."}
-            command.extend(["--portable"])
+            # MO2's supported portable-instance selector is an explicitly empty
+            # -i value. --portable is not a MO2 command-line option and can fall
+            # through to the previously selected global instance.
+            command.extend(["-i", ""])
             cwd = str(instance_path)
         else:
             command.extend(["--instance", instance_path.name])
