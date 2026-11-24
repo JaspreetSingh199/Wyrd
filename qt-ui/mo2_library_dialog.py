@@ -78,6 +78,10 @@ class Mo2LibraryDialog(QDialog):
         self.registered_instances.currentRowChanged.connect(self._select_registered)
         root.addWidget(self.registered_instances, 1)
         self._refresh_registered()
+        self._launch_existing_button = QPushButton("Launch selected registered instance")
+        self._launch_existing_button.setEnabled(False)
+        self._launch_existing_button.clicked.connect(self.launch_selected)
+        root.addWidget(self._launch_existing_button)
 
         root.addWidget(QLabel("Discovered instances"))
         self.instances = QListWidget()
@@ -169,6 +173,7 @@ class Mo2LibraryDialog(QDialog):
         if not isinstance(record, dict):
             self.selected_instance_record = None
             self.launch_selected_button.setEnabled(False)
+            self._launch_existing_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             return
         self.selected_instance_record = record
@@ -195,9 +200,10 @@ class Mo2LibraryDialog(QDialog):
         policies = record.get("storage_policy", {})
         self.share_mods_check.setChecked(policies.get("mods") == "shared")
         self.share_downloads_check.setChecked(policies.get("downloads") == "shared")
-        self.launch_selected_button.setEnabled(bool(
-            installation.get("executable") and game.get("path") and runtime.get("path")
-        ))
+        ready = bool(installation.get("executable") and game.get("path") and runtime.get("path")
+                     and record.get("prefix_path"))
+        self.launch_selected_button.setEnabled(ready)
+        self._launch_existing_button.setEnabled(ready)
         self.apply_storage_button.setEnabled(bool(record.get("config")))
 
     def _choose_shared(self, category: str) -> None:
