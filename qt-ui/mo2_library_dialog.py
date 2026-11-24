@@ -381,7 +381,8 @@ class Mo2AdvancedSettings(QWidget):
         scan_row = QHBoxLayout()
         self.scan_button = QPushButton("Scan for MO2 instances")
         self.scan_button.clicked.connect(self.scan_locations)
-        self.scan_status = QLabel("Read-only scan. Nothing will be changed.")
+        self.scan_button.setEnabled(False)
+        self.scan_status = QLabel("Wyrd will find MO2 here without changing any files.")
         self.scan_status.setObjectName("muted")
         self.scan_status.setWordWrap(True)
         scan_row.addWidget(self.scan_button)
@@ -507,6 +508,12 @@ class Mo2AdvancedSettings(QWidget):
         self.install_edit.setText(str(install_path or ""))
         self.game_path_edit.setText(str(game_path or ""))
         self.proton_edit.setText(str(proton_path or ""))
+        ready = bool(prefix_path and install_path)
+        self.scan_button.setEnabled(ready)
+        if ready:
+            self.scan_status.setText("Search these locations for MO2 instances.")
+        else:
+            self.scan_status.setText("Choose a Proton prefix and MO2 folder to scan.")
 
 
     def _registry_maps(self):
