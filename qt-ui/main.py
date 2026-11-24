@@ -20,7 +20,7 @@ from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
-    read_settings, write_settings, inspect_mo2_instances,
+    read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
@@ -407,6 +407,69 @@ class MainWindow(QMainWindow):
         self._restoring_selection = False
         self._restore_saved_selection()
         self._save_selection(self.proton_combo.currentIndex())
+        # Show onboarding only after initial detection and path population finish.
+        QTimer.singleShot(250, self._run_first_launch_setup)
+
+    def _run_first_launch_setup(self) -> None:
+        """Offer a one-time, non-destructive setup using detected Skyrim paths."""
+        if self._saved_settings.get("first_run_completed"):
+            return
+        mark_first_run_completed()
+        self._saved_settings["first_run_completed"] = True
+
+        game_ready = bool(self.game_state.get("found"))
+        proton_ready = bool(self.proton_combo.currentData())
+        if game_ready and proton_ready:
+            answer = QMessageBox.question(
+                self,
+                "Welcome to Wyrd",
+                "Wyrd found Skyrim Special Edition and a compatible Proton runtime. "
+                "Set up Wyrd using these detected settings?\n\n"
+                "This saves your game and Proton choices and points MO2 to Skyrim's "
+                "existing Steam compatdata folder. It will not install anything, "
+                "reset the prefix, or change game files.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self._save_selection(self.proton_combo.currentIndex())
+                self.manage_mo2_library()
+                self.progress_label.setText("Wyrd environment configured.")
+                self._log("First-launch setup: saved detected Skyrim and Proton settings.")
+        else:
+            QMessageBox.information(
+                self, "Welcome to Wyrd",
+                "Wyrd could not detect both Skyrim Special Edition and a compatible "
+                "Proton runtime yet. Install or locate them, then choose Refresh."
+            )
+
+        if self.mo2_state.get("installed"):
+            answer = QMessageBox.question(
+                self, "Mod Organizer 2",
+                "MO2 is already installed in Skyrim's Proton prefix. "
+                "Would you like to launch it now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self.start_mo2()
+            return
+
+        if not game_ready or not proton_ready:
+            return
+        answer = QMessageBox.question(
+            self, "Set up Mod Organizer 2?",
+            "Would you like Wyrd to download and install the official Mod Organizer 2 "
+            "into Skyrim's existing Steam compatdata prefix now?\n\n"
+            "You can skip this and launch unmodded Skyrim instead. You can install MO2 "
+            "later from Environment.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.install_mo2(confirm=False)
+        else:
+            self.progress_label.setText("MO2 setup skipped. You can launch unmodded Skyrim.")
 
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
@@ -872,7 +935,7 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         self._restore_registered_instance()
 
-    def install_mo2(self) -> None:
+    def install_mo2(self, *, confirm: bool = True) -> None:
         if self.worker and self.worker.isRunning():
             return
         if not self.game_state.get("found"):
@@ -889,17 +952,18 @@ class MainWindow(QMainWindow):
         if state.get("installed") or state.get("install"):
             self.refresh_all()
             return
-        answer = QMessageBox.question(
-            self, "Install Mod Organizer 2",
-            "Install official MO2 inside Skyrim's existing Steam compatdata prefix? "
-            "The prefix must already be initialized by launching Skyrim through Steam. "
-            "Wyrd will not reset the prefix or overwrite an unowned MO2 directory. "
-            "Normal Proton/MO2 runtime files may be written there. Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
+        if confirm:
+            answer = QMessageBox.question(
+                self, "Install Mod Organizer 2",
+                "Install official MO2 inside Skyrim's existing Steam compatdata prefix? "
+                "The prefix must already be initialized by launching Skyrim through Steam. "
+                "Wyrd will not reset the prefix or overwrite an unowned MO2 directory. "
+                "Normal Proton/MO2 runtime files may be written there. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
         self.worker = SteamPrefixInstallWorker(str(proton_path), self.game_state["game_dir"])
         self.worker.progress.connect(self._on_install_progress)
         self.worker.completed.connect(self._on_install_completed)
