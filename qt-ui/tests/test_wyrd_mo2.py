@@ -964,26 +964,33 @@ class WyrdMO2Tests(unittest.TestCase):
             (install / "ModOrganizer.exe").write_bytes(b"MZ")
             instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
             instance.mkdir(parents=True)
-            (instance / "ModOrganizer.ini").write_text(
-                "[General]\\ngameName=Skyrim Special Edition\\n"
-                "[Settings]\\nbase_directory=%BASE_DIR%\\n",
-                encoding="utf-8",
-            )
             game = home / ".steam/steam/steamapps/common/Skyrim Special Edition"
             game.mkdir(parents=True)
+            game_exe = game / "SkyrimSE.exe"
+            game_exe.write_bytes(b"game")
+            ini = (
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                f"gamePath=Z:{str(game).replace('/', chr(92))}\n"
+                "[customExecutables]\n"
+                "size=1\n"
+                "1\\title=Skyrim\n"
+                f"1\\binary=Z:{str(game).replace('/', chr(92))}\\SkyrimSE.exe\n"
+            )
+            (instance / "ModOrganizer.ini").write_text(ini, encoding="utf-8")
             proton = make_proton(home / "Proton")
             with patch("wyrd_mo2.inspect_proton_build", return_value={"ok": True}), \
                  patch("wyrd_mo2._runtime_environment", return_value={}), \
                  patch("wyrd_mo2.subprocess.Popen") as popen:
                 popen.return_value.pid = 456
                 result = launch_skyrim_via_mo2(
-                    "Skyrim", "Skyrim Special Edition", expected_binary=None,
+                    "Skyrim", "Skyrim Special Edition", expected_binary=game_exe,
                     proton_path=proton, game_path=game, prefix_root=prefix,
                     install_root=install, require_managed=False,
                 )
-            self.assertFalse(result["ok"])
-            self.assertIn("executable", result["message"].lower())
-            popen.assert_not_called()
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(popen.call_count, 1)
+            self.assertEqual(popen.call_args.args[0][-1], "Skyrim")
 
 
     def test_launch_process_status_validates_process_start_time(self):
