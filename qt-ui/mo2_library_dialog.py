@@ -221,9 +221,9 @@ class Mo2LibraryDialog(QDialog):
             references = sum(1 for item in registry["instances"]
                              if item.get("installation_id") == active_filter)
             self.installation_summary.setText(
-                f"Selected installation: {selected_installation.get('executable')}\\n"
+                f"Selected installation: {selected_installation.get('executable')}\n"
                 f"Ownership: {selected_installation.get('owner', 'unknown')} · "
-                f"Registered instances: {references}\\n"
+                f"Registered instances: {references}\n"
                 "Unregistering removes only Wyrd's reference; it never deletes MO2 files."
             )
             self.unregister_installation_button.setEnabled(references == 0)
@@ -308,7 +308,7 @@ class Mo2LibraryDialog(QDialog):
             return
         answer = QMessageBox.question(
             self, "Unregister MO2 instance",
-            "Remove this instance from Wyrd's registry?\\n\\n"
+            "Remove this instance from Wyrd's registry?\n\n"
             "The MO2 instance, profiles, mods, downloads, saves, Proton prefix and installation "
             "will remain exactly where they are. This action only removes Wyrd metadata.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -347,8 +347,8 @@ class Mo2LibraryDialog(QDialog):
                 )
             answer = QMessageBox.question(
                 self, "Unregister MO2 installation",
-                f"Remove this unused installation reference from Wyrd?\\n\\n"
-                f"{installation.get('executable')}\\n\\n"
+                f"Remove this unused installation reference from Wyrd?\n\n"
+                f"{installation.get('executable')}\n\n"
                 "The MO2 executable, installation directory, Proton prefix and all data remain untouched.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
