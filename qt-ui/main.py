@@ -96,6 +96,12 @@ QProgressBar { background: #24282a; border: 1px solid #665b43; border-radius: 3p
 QProgressBar::chunk { background: #8c7546; }
 QPlainTextEdit { background: #111416; color: #cfc6ad; border: 1px solid #514a3a; border-radius: 3px; padding: 6px; }
 QScrollArea { border: none; background: transparent; }
+QListWidget#mo2AdvancedCategories { background: #202326; border: 1px solid #514a3a; padding: 4px; outline: none; }
+QListWidget#mo2AdvancedCategories::item { color: #aaa18d; padding: 12px 10px; border-bottom: 1px solid #35383a; }
+QListWidget#mo2AdvancedCategories::item:hover { color: #f0e4c5; background: #292d30; }
+QListWidget#mo2AdvancedCategories::item:selected { color: #f0d89b; background: #343a3b; border-left: 3px solid #c2a76b; }
+QGroupBox { border: 1px solid #514a3a; border-radius: 3px; margin-top: 12px; padding: 10px 8px 8px 8px; color: #d9c28b; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 """
 
 
