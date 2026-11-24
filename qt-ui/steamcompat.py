@@ -516,10 +516,27 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
     except OSError as error:
         return {"ok": False, "message": f"Reset stopped after a partial removal: {error}", "removed": removed}
 
-    # Empty Wyrd's registry, but never delete or modify any external MO2 files.
+    # Remove only registry records for this verified Wyrd installation.
+    # External and unrelated Wyrd registrations remain available.
     try:
         if registry_path.exists():
-            save_registry(registry_path, empty_registry())
+            registry_payload["instances"] = [
+                item for item in registry_payload["instances"]
+                if item.get("installation_id") not in owned_install_ids
+            ]
+            registry_payload["installations"] = [
+                item for item in registry_payload["installations"]
+                if item.get("id") not in owned_install_ids
+            ]
+            used_games = {item.get("game_id") for item in registry_payload["instances"]}
+            used_runtimes = {item.get("runtime_id") for item in registry_payload["instances"]}
+            registry_payload["games"] = [
+                item for item in registry_payload["games"] if item.get("id") in used_games
+            ]
+            registry_payload["runtimes"] = [
+                item for item in registry_payload["runtimes"] if item.get("id") in used_runtimes
+            ]
+            save_registry(registry_path, registry_payload)
         if settings_payload is not None:
             settings_payload.pop("selected_mo2_instance_id", None)
             temporary = settings_path.with_suffix(".json.tmp")
