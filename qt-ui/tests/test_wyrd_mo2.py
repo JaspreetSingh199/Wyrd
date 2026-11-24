@@ -614,6 +614,18 @@ class WyrdMO2Tests(unittest.TestCase):
                 result["instances"][0]["paths"]["cache"]["status"], "outside-prefix"
             )
 
+    def test_wine_c_path_escape_is_rejected_before_host_resolution(self):
+        from wyrd_mo2 import _resolve_mo2_storage_path
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            drive_c = prefix / "pfx/drive_c"
+            drive_c.mkdir(parents=True)
+            result = _resolve_mo2_storage_path(
+                r"C:\\..\\..\\outside\\cache", drive_c, prefix
+            )
+            self.assertEqual(result["status"], "outside-prefix")
+
     def test_storage_inspection_reports_missing_symlink_and_out_of_prefix_c_drive(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

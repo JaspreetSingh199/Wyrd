@@ -1001,21 +1001,22 @@ def _resolve_mo2_storage_path(raw_value: str, base_directory: Path,
         resolution = "wine-z-drive"
         boundary = None
     elif drive == "c:":
+        # Count all path components from the C: drive root. Any leading parent
+        # traversal escapes drive_c, irrespective of the current user's depth.
         relative = normalized[2:].lstrip("\\").replace("\\", "/")
-        root = (Path(prefix_root) / "pfx/drive_c").resolve(strict=False)
-        # Resolve dot segments lexically as Windows would, before touching disk.
-        depth = 0
+        parts = []
         for part in relative.split("/"):
             if part in ("", "."):
                 continue
             if part == "..":
-                depth -= 1
-                if depth < 0:
-                    return {"configured": raw, "path": str(root / relative),
-                            "status": "outside-prefix", "resolution": "wine-c-drive"}
+                if not parts:
+                    return {"configured": raw, "path": "", "status": "outside-prefix",
+                            "resolution": "wine-c-drive"}
+                parts.pop()
             else:
-                depth += 1
-        candidate = root.joinpath(*[p for p in relative.split("/") if p not in ("", ".")])
+                parts.append(part)
+        root = (Path(prefix_root) / "pfx/drive_c").resolve(strict=False)
+        candidate = root.joinpath(*parts)
         resolution = "wine-c-drive"
         boundary = root
     elif re.match(r"^[a-zA-Z]:", normalized):
