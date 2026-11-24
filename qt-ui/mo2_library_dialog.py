@@ -434,7 +434,7 @@ class Mo2LibraryDialog(QDialog):
 
         game = {
             "id": game_id, "name": game_name, "app_id": "489830",
-            "path": game_path,
+            "path": game_path, "steam_root": str(Path(game_path).parents[2]),
         }
         runtime = None
         proton_path = self.proton_edit.text().strip()
