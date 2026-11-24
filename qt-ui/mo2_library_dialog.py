@@ -173,10 +173,13 @@ class Mo2LibraryDialog(QWidget):
             self.setup_status.setText(f"Could not check saved instances: {error}")
             return
         proposals = result.get("proposals", [])
+        self._proposal_registration_state = {}
         for proposal in proposals:
             identity = os.path.normcase(os.path.realpath(proposal.get("instance_path", "")))
             already_registered = identity in registered_paths
-            proposal["registration_status"] = "registered" if already_registered else "discovered"
+            # Preserve the service-issued discovery proposal unchanged. The
+            # registration service requires its exact fresh-proposal marker.
+            self._proposal_registration_state[id(proposal)] = already_registered
             game = proposal.get("game_name") or "Skyrim Special Edition"
             kind = proposal.get("instance_type", "instance")
             row = QListWidgetItem(f"{game} · {kind}" + (" · Already added" if already_registered else ""))
@@ -192,15 +195,28 @@ class Mo2LibraryDialog(QWidget):
     def _show_selected(self, row: int):
         item = self.instances.item(row) if row >= 0 else None
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
-        is_new = isinstance(proposal, dict) and proposal.get("registration_status") != "registered"
-        self.register_button.setVisible(bool(is_new))
-        self.register_button.setEnabled(bool(is_new))
+        already_registered = (
+            isinstance(proposal, dict)
+            and self._proposal_registration_state.get(id(proposal), False)
+        )
+        is_fresh = (
+            isinstance(proposal, dict)
+            and proposal.get("registration_status") == "discovered-not-registered"
+            and not already_registered
+        )
+        self.register_button.setVisible(bool(is_fresh))
+        self.register_button.setEnabled(bool(is_fresh))
 
     def register_selected(self):
         item = self.instances.currentItem()
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
         installation = self.discovery.get("installation")
-        if not isinstance(proposal, dict) or not installation or proposal.get("registration_status") == "registered":
+        if (
+            not isinstance(proposal, dict)
+            or not installation
+            or proposal.get("registration_status") != "discovered-not-registered"
+            or self._proposal_registration_state.get(id(proposal), False)
+        ):
             return
         game_path = Path(self.game_path).expanduser()
         prefix = Path(self.prefix_path).expanduser()
