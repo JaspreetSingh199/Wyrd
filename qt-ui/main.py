@@ -853,22 +853,27 @@ class MainWindow(QMainWindow):
         if steam_root_value:
             steam_root = Path(steam_root_value).expanduser()
         else:
-            # Do not infer a different game's Steam prefix from the current UI.
-            from wyrd_mo2 import _steam_root_for_game
-            try:
-                steam_root = _steam_root_for_game(game_path)
-            except Exception as error:
-                return {"ok": False, "message": f"Could not resolve the registered game's Steam root: {error}"}
+            # Non-Steam games still need a Steam client install root for Proton.
+            candidates = (
+                Path.home() / ".steam/steam",
+                Path.home() / ".local/share/Steam",
+                Path.home() / ".steam/root",
+            )
+            steam_root = next((candidate for candidate in candidates if candidate.is_dir()), Path(""))
         if not steam_root.is_dir():
-            return {"ok": False, "message": "Registered game's Steam root is not available."}
+            return {"ok": False, "message": "A Steam client install root is needed by the selected Proton runtime but could not be found."}
 
         env = _runtime_environment(proton, steam_root, prefix)
-        app_id = str(game.get("app_id") or "489830")
-        env.update({
-            "SteamAppId": app_id, "SteamGameId": app_id,
-            "STEAM_COMPAT_APP_ID": app_id,
-            "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
-        })
+        app_id = str(game.get("app_id") or "").strip()
+        if app_id:
+            env.update({
+                "SteamAppId": app_id, "SteamGameId": app_id,
+                "STEAM_COMPAT_APP_ID": app_id,
+            })
+        else:
+            for key in ("SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"):
+                env.pop(key, None)
+        env["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())
         if self.xaudio_override_checkbox.isChecked() and app_id == "489830":
             current = env.get("WINEDLLOVERRIDES", "")
             overrides = [item for item in current.split(";")
