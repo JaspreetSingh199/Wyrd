@@ -1461,7 +1461,10 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     env = _runtime_environment(proton, steam_root, prefix)
     # Prefix identity alone is not Wyrd attribution: Steam-launched Skyrim
     # shares this AppID prefix. This marker is inherited by the MO2 handoff.
+    import uuid
+    launch_token = uuid.uuid4().hex
     env["WYRD_LAUNCHED"] = "1"
+    env["WYRD_LAUNCH_ID"] = launch_token
     if audio_mode == "xaudio2_compat":
         current_overrides = env.get("WINEDLLOVERRIDES", "")
         overrides = [
@@ -1497,6 +1500,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         return {"ok": False, "message": f"Could not start MO2 executable handoff: {error}"}
     return {
         "ok": True, "pid": process.pid, "command": command,
+        "launch_token": launch_token,
         "log_path": str(diagnostics),
         "message": (
             f"Started the Proton wrapper for MO2 executable '{title}' "
@@ -1652,8 +1656,11 @@ def detect_game_processes(
     }
 
 
-def detect_skyrim_processes(prefix_root: Path | None = None,
-                           proc_root: Path = Path("/proc")) -> dict:
+def detect_skyrim_processes(
+    prefix_root: Path | None = None,
+    proc_root: Path = Path("/proc"),
+    launch_token: str | None = None,
+) -> dict:
     """Read /proc for Skyrim/SKSE and attribute processes to Wyrd when possible."""
     expected = {"skyrimse.exe", "skyrimse", "skse64_loader.exe", "skse64.exe"}
     prefix = str(Path(prefix_root).expanduser().resolve()) if prefix_root else None
@@ -1714,6 +1721,10 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         wyrd_marker = env_readable and any(
             part == "WYRD_LAUNCHED=1" for part in env_parts
         )
+        if launch_token is not None:
+            wyrd_marker = wyrd_marker and any(
+                part == "WYRD_LAUNCH_ID=" + launch_token for part in env_parts
+            )
         attributed = bool(prefix_attributed and wyrd_marker)
         # Only expose a small, non-secret audio-related environment allowlist.
         # This reads the actual Skyrim/SKSE process environment, not the Proton wrapper.
