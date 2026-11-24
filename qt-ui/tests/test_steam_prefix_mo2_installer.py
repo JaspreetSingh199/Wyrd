@@ -71,6 +71,63 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "compatdata prefix is missing"):
                     install_mo2_into_skyrim_prefix(proton, game, home)
 
+    def test_installer_refuses_symlinked_proton_prefix_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".steam/steam"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            prefix = steam_compat_prefix(steam)
+            prefix.mkdir(parents=True)
+            outside = home / "outside-proton-prefix"
+            (outside / "drive_c").mkdir(parents=True)
+            (prefix / "pfx").symlink_to(outside, target_is_directory=True)
+            proton = fake_proton(home / "Proton")
+            with patch("steamcompat._steam_root_for_game", return_value=steam), patch(
+                "steamcompat._latest_mo2_archive"
+            ) as release:
+                with self.assertRaisesRegex(RuntimeError, "symlinked Proton prefix path"):
+                    install_mo2_into_skyrim_prefix(proton, game, home)
+                release.assert_not_called()
+            self.assertFalse((outside / "drive_c/Modding/MO2").exists())
+
+    def test_inspector_rejects_symlinked_proton_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            prefix = steam_compat_prefix(steam)
+            prefix.mkdir(parents=True)
+            outside = home / "outside-proton-prefix"
+            (outside / "drive_c/users").mkdir(parents=True)
+            (prefix / "pfx").symlink_to(outside, target_is_directory=True)
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertIn("symlink", state["message"].lower())
+
+    def test_inspector_rejects_symlinked_ownership_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            install = steam_compat_prefix(steam) / "pfx/drive_c/Modding/MO2"
+            game.mkdir(parents=True)
+            install.mkdir(parents=True)
+            (install / "ModOrganizer.exe").write_bytes(b"MO2")
+            outside_marker = home / "external-marker.json"
+            outside_marker.write_text(json.dumps({
+                "managed_by": "Wyrd", "game_app_id": "489830",
+                "installation_mode": "skyrim-steam-prefix",
+                "install": str(install),
+            }))
+            (install / ".wyrd-managed.json").symlink_to(outside_marker)
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertIn("marker is a symlink", state["message"])
+
     def test_refuses_unowned_existing_install_target_without_overwriting(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
