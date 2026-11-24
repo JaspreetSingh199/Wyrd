@@ -1001,9 +1001,17 @@ def _resolve_mo2_storage_path(raw_value: str, base_directory: Path,
         resolution = "wine-z-drive"
         boundary = None
     elif drive == "c:":
-        candidate = Path(prefix_root) / "pfx/drive_c" / normalized[2:].lstrip("\\").replace("\\", "/")
+        relative = normalized[2:].lstrip("\\").replace("\\", "/")
+        root = (Path(prefix_root) / "pfx/drive_c").resolve(strict=False)
+        lexical = Path(os.path.normpath(str(root / relative)))
+        try:
+            lexical.relative_to(root)
+        except ValueError:
+            return {"configured": raw, "path": str(lexical), "status": "outside-prefix",
+                    "resolution": "wine-c-drive"}
+        candidate = lexical
         resolution = "wine-c-drive"
-        boundary = (Path(prefix_root) / "pfx/drive_c").resolve(strict=False)
+        boundary = root
     elif re.match(r"^[a-zA-Z]:", normalized):
         return {"configured": raw, "path": "", "status": "unsupported-drive",
                 "resolution": "unsupported"}

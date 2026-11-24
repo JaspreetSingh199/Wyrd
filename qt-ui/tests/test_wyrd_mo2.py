@@ -621,6 +621,28 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(paths["downloads"]["status"], "symlink")
             self.assertEqual(paths["cache"]["status"], "outside-prefix")
 
+    def test_storage_inspection_rejects_c_drive_dotdot_escape_before_filesystem_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install = root / "prefix", root / "install"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim"
+            instance.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "[Settings]\n"
+                "cache_directory=C:\\\\..\\\\..\\\\..\\\\outside\\\\cache\n",
+                encoding="utf-8",
+            )
+            result = inspect_mo2_storage(prefix, install)
+            self.assertEqual(
+                result["instances"][0]["paths"]["cache"]["status"], "outside-prefix"
+            )
+
     def test_storage_inspection_detects_shared_roots_between_instances(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
