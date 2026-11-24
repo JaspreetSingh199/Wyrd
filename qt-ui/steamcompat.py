@@ -104,25 +104,63 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
             "message": f"MO2 {version} installed and verified inside Skyrim's Steam compatdata prefix."}
 
 
-def inspect_skyrim_prefix_mo2_instances(home: Path | None = None) -> dict:
-    """Inventory Skyrim-specific MO2 instances in Skyrim's validated AppID prefix."""
-    state = inspect_wyrd_installation(home)
-    if not state.get("installed"):
-        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Wyrd-managed MO2 is not installed."}
-    metadata = state.get("metadata", {})
-    steam_root = Path(metadata.get("steam_root", "")).expanduser()
-    prefix = steam_compat_prefix(steam_root)
-    if prefix.is_symlink() or not prefix.is_dir():
-        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
+def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = None) -> dict:
+    """Safely inspect the Wyrd-owned MO2 directory inside Skyrim's Steam prefix.
+
+    Steam compatdata remains Steam-owned. Only the dedicated MO2 directory may
+    carry Wyrd's ownership marker.
+    """
+    home = (home or Path.home()).expanduser()
+    game = Path(game_path).expanduser()
+    if not game.is_dir():
+        return {"installed": False, "message": "Skyrim game directory is missing."}
     try:
-        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
-    except (OSError, ValueError, RuntimeError):
-        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim compatdata prefix is outside the Steam root."}
-    if not (prefix / "pfx/drive_c/users").is_dir():
-        return {"ok": False, "instances": [], "skyrim_instances": [], "message": "Skyrim's Proton prefix is not initialized."}
-    return inspect_mo2_instances(prefix, require_managed=False)
+        steam_root = _steam_root_for_game(game, home)
+        prefix = steam_compat_prefix(steam_root)
+        if prefix.is_symlink() or not prefix.is_dir():
+            return {"installed": False, "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
+        resolved_prefix = prefix.resolve(strict=True)
+        resolved_steam = steam_root.resolve(strict=True)
+        resolved_prefix.relative_to(resolved_steam)
+        install = prefix / "pfx/drive_c/Modding/MO2"
+        if not (prefix / "pfx/drive_c").is_dir():
+            return {"installed": False, "prefix": str(prefix), "install": str(install),
+                    "message": "Skyrim's Proton prefix is not initialized. Launch Skyrim through Steam once first."}
+        if install.is_symlink() or install.parent.is_symlink() or install.parent.parent.is_symlink():
+            return {"installed": False, "prefix": str(prefix), "install": str(install),
+                    "message": "MO2 install path contains a symlink and was not inspected."}
+        marker = install / ".wyrd-managed.json"
+        executable = install / "ModOrganizer.exe"
+        metadata = {}
+        try:
+            metadata = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        owned = (
+            executable.is_file() and not executable.is_symlink()
+            and metadata.get("managed_by") == "Wyrd"
+            and metadata.get("game_app_id") == APP_ID
+            and metadata.get("installation_mode") == "skyrim-steam-prefix"
+            and Path(metadata.get("install", "")).expanduser() == install
+        )
+        return {
+            "installed": bool(owned), "executable": str(executable) if owned else None,
+            "metadata": metadata if owned else {}, "prefix": str(prefix),
+            "install": str(install), "steam_root": str(steam_root),
+            "message": "Wyrd-managed MO2 is installed in Skyrim's Steam prefix." if owned
+                       else "No verified Wyrd-managed MO2 installation was found in Skyrim's prefix. Existing files were left untouched.",
+        }
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"installed": False, "message": f"Could not safely inspect Skyrim's MO2 prefix: {error}"}
 
 
+def inspect_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = None) -> dict:
+    """Inventory MO2 instances in Skyrim's validated AppID prefix."""
+    state = inspect_skyrim_prefix_mo2_installation(game_path, home)
+    if not state.get("installed"):
+        return {"ok": False, "instances": [], "skyrim_instances": [],
+                "message": state.get("message", "Wyrd-managed MO2 is not installed.")}
+    return inspect_mo2_instances(Path(state["prefix"]), Path(state["install"]))
 
 
 from pathlib import Path
