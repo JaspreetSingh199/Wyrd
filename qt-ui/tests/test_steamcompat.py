@@ -181,3 +181,91 @@ def test_copy_instance_refuses_existing_destination_without_overwrite(tmp_path):
     assert not result["ok"]
     assert (destination / "keep.txt").read_text() == "keep"
     assert source.is_dir()
+
+
+def _external_game_layout(tmp_path):
+    root = tmp_path / ".steam/steam"
+    game = root / "steamapps/common/Skyrim Special Edition"
+    game.mkdir(parents=True)
+    prefix = root / "steamapps/compatdata/489830"
+    exe = prefix / "pfx/drive_c/Modding/MO2/ModOrganizer.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"MZ-external")
+    return root, game, prefix, exe
+
+
+def test_external_mo2_discovery_is_read_only_and_not_managed(monkeypatch, tmp_path):
+    root, game, prefix, exe = _external_game_layout(tmp_path)
+    before = {p.relative_to(prefix): p.read_bytes() for p in exe.parent.rglob("*") if p.is_file()}
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
+    assert state["installed"] is True
+    assert state["managed"] is False
+    assert state["executable"] == str(exe)
+    assert not (exe.parent / ".wyrd-managed.json").exists()
+    after = {p.relative_to(prefix): p.read_bytes() for p in exe.parent.rglob("*") if p.is_file()}
+    assert after == before
+
+
+def test_external_mo2_refuses_symlinked_install_path(monkeypatch, tmp_path):
+    root = tmp_path / "Steam"
+    game = root / "steamapps/common/Skyrim Special Edition"
+    game.mkdir(parents=True)
+    prefix = root / "steamapps/compatdata/489830"
+    drive = prefix / "pfx/drive_c"
+    drive.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (drive / "Modding").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
+    assert not state["installed"]
+    assert "symlink" in state["message"].lower()
+
+
+def test_external_mo2_refuses_invalid_ownership_marker(monkeypatch, tmp_path):
+    root, game, prefix, exe = _external_game_layout(tmp_path)
+    (exe.parent / ".wyrd-managed.json").write_text('{"managed_by":"SomeoneElse"}', encoding="utf-8")
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
+    assert not state["installed"]
+    assert "marker" in state["message"].lower() or "ownership" in state["message"].lower()
+
+
+def test_external_launch_uses_skyrim_prefix_and_does_not_write_marker(monkeypatch, tmp_path):
+    root, game, prefix, exe = _external_game_layout(tmp_path)
+    proton = tmp_path / "Proton"
+    (proton / "files/bin").mkdir(parents=True)
+    (proton / "proton").write_text("#!/bin/sh\\n")
+    (proton / "files/bin/wine").write_bytes(b"wine")
+    instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
+    instance.mkdir(parents=True)
+    (instance / "ModOrganizer.ini").write_text(
+        "[General]\\ngameName=Skyrim Special Edition\\n"
+        "[Settings]\\nbase_directory=%BASE_DIR%\\n"
+        "profiles_directory=%BASE_DIR%/profiles\\n",
+        encoding="utf-8",
+    )
+    (instance / "profiles/Default").mkdir(parents=True)
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steamcompat, "inspect_proton_build", lambda path: {"ok": True})
+    monkeypatch.setattr(steamcompat, "_runtime_environment", lambda proton, steam, prefix: {})
+    class Process:
+        pid = 876
+    captured = {}
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        captured["cwd"] = kwargs["cwd"]
+        return Process()
+    monkeypatch.setattr(steamcompat.subprocess, "Popen", fake_popen)
+    before = exe.read_bytes()
+    result = steamcompat.launch_external_mo2_in_skyrim_prefix(proton, game, tmp_path, "Skyrim Special Edition")
+    assert result["ok"], result
+    assert result["managed"] is False
+    assert captured["env"]["STEAM_COMPAT_DATA_PATH"] == str(prefix.resolve())
+    assert captured["env"]["SteamAppId"] == "489830"
+    assert captured["command"][-2:] == ["--instance", "Skyrim Special Edition"]
+    assert captured["command"][-3] == str(exe)
+    assert exe.read_bytes() == before
+    assert not (exe.parent / ".wyrd-managed.json").exists()
