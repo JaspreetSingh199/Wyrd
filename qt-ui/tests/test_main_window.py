@@ -658,6 +658,57 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(window.launch_game_button.isEnabled())
         window.close()
 
+    def test_first_launch_yes_configures_detected_environment_and_offers_mo2_install(self):
+        window = self._window()
+        yes = QMessageBox.StandardButton.Yes
+        with patch("main.mark_first_run_completed") as mark, patch(
+            "main.QMessageBox.question", side_effect=[yes, yes]
+        ), patch.object(window, "_save_selection") as save, patch.object(
+            window, "manage_mo2_library"
+        ) as sync, patch.object(window, "install_mo2") as install:
+            window._run_first_launch_setup()
+        mark.assert_called_once()
+        save.assert_called_once()
+        sync.assert_called_once()
+        install.assert_called_once_with(confirm=False)
+        self.assertTrue(window._saved_settings["first_run_completed"])
+        window.close()
+
+    def test_first_launch_can_skip_mo2_install_and_keep_unmodded_path(self):
+        window = self._window()
+        yes = QMessageBox.StandardButton.Yes
+        no = QMessageBox.StandardButton.No
+        with patch("main.mark_first_run_completed"), patch(
+            "main.QMessageBox.question", side_effect=[yes, no]
+        ), patch.object(window, "install_mo2") as install:
+            window._run_first_launch_setup()
+        install.assert_not_called()
+        self.assertIn("MO2 setup skipped", window.progress_label.text())
+        window.close()
+
+    def test_first_launch_offers_to_launch_already_installed_mo2(self):
+        window = self._window(steam_mo2={
+            "installed": True, "managed": True,
+            "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
+            "prefix": "/steam/compatdata/489830",
+        })
+        with patch("main.mark_first_run_completed"), patch(
+            "main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes
+        ), patch.object(window, "start_mo2") as launch:
+            window._run_first_launch_setup()
+        launch.assert_called_once()
+        window.close()
+
+    def test_first_launch_prompt_is_not_repeated_after_completion(self):
+        window = self._window(settings={"first_run_completed": True})
+        with patch("main.mark_first_run_completed") as mark, patch(
+            "main.QMessageBox.question"
+        ) as question:
+            window._run_first_launch_setup()
+        mark.assert_not_called()
+        question.assert_not_called()
+        window.close()
+
     def test_install_is_enabled_only_when_game_and_proton_are_detected(self):
         window = self._window(builds=[])
         self.assertFalse(window.install_button.isEnabled())
