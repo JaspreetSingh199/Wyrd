@@ -49,16 +49,19 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
         prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
     except (OSError, ValueError, RuntimeError):
         raise RuntimeError("Skyrim compatdata prefix is outside the detected Steam root.")
-    wine_drive = prefix / "pfx/drive_c"
+    proton_prefix = prefix / "pfx"
+    wine_drive = proton_prefix / "drive_c"
+    if proton_prefix.is_symlink() or wine_drive.is_symlink():
+        raise RuntimeError("Refusing to install MO2 through a symlinked Proton prefix path.")
     if not wine_drive.is_dir():
         raise RuntimeError("Skyrim's Proton prefix is not initialized. Launch Skyrim through Steam once first.")
     install = wine_drive / "Modding/MO2"
-    if install.is_symlink() or install.parent.is_symlink() or (install.parent.parent).is_symlink():
+    if install.is_symlink() or install.parent.is_symlink() or install.parent.parent.is_symlink():
         raise RuntimeError("Refusing to install MO2 through a symlinked path inside Skyrim's prefix.")
     marker = install / ".wyrd-managed.json"
     executable = install / "ModOrganizer.exe"
     if install.exists():
-        if executable.is_file() and marker.is_file():
+        if executable.is_file() and not executable.is_symlink() and marker.is_file() and not marker.is_symlink():
             try:
                 ownership = json.loads(marker.read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -123,7 +126,12 @@ def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = 
         resolved_steam = steam_root.resolve(strict=True)
         resolved_prefix.relative_to(resolved_steam)
         install = prefix / "pfx/drive_c/Modding/MO2"
-        if not (prefix / "pfx/drive_c").is_dir():
+        proton_prefix = prefix / "pfx"
+        wine_drive = proton_prefix / "drive_c"
+        if proton_prefix.is_symlink() or wine_drive.is_symlink():
+            return {"installed": False, "prefix": str(prefix), "install": str(install),
+                    "message": "Skyrim's Proton prefix path contains a symlink and was not inspected."}
+        if not wine_drive.is_dir():
             return {"installed": False, "prefix": str(prefix), "install": str(install),
                     "message": "Skyrim's Proton prefix is not initialized. Launch Skyrim through Steam once first."}
         if install.is_symlink() or install.parent.is_symlink() or install.parent.parent.is_symlink():
@@ -131,6 +139,9 @@ def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = 
                     "message": "MO2 install path contains a symlink and was not inspected."}
         marker = install / ".wyrd-managed.json"
         executable = install / "ModOrganizer.exe"
+        if marker.is_symlink():
+            return {"installed": False, "prefix": str(prefix), "install": str(install),
+                    "message": "MO2 ownership marker is a symlink and was not inspected."}
         metadata = {}
         try:
             metadata = json.loads(marker.read_text(encoding="utf-8"))
