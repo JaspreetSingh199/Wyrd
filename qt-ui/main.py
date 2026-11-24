@@ -286,14 +286,14 @@ class MainWindow(QMainWindow):
         setup_layout.addLayout(game_actions)
 
         management_row = QHBoxLayout()
-        self.mo2_library_button = QPushButton("Manage MO2")
+        self.mo2_library_button = QPushButton("MO2 setup")
         self.mo2_library_button.clicked.connect(self.manage_mo2_library)
         self.mo2_library_button.setEnabled(False)
         management_row.addWidget(self.mo2_library_button)
         self.reset_mo2_button = QPushButton("Reset MO2")
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         management_row.addWidget(self.reset_mo2_button)
-        management_hint = QLabel("Instances and storage")
+        management_hint = QLabel("Set up or change MO2 instances")
         management_hint.setObjectName("muted")
         management_row.addWidget(management_hint, 1)
         setup_layout.addLayout(management_row)
@@ -592,7 +592,7 @@ class MainWindow(QMainWindow):
         self.active_instance_label.setText(
             f"Active MO2 instance: {label} · {game.get('name', 'unknown game')} · "
             f"{runtime.get('name', 'no runtime')} · "
-            + ("Ready" if ready else "Association/path unavailable — open MO2 Library")
+            + ("Ready" if ready else "Association/path unavailable — open MO2 setup")
         )
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
@@ -1225,7 +1225,7 @@ class MainWindow(QMainWindow):
             if self.game_state.get("found") and self.instance_state.get("skyrim_instances"):
                 self.start_skyrim()
                 return
-            QMessageBox.warning(self, "No active MO2 instance", "Select or register an MO2 instance in the MO2 Library first.")
+            QMessageBox.warning(self, "No MO2 instance selected", "Open MO2 setup and choose an instance first.")
             return
         registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
         installations = {item["id"]: item for item in registry["installations"]}
@@ -1283,7 +1283,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self, "Game association mismatch",
                     f"The MO2 instance reports '{configured_game}', but Wyrd associates it with "
-                    f"'{registered_game}'. Update the association in MO2 Library before launching."
+                    f"'{registered_game}'. Change the game in MO2 setup before launching."
                 )
                 return
 
