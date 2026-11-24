@@ -602,8 +602,7 @@ class Mo2LibraryDialog(QDialog):
                 names = ", ".join(f"{name}: {path}" for name, path in missing)
                 raise ValueError(
                     "These storage directories do not exist. Enable 'Create missing empty storage folders' "
-                    f"to create only empty directories, or choose existing folders:
-{names}"
+                    f"to create only empty directories, or choose existing folders:\n{names}"
                 )
             for category, path in missing:
                 if path.parent.is_symlink() or not path.parent.is_dir():
@@ -624,8 +623,7 @@ class Mo2LibraryDialog(QDialog):
                 if enabled and category not in chosen:
                     raise ValueError(f"Select an existing {category.title()} directory before opting into sharing.")
             if any(shared.values()):
-                summary = "
-".join(
+                summary = "\n".join(
                     f"{category.title()}: {chosen[category]}"
                     for category, enabled in shared.items() if enabled
                 )
@@ -633,12 +631,8 @@ class Mo2LibraryDialog(QDialog):
                     self, "Confirm shared storage",
                     "Shared storage can cause mod/download collisions and cross-instance interference. "
                     "Wyrd will not merge, deduplicate, lock, or reconcile contents. Every participating "
-                    "instance must separately opt in.
-
-" + summary
-                    + "
-
-Continue only if these instances are deliberately sharing the same data roots.",
+                    "instance must separately opt in.\n\n" + summary
+                    + "\n\nContinue only if these instances are deliberately sharing the same data roots.",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )
@@ -676,12 +670,9 @@ Continue only if these instances are deliberately sharing the same data roots.",
                             )
             if collisions:
                 raise ValueError(
-                    "Storage collision detected; no INI changes were made:
-"
-                    + "
-".join(collisions)
-                    + "
-Only Mods-to-Mods and Downloads-to-Downloads sharing is allowed, "
+                    "Storage collision detected; no INI changes were made:\n"
+                    + "\n".join(collisions)
+                    + "\nOnly Mods-to-Mods and Downloads-to-Downloads sharing is allowed, "
                     "and every participating instance must opt in."
                 )
 
@@ -705,13 +696,8 @@ Only Mods-to-Mods and Downloads-to-Downloads sharing is allowed, "
                     self, "Existing data remains in place",
                     "These data roots will be replaced in ModOrganizer.ini. Wyrd will not move, copy, "
                     "merge, or delete files. MO2 may show existing content as missing unless the "
-                    "destination is already prepared:
-
-" + "
-".join(data_changes)
-                    + "
-
-Continue?",
+                    "destination is already prepared:\n\n" + "\n".join(data_changes)
+                    + "\n\nContinue?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )
