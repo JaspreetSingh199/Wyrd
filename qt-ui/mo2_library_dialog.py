@@ -292,6 +292,7 @@ class Mo2LibraryDialog(QDialog):
             self.details.setPlainText(f"Registry entry is incomplete: {error}")
             self._launch_existing_button.setEnabled(False)
             self._edit_associations_button.setEnabled(False)
+            self.rename_instance_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             self.restore_storage_button.setEnabled(False)
             for button in self.storage_browse_buttons.values():
