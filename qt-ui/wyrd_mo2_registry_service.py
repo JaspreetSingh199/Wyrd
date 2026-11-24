@@ -94,7 +94,7 @@ class RegistryService:
                 "config": str(config.resolve(strict=True)),
                 "game_name": item.get("game_name", ""),
                 "is_skyrim_se": bool(item.get("is_skyrim_se")),
-                "storage": item.get("storage", {}),
+                "storage": item.get("storage", item.get("paths", {})),
                 "owner": owner,
                 "registration_status": "discovered-not-registered",
                 "default_storage_policy": {
