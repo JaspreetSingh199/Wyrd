@@ -844,11 +844,14 @@ class MainWindow(QMainWindow):
         game_path = Path(self.game_state["game_dir"])
         mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
         if not mo2_state.get("installed"):
-            QMessageBox.warning(self, "MO2 unavailable", mo2_state.get("message", "MO2 install is not verified."))
+            mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
+        if not mo2_state.get("installed"):
+            QMessageBox.warning(self, "MO2 unavailable", mo2_state.get("message", "MO2 install is not available."))
             return
         target_state = inspect_skyrim_launch_targets(
             Path(mo2_state["prefix"]), game_path,
             instance_name=instance_name, install_root=Path(mo2_state["install"]),
+            require_managed=bool(mo2_state.get("managed", True)),
         )
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
@@ -893,6 +896,7 @@ class MainWindow(QMainWindow):
             proton_path=Path(self.proton_combo.currentData()),
             game_path=game_path, prefix_root=Path(mo2_state["prefix"]),
             install_root=Path(mo2_state["install"]),
+            require_managed=bool(mo2_state.get("managed", True)),
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
