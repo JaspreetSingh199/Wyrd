@@ -110,7 +110,8 @@ class WyrdMO2ResetTests(unittest.TestCase):
             outside = home / "outside-instance"
             outside.mkdir()
             (outside / "ModOrganizer.ini").write_text("[General]\n", encoding="utf-8")
-            instance.rmdir()
+            import shutil
+            shutil.rmtree(instance)
             instance.symlink_to(outside, target_is_directory=True)
             with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "install": str(install), "prefix": str(prefix),
