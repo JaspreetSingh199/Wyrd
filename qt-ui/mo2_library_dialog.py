@@ -119,42 +119,16 @@ class Mo2LibraryDialog(QWidget):
         self.discover_button.setText("Find MO2 instances")
         setup_layout.addLayout(actions)
 
-        advanced_layout.addWidget(QLabel("MO2 installations"))
-        self.installation_filter = QComboBox()
-        self.installation_filter.addItem("All installations", None)
-        self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
-        advanced_layout.addWidget(self.installation_filter)
-        self.installation_summary = QLabel("Choose an installation.")
-        self.installation_summary.setWordWrap(True)
-        advanced_layout.addWidget(self.installation_summary)
-        setup_layout.addWidget(QLabel("MO2 instances connected to Wyrd"))
+        setup_layout.addWidget(QLabel("Connected instances"))
         self.registered_instances = QListWidget()
-        self.registered_instances.setMinimumHeight(75)
-        self.registered_instances.setMaximumHeight(115)
+        self.registered_instances.setMinimumHeight(48)
+        self.registered_instances.setMaximumHeight(90)
         self.registered_instances.currentRowChanged.connect(self._select_registered)
         setup_layout.addWidget(self.registered_instances)
-        self._edit_associations_button = QPushButton("Change game or Proton")
-        self._edit_associations_button.setEnabled(False)
-        self._edit_associations_button.clicked.connect(self.edit_associations)
-        advanced_layout.addWidget(self._edit_associations_button)
-        self.rename_instance_button = QPushButton("Rename in Wyrd…")
-        self.rename_instance_button.setEnabled(False)
-        self.rename_instance_button.clicked.connect(self.rename_selected_instance)
-        advanced_layout.addWidget(self.rename_instance_button)
         self._launch_existing_button = QPushButton("Use selected instance")
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
         setup_layout.addWidget(self._launch_existing_button)
-        management_actions = QHBoxLayout()
-        self.unregister_instance_button = QPushButton("Remove instance from Wyrd")
-        self.unregister_instance_button.setEnabled(False)
-        self.unregister_instance_button.clicked.connect(self.unregister_selected_instance)
-        self.unregister_installation_button = QPushButton("Remove unused installation from Wyrd")
-        self.unregister_installation_button.setEnabled(False)
-        self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
-        management_actions.addWidget(self.unregister_instance_button)
-        management_actions.addWidget(self.unregister_installation_button)
-        advanced_layout.addLayout(management_actions)
 
         setup_layout.addWidget(QLabel("Found instances"))
         self.instances = QListWidget()
@@ -171,51 +145,6 @@ class Mo2LibraryDialog(QWidget):
         self.details.setPlaceholderText("Select an instance to see its details.")
         setup_layout.addWidget(self.details)
 
-        storage_box = QGroupBox("Storage locations")
-        storage_form = QFormLayout(storage_box)
-        self.storage_fields = {}
-        self.storage_browse_buttons = {}
-        for key, label in (("base", "Base"), ("mods", "Mods"), ("downloads", "Downloads"),
-                           ("cache", "Cache"), ("profiles", "Profiles"), ("overwrite", "Overwrite")):
-            row = QHBoxLayout()
-            field = QLineEdit()
-            field.setMinimumHeight(30)
-            field.setReadOnly(True)
-            browse = QPushButton("Browse…")
-            browse.setEnabled(False)
-            browse.clicked.connect(lambda _checked=False, category=key: self._choose_storage_path(category))
-            self.storage_fields[key] = field
-            self.storage_browse_buttons[key] = browse
-            row.addWidget(field, 1)
-            row.addWidget(browse)
-            storage_form.addRow(label, row)
-        advanced_layout.addWidget(storage_box)
-
-        self.share_mods_check = QCheckBox("Share Mods folder")
-        self.share_downloads_check = QCheckBox("Share Downloads folder")
-        advanced_layout.addWidget(self.share_mods_check)
-        advanced_layout.addWidget(self.share_downloads_check)
-        self.create_storage_check = QCheckBox(
-            "Create missing folders (existing files are never moved or copied)"
-        )
-        advanced_layout.addWidget(self.create_storage_check)
-        storage_actions = QHBoxLayout()
-        self.apply_storage_button = QPushButton("Save storage settings")
-        self.restore_storage_button = QPushButton("Restore settings backup…")
-        self.apply_storage_button.setEnabled(False)
-        self.restore_storage_button.setEnabled(False)
-        self.apply_storage_button.clicked.connect(self.apply_storage)
-        self.restore_storage_button.clicked.connect(self.restore_config_backup)
-        storage_actions.addWidget(self.apply_storage_button)
-        storage_actions.addWidget(self.restore_storage_button)
-        advanced_layout.addLayout(storage_actions)
-
-        self.register_button = QPushButton("Add to Wyrd")
-        self.register_button.setEnabled(False)
-        self.register_button.clicked.connect(self.register_selected)
-        setup_layout.addWidget(self.register_button)
-        setup_layout.addStretch(1)
-        self._refresh_registered()
 
     def _registry_maps(self):
         registry = self.service.load()
@@ -227,92 +156,33 @@ class Mo2LibraryDialog(QWidget):
         )
 
     def _refresh_registered(self, _index: int = -1) -> None:
-        selected_filter = self.installation_filter.currentData() if self.installation_filter.count() else None
+        """Show saved instances without exposing registry administration here."""
         self.registered_instances.clear()
         self.selected_instance_record = None
         try:
-            registry, installations, games, _runtimes = self._registry_maps()
+            registry, installations, games, runtimes = self._registry_maps()
         except Exception as error:
-            self.registered_instances.addItem(f"Registry unavailable: {error}")
-            self.unregister_instance_button.setEnabled(False)
-            self.rename_instance_button.setEnabled(False)
-            self.unregister_installation_button.setEnabled(False)
+            self.registered_instances.addItem(f"Could not load saved instances: {error}")
             self._launch_existing_button.setEnabled(False)
-            self._edit_associations_button.setEnabled(False)
-            self.apply_storage_button.setEnabled(False)
-            self.restore_storage_button.setEnabled(False)
             return
-
-        self.installation_filter.blockSignals(True)
-        self.installation_filter.clear()
-        self.installation_filter.addItem("All installations", None)
-        for installation in sorted(
-            registry["installations"],
-            key=lambda item: Path(item.get("executable", "")).parent.name.casefold(),
-        ):
-            executable = Path(installation.get("executable", ""))
-            label = (
-                f"{executable.parent.name or 'MO2'} · {installation.get('owner', 'unknown')} · "
-                f"{installation.get('executable', '')}"
-            )
-            self.installation_filter.addItem(label, installation.get("id"))
-        selected_index = self.installation_filter.findData(selected_filter)
-        self.installation_filter.setCurrentIndex(max(0, selected_index))
-        self.installation_filter.blockSignals(False)
-        active_filter = self.installation_filter.currentData()
-        selected_installation = installations.get(active_filter) if active_filter else None
-        if selected_installation:
-            references = sum(1 for item in registry["instances"]
-                             if item.get("installation_id") == active_filter)
-            self.installation_summary.setText(
-                f"Selected installation: {selected_installation.get('executable')}\n"
-                f"Ownership: {selected_installation.get('owner', 'unknown')} · "
-                f"Registered instances: {references}\n"
-                "Unregistering removes only Wyrd's reference; it never deletes MO2 files."
-            )
-            self.unregister_installation_button.setEnabled(references == 0)
-        else:
-            self.installation_summary.setText(
-                f"Installations: {len(registry['installations'])} · "
-                f"Registered instances: {len(registry['instances'])}. "
-                "Choose an installation to see its instances."
-            )
-            self.unregister_installation_button.setEnabled(False)
-        self.unregister_instance_button.setEnabled(False)
-
-        if not registry["instances"]:
-            self.registered_instances.addItem("No instances added to Wyrd yet.")
-            self.setup_status.setText(
-                "MO2 is not connected yet. Find your existing instance, select it, then choose Add to Wyrd."
-            )
-            return
-        visible_count = 0
+        visible = []
         for record in registry["instances"]:
-            if active_filter and record.get("installation_id") != active_filter:
-                continue
             installation = installations.get(record.get("installation_id"), {})
             game = games.get(record.get("game_id"), {})
             item = QListWidgetItem(
-                f"{record.get('display_name') or game.get('name', 'Unknown game')} · "
-                f"{record.get('instance_type', 'unknown')} · {installation.get('owner', 'unknown')}\n"
-                f"{record.get('instance_path', '')}"
+                f"{record.get('display_name') or game.get('name', 'MO2')} · "
+                f"{record.get('instance_type', 'instance')}"
             )
             item.setData(Qt.ItemDataRole.UserRole, record)
             self.registered_instances.addItem(item)
-            visible_count += 1
+            visible.append(record)
             if record.get("id") == self.preferred_instance_id:
                 self.registered_instances.setCurrentItem(item)
-        if not visible_count:
-            self.registered_instances.addItem("No instances found for this installation.")
-        if self.preferred_instance_id and any(
-            record.get("id") == self.preferred_instance_id for record in registry["instances"]
-        ):
+        if not visible:
+            self.registered_instances.addItem("No instances connected yet.")
+        elif not self.preferred_instance_id:
             self.setup_status.setText(
-                "MO2 is connected to Wyrd. Select an instance below to use it, or find another one."
-            )
-        else:
-            self.setup_status.setText(
-                f"{len(registry['instances'])} instance(s) connected to Wyrd. Select one below, or find another."
+                f"{len(visible)} instance(s) connected. Select one to make it active."
             )
 
     def _select_registered(self, row: int) -> None:
@@ -321,56 +191,19 @@ class Mo2LibraryDialog(QWidget):
         if not isinstance(record, dict):
             self.selected_instance_record = None
             self._launch_existing_button.setEnabled(False)
-            self._edit_associations_button.setEnabled(False)
-            self.apply_storage_button.setEnabled(False)
-            self.unregister_instance_button.setEnabled(False)
-            self.rename_instance_button.setEnabled(False)
             return
         self.selected_instance_record = dict(record)
         self.selection_changed = True
         self.preferred_instance_id = record.get("id", "")
-        self.unregister_instance_button.setEnabled(True)
-        self.rename_instance_button.setEnabled(True)
         try:
             registry, installations, games, runtimes = self._registry_maps()
             installation = installations[record["installation_id"]]
             game = games[record["game_id"]]
             runtime = runtimes.get(record.get("runtime_id"), {})
         except Exception as error:
-            self.details.setPlainText(f"Registry entry is incomplete: {error}")
+            self.details.setPlainText(f"Instance settings are incomplete: {error}")
             self._launch_existing_button.setEnabled(False)
-            self._edit_associations_button.setEnabled(False)
-            self.rename_instance_button.setEnabled(False)
-            self.apply_storage_button.setEnabled(False)
-            self.restore_storage_button.setEnabled(False)
-            for button in self.storage_browse_buttons.values():
-                button.setEnabled(False)
             return
-        self.details.setPlainText(
-            f"Instance: {record.get('instance_path')}\n"
-            f"Installation: {installation.get('executable')} ({installation.get('owner')})\n"
-            f"Game: {game.get('name')} — {game.get('path')}\n"
-            f"Proton runtime: {runtime.get('path') or 'Not associated'}\n"
-            f"Instance INI: {record.get('config')}\n"
-            "Existing installation ownership is unchanged."
-        )
-        paths = record.get("storage_paths", {})
-        # Display all six resolved storage roots even for registry entries created
-        # before storage metadata existed; fall back to the MO2 instance defaults.
-        base_path = Path(paths.get("base", {}).get("path") or record.get("instance_path", "")).expanduser()
-        defaults = {
-            "base": base_path,
-            "mods": base_path / "mods",
-            "downloads": base_path / "downloads",
-            "cache": base_path / "webcache",
-            "profiles": base_path / "profiles",
-            "overwrite": base_path / "overwrite",
-        }
-        for category, field in self.storage_fields.items():
-            field.setText(str(paths.get(category, {}).get("path") or defaults[category]))
-        policies = record.get("storage_policy", {})
-        self.share_mods_check.setChecked(policies.get("mods") == "shared")
-        self.share_downloads_check.setChecked(policies.get("downloads") == "shared")
         prefix_value = record.get("prefix_path") or game.get("prefix_path") or installation.get("prefix_path")
         ready = bool(
             installation.get("executable") and Path(installation["executable"]).is_file()
@@ -379,15 +212,15 @@ class Mo2LibraryDialog(QWidget):
             and prefix_value and Path(prefix_value).is_dir()
         )
         self._launch_existing_button.setEnabled(ready)
-        writable = bool(record.get("config")) and installation.get("owner") == "wyrd"
-        self.apply_storage_button.setEnabled(writable)
-        self.restore_storage_button.setEnabled(writable and bool(record.get("config_backups")))
-        for button in self.storage_browse_buttons.values():
-            button.setEnabled(writable)
-        self.create_storage_check.setEnabled(writable)
-        self.share_mods_check.setEnabled(writable)
-        self.share_downloads_check.setEnabled(writable)
-        self._edit_associations_button.setEnabled(True)
+        self.details.setPlainText(
+            f"Game: {game.get('name', 'Unknown')}\n"
+            f"Proton: {runtime.get('name', 'Not set')}\n"
+            + ("Ready to use." if ready else "Some paths need attention. Check Advanced settings.")
+        )
+        self.setup_status.setText(
+            f"Selected: {record.get('display_name') or game.get('name', 'MO2')}"
+            + (" · Ready" if ready else " · Needs attention")
+        )
 
     def rename_selected_instance(self) -> None:
         """Rename only Wyrd's display label; never rename MO2 directories or profiles."""
@@ -1178,5 +1011,7 @@ class Mo2LibraryDialog(QWidget):
                 self.instances.setCurrentRow(row)
                 break
         self.register_button.setEnabled(False)
-        self.details.appendPlainText("\n\nRegistered successfully in Wyrd's local MO2 registry.")
-        QMessageBox.information(self, "MO2 instance registered", "Added to Wyrd. No MO2 or game files were changed.")
+        QMessageBox.information(self, "MO2 instance added", "Added to Wyrd. Your MO2 and game files were not changed.")
+        callback = getattr(self, "on_registry_changed", None)
+        if callable(callback):
+            callback(self.selected_instance_record, True)
