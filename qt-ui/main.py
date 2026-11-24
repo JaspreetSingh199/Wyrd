@@ -1487,7 +1487,8 @@ class MainWindow(QMainWindow):
         elif self.launch_session.target_binary:
             from wyrd_mo2 import detect_game_processes
             process_scan = detect_game_processes(
-                self.launch_session.wrapper_pid, self.launch_session.target_binary
+                self.launch_session.wrapper_pid, self.launch_session.target_binary,
+                self.launch_session.prefix_root,
             )
             session_processes = process_scan.get("processes", []) if process_scan.get("ok") and wrapper_identity_matches else []
         else:
@@ -1602,7 +1603,7 @@ class MainWindow(QMainWindow):
             Path(session.prefix_root) if session.prefix_root
             else _steam_prefix_for_game_path(game_dir)
         )
-        if session.app_id == "489830" or not session.app_id:
+        if session.app_id == "489830":
             process_scan = detect_skyrim_processes(steam_prefix)
             self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
             for item in process_scan.get("processes", []):
@@ -1631,7 +1632,9 @@ class MainWindow(QMainWindow):
                 )
         elif session.wrapper_pid and session.target_binary:
             from wyrd_mo2 import detect_game_processes
-            process_scan = detect_game_processes(session.wrapper_pid, session.target_binary)
+            process_scan = detect_game_processes(
+                session.wrapper_pid, session.target_binary, session.prefix_root
+            )
             self._log("Registered game process scan: " + process_scan.get("message", "Detection unavailable."))
         else:
             process_scan = {"ok": False, "processes": [], "message": "No generic target is available for process attribution."}
