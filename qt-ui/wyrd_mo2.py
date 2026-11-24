@@ -1552,6 +1552,7 @@ def detect_game_processes(
     ancestor_pid: int, expected_binary: Path | str,
     prefix_root: Path | str | None = None,
     proc_root: Path = Path("/proc"),
+    launch_token: str | None = None,
 ) -> dict:
     """Find the configured game executable under a Wyrd-launched Proton context.
 
@@ -1620,6 +1621,8 @@ def detect_game_processes(
                 variables[key.decode("utf-8", errors="replace")] = value.decode("utf-8", errors="replace")
             inherited_launch_marker = (
                 variables.get("WYRD_LAUNCHED") == "1"
+                and launch_token is not None
+                and variables.get("WYRD_LAUNCH_ID") == launch_token
                 and variables.get("STEAM_COMPAT_DATA_PATH")
                 and os.path.normcase(os.path.realpath(variables["STEAM_COMPAT_DATA_PATH"]))
                     == os.path.normcase(expected_prefix)
