@@ -305,7 +305,13 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         setup_layout.addWidget(self.progress)
         setup_layout.addStretch(1)
-        self.tabs.addTab(setup_page, "ENVIRONMENT")
+        setup_scroll = QScrollArea()
+        setup_scroll.setWidgetResizable(True)
+        setup_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        setup_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        setup_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        setup_scroll.setWidget(setup_page)
+        self.tabs.addTab(setup_scroll, "ENVIRONMENT")
 
         advanced_page = QWidget()
         advanced_layout = QVBoxLayout(advanced_page)
@@ -324,6 +330,10 @@ class MainWindow(QMainWindow):
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
 
+        maintenance_panel = panel(
+            "MO2 MAINTENANCE",
+            "Rarely needed. Reset is available only for a verified Wyrd-managed installation; external MO2 is never reset.",
+        )
         maintenance_row = QHBoxLayout()
         self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
         self.reset_mo2_button.setToolTip(
@@ -332,7 +342,8 @@ class MainWindow(QMainWindow):
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         maintenance_row.addWidget(self.reset_mo2_button)
         maintenance_row.addStretch(1)
-        advanced_layout.addLayout(maintenance_row)
+        maintenance_panel.layout().addLayout(maintenance_row)
+        advanced_layout.addWidget(maintenance_panel)
 
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
@@ -355,11 +366,16 @@ class MainWindow(QMainWindow):
         audio_layout.addLayout(audio_actions)
         advanced_layout.addWidget(self.audio_panel)
 
+        diagnostics_panel = panel(
+            "LAUNCH DIAGNOSTICS",
+            "Check whether Skyrim or SKSE is running and open the detailed launch log when troubleshooting."
+        )
         diagnostic_row = QHBoxLayout()
         diagnostic_row.addWidget(self.diagnostics_button)
         diagnostic_row.addWidget(self.launch_status_button)
         diagnostic_row.addStretch(1)
-        advanced_layout.addLayout(diagnostic_row)
+        diagnostics_panel.layout().addLayout(diagnostic_row)
+        advanced_layout.addWidget(diagnostics_panel)
 
         logs_heading = QLabel("SETUP LOG")
         logs_heading.setObjectName("section")
@@ -371,15 +387,15 @@ class MainWindow(QMainWindow):
         self.log_view.setMinimumHeight(220)
         advanced_layout.addWidget(self.log_view)
         advanced_layout.addStretch(1)
-        self.tabs.addTab(advanced_page, "ADVANCED")
+        advanced_scroll = QScrollArea()
+        advanced_scroll.setWidgetResizable(True)
+        advanced_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        advanced_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        advanced_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        advanced_scroll.setWidget(advanced_page)
+        self.tabs.addTab(advanced_scroll, "ADVANCED")
 
-
-        from PySide6.QtWidgets import QScrollArea
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(root)
-        self.setCentralWidget(scroll)
+        self.setCentralWidget(root)
         self._restore_registered_instance()
         self.refresh_all()
         self._restoring_selection = False
