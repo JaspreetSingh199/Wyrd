@@ -169,7 +169,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "metadata": {"version": "v2.5.2"},
             "external_installations": [],
         }
-        with patch("main.inspect_skyrim_prefix_mo2_instances", return_value={
+        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value={
             "ok": False, "instances": [], "skyrim_instances": [],
             "message": "The Steam prefix could not be safely inspected."
         }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2_in_skyrim_prefix") as launch, patch("main.launch_mo2") as legacy_launch:
@@ -187,7 +187,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "skyrim_instances": [{"name": "Skyrim"}],
             "message": "One Skyrim instance found.",
         }
-        with patch("main.inspect_skyrim_prefix_mo2_instances", return_value=inventory), patch(
+        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), patch(
             "main.QInputDialog.getItem", return_value=("Skyrim", True)
         ), patch("main.launch_mo2_in_skyrim_prefix", return_value={
             "ok": True, "message": "Started Steam-prefix MO2."
