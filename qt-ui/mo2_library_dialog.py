@@ -19,7 +19,7 @@ from wyrd_mo2 import managed_paths
 from wyrd_mo2_registry_service import RegistryService
 
 
-class Mo2LibraryDialog(QDialog):
+class Mo2LibraryDialog(QWidget):
     """Discover existing MO2 resources and register metadata without modifying MO2."""
 
     def __init__(
@@ -28,9 +28,7 @@ class Mo2LibraryDialog(QDialog):
         proton_path: Path | str = "", selected_instance_id: str = "",
     ):
         super().__init__(parent)
-        self.setWindowTitle("Wyrd — MO2 Library")
-        self.resize(760, 620)
-        self.setMinimumSize(620, 480)
+        self.setObjectName("mo2SetupPanel")
         self.service = RegistryService(managed_paths()["config"] / "mo2-registry.json")
         self.discovery: dict = {}
         self.registered = False
@@ -41,7 +39,7 @@ class Mo2LibraryDialog(QDialog):
         self.preferred_instance_id = selected_instance_id
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
+        root.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget(self)
         setup_scroll = QScrollArea(self)
         setup_scroll.setWidgetResizable(True)
@@ -218,17 +216,11 @@ class Mo2LibraryDialog(QDialog):
         storage_actions.addWidget(self.restore_storage_button)
         advanced_layout.addLayout(storage_actions)
 
-        footer = QHBoxLayout()
         self.register_button = QPushButton("Add selected instance")
         self.register_button.setEnabled(False)
         self.register_button.clicked.connect(self.register_selected)
-        close = QPushButton("Done")
-        close.clicked.connect(self.accept)
         setup_layout.addWidget(self.register_button)
         setup_layout.addStretch(1)
-        footer.addStretch(1)
-        footer.addWidget(close)
-        root.addLayout(footer)
         self._refresh_registered()
 
     def _registry_maps(self):
@@ -933,7 +925,9 @@ class Mo2LibraryDialog(QDialog):
         if answer == QMessageBox.StandardButton.Yes:
             self.launch_requested = True
             self.preferred_instance_id = self.selected_instance_record.get("id", "")
-            self.accept()
+            callback = getattr(self, "on_launch_requested", None)
+            if callable(callback):
+                callback(self.selected_instance_record)
 
     def _browse_game(self) -> None:
         selected = QFileDialog.getExistingDirectory(
