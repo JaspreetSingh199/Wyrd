@@ -21,7 +21,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def _window(self, state=None, game=None, builds=None):
+    def _window(self, state=None, game=None, builds=None, steam_mo2=None):
         game = game or {
             "found": True, "game_dir": "/games/Skyrim Special Edition",
             "steam_root": "/home/test/.steam/steam", "library": "/home/test/.steam/steam/steamapps",
@@ -38,7 +38,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.detect_skyrim", return_value=game),
             patch("main.discover_proton_builds", return_value=builds),
             patch("main.inspect_wyrd_installation", return_value=state),
-            patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
+            patch("main.inspect_skyrim_prefix_mo2_installation", return_value=steam_mo2 or {"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
             patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("main.read_settings", return_value={}),
             patch("main.write_settings"),
@@ -494,6 +494,17 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (Steam)")
         self.assertFalse(window.launch_button.isEnabled())
         self.assertFalse(hasattr(window, "nav"))
+        window.close()
+
+    def test_verified_steam_prefix_install_keeps_install_button_disabled(self):
+        window = self._window(steam_mo2={
+            "installed": True,
+            "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
+            "prefix": "/steam/compatdata/489830",
+            "message": "Verified Wyrd-managed MO2 installation.",
+        })
+        self.assertFalse(window.install_button.isEnabled())
+        self.assertTrue(window.launch_button.isEnabled())
         window.close()
 
     def test_launch_skyrim_button_requires_verified_steam_prefix_instance(self):
