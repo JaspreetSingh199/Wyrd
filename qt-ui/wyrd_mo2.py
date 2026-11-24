@@ -1235,7 +1235,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         if install.is_symlink() or not install.is_dir() or not (install / "ModOrganizer.exe").is_file():
             return {"ok": False, "message": "The selected MO2 install directory is missing or unsafe."}
         state_ok = True
-        steam_root = prefix.parent.parent
+        steam_root = prefix.parents[2]
     else:
         state = inspect_wyrd_installation(home)
         if not state.get("installed") or not state.get("prefix_ready"):
