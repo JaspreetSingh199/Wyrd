@@ -1431,8 +1431,20 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         if not matches:
             continue
         env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
-        prefix_attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
-        wyrd_marker = any(part == "WYRD_LAUNCHED=1" for part in env_parts)
+        # A failed /proc/<pid>/environ read is unknown, not evidence that a
+        # process belongs to Wyrd or that a launch marker is absent. Keep
+        # prefix attribution separate because Steam and Wyrd share AppID 489830.
+        prefix_attributed = bool(
+            env_readable and prefix and (
+                any(part.startswith("STEAM_COMPAT_DATA_PATH=") and
+                    str(Path(part.split("=", 1)[1]).expanduser().resolve()) == prefix
+                    for part in env_parts)
+                or any(arg == f"STEAM_COMPAT_DATA_PATH={prefix}" for arg in argv)
+            )
+        )
+        wyrd_marker = env_readable and any(
+            part == "WYRD_LAUNCHED=1" for part in env_parts
+        )
         attributed = bool(prefix_attributed and wyrd_marker)
         # Only expose a small, non-secret audio-related environment allowlist.
         # This reads the actual Skyrim/SKSE process environment, not the Proton wrapper.
