@@ -103,13 +103,24 @@ class Mo2LibraryDialog(QWidget):
             self.setup_status.setText(f"Connected: {record.get('display_name') or game.get('name', 'MO2')}")
         elif self.connected_records:
             self.setup_status.setText(f"{len(self.connected_records)} MO2 instance(s) connected. Choose one below.")
+        if self.connected_records:
             self.connected_instances.clear()
             for item in self.connected_records:
                 game = games.get(item.get("game_id"), {})
-                row = QListWidgetItem(record_name := f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}")
+                label = f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}"
+                if item.get("id") == self.preferred_instance_id:
+                    label += " · Active"
+                row = QListWidgetItem(label)
                 row.setData(Qt.ItemDataRole.UserRole, item)
                 self.connected_instances.addItem(row)
             self.connected_instances.show()
+            if record:
+                for row_index in range(self.connected_instances.count()):
+                    row = self.connected_instances.item(row_index)
+                    value = row.data(Qt.ItemDataRole.UserRole)
+                    if isinstance(value, dict) and value.get("id") == record.get("id"):
+                        self.connected_instances.setCurrentRow(row_index)
+                        break
         else:
             self.setup_status.setText("MO2 is not connected yet. Find your existing instance to get started.")
             self.connected_instances.hide()
