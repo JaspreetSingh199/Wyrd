@@ -1433,6 +1433,7 @@ class MainWindow(QMainWindow):
             self.launch_session.prefix_root = str(prefix.resolve())
             self.launch_session.game_path = str(game_path.resolve())
             self.launch_session.app_id = "489830"
+            self.launch_session.target_binary = Path(selected_target["binary"]).name
             self.launch_session.state = "handoff"
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
@@ -1476,18 +1477,30 @@ class MainWindow(QMainWindow):
             if self.launch_session.prefix_root else
             _steam_prefix_for_game_path(self.game_state.get("game_dir"))
         )
-        process_scan = detect_skyrim_processes(scan_prefix)
-        session_processes = []
-        if process_scan.get("ok") and wrapper_identity_matches:
-            for item in process_scan.get("processes", []):
-                if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
-                    session_processes.append(item)
+        if self.launch_session.app_id == "489830":
+            process_scan = detect_skyrim_processes(scan_prefix)
+            session_processes = []
+            if process_scan.get("ok") and wrapper_identity_matches:
+                for item in process_scan.get("processes", []):
+                    if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
+                        session_processes.append(item)
+        elif self.launch_session.target_binary:
+            from wyrd_mo2 import detect_game_processes
+            process_scan = detect_game_processes(
+                self.launch_session.wrapper_pid, self.launch_session.target_binary
+            )
+            session_processes = process_scan.get("processes", []) if process_scan.get("ok") and wrapper_identity_matches else []
+        else:
+            process_scan = {"ok": False, "processes": [], "message": "No configured target binary is available for process attribution."}
+            session_processes = []
         if session_processes:
             detected = ", ".join(
                 f"{item['binary']} (PID {item['pid']})" for item in session_processes
             )
             self.progress_label.setText(
                 "Skyrim/SKSE detected in this Wyrd launch process tree."
+                if self.launch_session.app_id == "489830"
+                else "Configured game executable detected in this Wyrd launch process tree."
             )
             self.launch_session.detected_processes = list(session_processes)
             self.launch_session.process_identities = {
@@ -1503,15 +1516,26 @@ class MainWindow(QMainWindow):
             ]
             self.launch_session.state = "detected"
             self._log("Launch session detected: " + detected)
-            self._log_audio_runtime_environment(session_processes)
-            self._stop_launch_monitor("Skyrim/SKSE process detected")
+            if self.launch_session.app_id == "489830":
+                self._log_audio_runtime_environment(session_processes)
+            self._stop_launch_monitor(
+                "Skyrim/SKSE process detected"
+                if self.launch_session.app_id == "489830"
+                else "registered game executable detected"
+            )
             self._start_game_process_watch()
             return
         if result["state"] in {"exited", "invalid"}:
             self.progress_label.setText(
                 "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
+                if self.launch_session.app_id == "489830"
+                else "MO2 game wrapper exited before the configured executable was detected; review diagnostics."
             )
-            self._log("Launch handoff ended without detected Skyrim: " + result["message"])
+            self._log(
+                ("Launch handoff ended without detected Skyrim: " if self.launch_session.app_id == "489830"
+                 else "MO2 custom-executable handoff ended without a matching game process: ")
+                + result["message"]
+            )
             if self.launch_session.log_path:
                 diagnostics = read_launch_diagnostics(Path(self.launch_session.log_path))
                 if diagnostics.get("ok") and diagnostics.get("content", "").strip():
@@ -1536,7 +1560,12 @@ class MainWindow(QMainWindow):
         else:
             self.launch_session.state = "waiting"
             self.progress_label.setText(
-                f"Waiting for Skyrim/SKSE… (check {self.launch_session.poll_count}/{self._launch_poll_limit})"
+                (
+                    f"Waiting for Skyrim/SKSE… (check {self.launch_session.poll_count}/{self._launch_poll_limit})"
+                    if self.launch_session.app_id == "489830"
+                    else f"Waiting for {self.launch_session.target_binary or 'game process'}… "
+                         f"(check {self.launch_session.poll_count}/{self._launch_poll_limit})"
+                )
             )
 
     def _start_game_process_watch(self) -> None:
@@ -1573,32 +1602,40 @@ class MainWindow(QMainWindow):
             Path(session.prefix_root) if session.prefix_root
             else _steam_prefix_for_game_path(game_dir)
         )
-        process_scan = detect_skyrim_processes(steam_prefix)
-        self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
-        for item in process_scan.get("processes", []):
-            self._log(
-                f"Skyrim/SKSE candidate PID {item.get('pid')} ({item.get('binary')}): "
-                f"prefix attribution={item.get('attributed_to_wyrd')}; "
-                f"start_time={item.get('start_time')}"
-            )
-            mappings = item.get("audio_module_mappings", {})
-            if item.get("audio_module_mappings_readable"):
-                observed = [name for name, path in mappings.items() if path]
+        if session.app_id == "489830" or not session.app_id:
+            process_scan = detect_skyrim_processes(steam_prefix)
+            self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
+            for item in process_scan.get("processes", []):
                 self._log(
-                    f"Audio DLL mappings PID {item.get('pid')}: "
-                    + (", ".join(observed) if observed else "none observed")
+                    f"Skyrim/SKSE candidate PID {item.get('pid')} ({item.get('binary')}): "
+                    f"prefix attribution={item.get('attributed_to_wyrd')}; "
+                    f"start_time={item.get('start_time')}"
                 )
-            else:
+                mappings = item.get("audio_module_mappings", {})
+                if item.get("audio_module_mappings_readable"):
+                    observed = [name for name, path in mappings.items() if path]
+                    self._log(
+                        f"Audio DLL mappings PID {item.get('pid')}: "
+                        + (", ".join(observed) if observed else "none observed")
+                    )
+                else:
+                    self._log(
+                        f"Audio DLL mappings PID {item.get('pid')}: unavailable "
+                        f"({item.get('audio_module_mappings_error') or 'access denied'})"
+                    )
+                env = item.get("audio_runtime_environment", {})
                 self._log(
-                    f"Audio DLL mappings PID {item.get('pid')}: unavailable "
-                    f"({item.get('audio_module_mappings_error') or 'access denied'})"
+                    f"Audio runtime environment PID {item.get('pid')}: "
+                    f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')!r}; "
+                    f"PULSE_LATENCY_MSEC={env.get('PULSE_LATENCY_MSEC')!r}"
                 )
-            env = item.get("audio_runtime_environment", {})
-            self._log(
-                f"Audio runtime environment PID {item.get('pid')}: "
-                f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')!r}; "
-                f"PULSE_LATENCY_MSEC={env.get('PULSE_LATENCY_MSEC')!r}"
-            )
+        elif session.wrapper_pid and session.target_binary:
+            from wyrd_mo2 import detect_game_processes
+            process_scan = detect_game_processes(session.wrapper_pid, session.target_binary)
+            self._log("Registered game process scan: " + process_scan.get("message", "Detection unavailable."))
+        else:
+            process_scan = {"ok": False, "processes": [], "message": "No generic target is available for process attribution."}
+            self._log(process_scan["message"])
 
         # First revalidate processes already attributed to this launch. This avoids
         # losing a still-running game when Proton's short-lived wrapper has exited.
@@ -1615,10 +1652,15 @@ class MainWindow(QMainWindow):
                 f"{p.binary} (PID {p.pid}) — {p.attribution_confidence}"
                 for p in tracked
             )
+            is_skyrim = session.app_id == "489830" or not session.app_id
             self.progress_label.setText(
                 "Skyrim/SKSE is running; tracked process identity verified."
+                if is_skyrim else "Registered game process is running; tracked identity verified."
             )
-            detail = "Tracked Skyrim/SKSE processes are still present:\\n" + detected
+            detail = (
+                ("Tracked Skyrim/SKSE processes are still present:\\n" if is_skyrim
+                 else "Tracked registered game processes are still present:\\n") + detected
+            )
             QMessageBox.information(self, "Launch process status", detail)
             return
 
@@ -1626,8 +1668,15 @@ class MainWindow(QMainWindow):
             session.game_processes = []
             session.state = "game-exited"
             self._game_watch_timer.stop()
-            self.progress_label.setText("Previously detected Skyrim/SKSE processes have exited.")
-            self._log("Tracked Skyrim/SKSE process identities are no longer present.")
+            is_skyrim = session.app_id == "489830" or not session.app_id
+            self.progress_label.setText(
+                "Previously detected Skyrim/SKSE processes have exited."
+                if is_skyrim else "Previously detected registered game processes have exited."
+            )
+            self._log(
+                "Tracked Skyrim/SKSE process identities are no longer present."
+                if is_skyrim else "Tracked registered game process identities are no longer present."
+            )
 
         if not session.wrapper_pid:
             detail = (
