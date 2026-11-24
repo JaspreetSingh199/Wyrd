@@ -71,6 +71,42 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "compatdata prefix is missing"):
                     install_mo2_into_skyrim_prefix(proton, game, home)
 
+    def test_installer_refuses_symlinked_modding_parent_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".steam/steam"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            prefix = steam_compat_prefix(steam)
+            (prefix / "pfx/drive_c").mkdir(parents=True)
+            outside = home / "outside-modding"
+            outside.mkdir()
+            (prefix / "pfx/drive_c/Modding").symlink_to(outside, target_is_directory=True)
+            proton = fake_proton(home / "Proton")
+            with patch("steamcompat._steam_root_for_game", return_value=steam), patch(
+                "steamcompat._latest_mo2_archive"
+            ) as release:
+                with self.assertRaisesRegex(RuntimeError, "symlinked Proton prefix path"):
+                    install_mo2_into_skyrim_prefix(proton, game, home)
+                release.assert_not_called()
+            self.assertEqual(list(outside.iterdir()), [])
+
+    def test_inspector_rejects_symlinked_modding_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam = home / ".local/share/Steam"
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            prefix = steam_compat_prefix(steam)
+            (prefix / "pfx/drive_c").mkdir(parents=True)
+            outside = home / "outside-modding"
+            (outside / "MO2").mkdir(parents=True)
+            (prefix / "pfx/drive_c/Modding").symlink_to(outside, target_is_directory=True)
+            with patch("steamcompat._steam_root_for_game", return_value=steam):
+                state = inspect_skyrim_prefix_mo2_installation(game, home)
+            self.assertFalse(state["installed"])
+            self.assertIn("symlink", state["message"].lower())
+
     def test_installer_refuses_symlinked_proton_prefix_without_touching_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
