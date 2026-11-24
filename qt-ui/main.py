@@ -32,6 +32,7 @@ from steamcompat import (
     inspect_any_skyrim_prefix_mo2_instances, launch_external_mo2_in_skyrim_prefix,
     launch_mo2_in_skyrim_prefix, steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
 )
+from mo2_library_dialog import Mo2LibraryDialog
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -267,8 +268,12 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         self.launch_status_button = QPushButton("Check launch status")
         self.launch_status_button.clicked.connect(self.check_launch_status)
+        self.mo2_library_button = QPushButton("MO2 Library / Instances")
+        self.mo2_library_button.clicked.connect(self.manage_mo2_library)
+        self.mo2_library_button.setEnabled(False)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
+        action_row.addWidget(self.mo2_library_button)
         self.launch_game_prefix_button.hide()
         self.copy_instance_button.hide()
         self.reset_prefix_button.hide()
@@ -481,6 +486,31 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
+        self.mo2_library_button.setEnabled(bool(self.game_state.get("found")))
+
+    def manage_mo2_library(self) -> None:
+        """Open the read-only MO2 discovery and explicit registration interface."""
+        game_path = self.game_state.get("game_dir")
+        if not game_path:
+            QMessageBox.warning(self, "MO2 Library", "Detect Skyrim Special Edition before managing MO2 instances.")
+            return
+        prefix = _steam_prefix_for_game_path(game_path)
+        if prefix is None:
+            QMessageBox.warning(self, "MO2 Library", "Could not resolve Skyrim's Steam compatdata prefix from the detected game path.")
+            return
+        install_path = self.mo2_state.get("install")
+        if not install_path and self.mo2_state.get("executable"):
+            install_path = str(Path(self.mo2_state["executable"]).parent)
+        if not install_path:
+            install_path = str(prefix / "pfx/drive_c/Modding/MO2")
+        dialog = Mo2LibraryDialog(
+            self, prefix_path=prefix, install_path=install_path,
+            game_path=game_path, proton_path=self.proton_combo.currentData() or "",
+        )
+        dialog.exec()
+        if dialog.registered:
+            self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
+            self.refresh_all()
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
