@@ -207,6 +207,17 @@ def test_external_mo2_discovery_is_read_only_and_not_managed(monkeypatch, tmp_pa
     assert after == before
 
 
+def test_external_mo2_refuses_symlinked_executable(monkeypatch, tmp_path):
+    root, game, prefix, exe = _external_game_layout(tmp_path)
+    outside = tmp_path / "ModOrganizer.exe"
+    outside.write_bytes(b"MZ-external")
+    exe.unlink()
+    exe.symlink_to(outside)
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
+    assert not state["installed"]
+
+
 def test_external_mo2_refuses_symlinked_install_path(monkeypatch, tmp_path):
     root = tmp_path / "Steam"
     game = root / "steamapps/common/Skyrim Special Edition"
