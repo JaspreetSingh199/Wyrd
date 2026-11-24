@@ -400,6 +400,9 @@ class Mo2AdvancedSettings(QWidget):
             return
         self.selected_instance_record=dict(record); self.preferred_instance_id=record.get("id","")
         self._edit_associations_button.setEnabled(True); self.rename_instance_button.setEnabled(True); self.unregister_instance_button.setEnabled(True)
+        callback = getattr(self, "on_registry_changed", None)
+        if callable(callback):
+            callback(self.selected_instance_record, False)
         registry,installations,games,runtimes=self._registry_maps()
         installation=installations[record["installation_id"]]
         paths=record.get("storage_paths",{})
@@ -466,6 +469,9 @@ class Mo2AdvancedSettings(QWidget):
             self.selected_instance_record = None
             self.selection_changed = True
             self._refresh_registered()
+            callback = getattr(self, "on_registry_changed", None)
+            if callable(callback):
+                callback(None, True)
             callback = getattr(self, "on_registry_changed", None)
             if callable(callback):
                 callback(None, True)
