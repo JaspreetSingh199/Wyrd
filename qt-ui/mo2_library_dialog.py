@@ -748,6 +748,21 @@ class Mo2LibraryDialog(QDialog):
             identity = hashlib.sha256((str(Path(game_path).expanduser()) + "|" + app_id).encode()).hexdigest()[:16]
             game_id = f"steam-{app_id}" if app_id else f"game-{identity}"
         selected_prefix = Path(self.prefix_edit.text()).expanduser()
+        discovered_install = self.discovery.get("installation", {})
+        discovered_prefix = Path(discovered_install.get("prefix_path", "")).expanduser()
+        discovered_install_root = Path(discovered_install.get("executable", "")).expanduser().parent
+        current_install_root = Path(self.install_edit.text()).expanduser()
+        try:
+            same_prefix = selected_prefix.resolve(strict=True) == discovered_prefix.resolve(strict=True)
+            same_install = current_install_root.resolve(strict=True) == discovered_install_root.resolve(strict=True)
+        except (OSError, RuntimeError):
+            same_prefix = same_install = False
+        if not same_prefix or not same_install:
+            QMessageBox.warning(
+                self, "Discovery is out of date",
+                "The selected prefix or MO2 installation changed after discovery. Run Discover MO2 again before registering."
+            )
+            return
         if selected_prefix.is_symlink() or not (selected_prefix / "pfx/drive_c/users").is_dir():
             QMessageBox.warning(
                 self, "Register MO2 instance",
