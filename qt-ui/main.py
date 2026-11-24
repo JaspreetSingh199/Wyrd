@@ -749,7 +749,10 @@ class MainWindow(QMainWindow):
         proton = Path(runtime.get("path", "")).expanduser()
         prefix_value = record.get("prefix_path") or installation.get("prefix_path")
         if not prefix_value:
-            return {"ok": False, "message": "No Proton prefix was recorded for this instance. Re-discover it with the correct prefix before launching."}
+            # Backward-compatible registration from earlier Wyrd V1 builds:
+            # the library dialog's selected prefix is kept on the instance record
+            # from now on; legacy records must be re-discovered before launch.
+            return {"ok": False, "message": "This older registry entry has no prefix association. Re-discover and register this instance to make it launchable."}
         prefix = Path(prefix_value).expanduser()
 
         if installation.get("owner") not in ("wyrd", "external"):
