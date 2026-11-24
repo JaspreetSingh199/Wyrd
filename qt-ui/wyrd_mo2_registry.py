@@ -120,6 +120,8 @@ def validate_registry(data: Any) -> dict[str, Any]:
                 raise RegistryError(f"{context}.storage_policy has unknown category: {category}")
             if policy not in ("instance-local", "shared", "external"):
                 raise RegistryError(f"{context}.storage_policy.{category} is invalid")
+            if category == "overwrite" and policy == "shared":
+                raise RegistryError(f"{context}.storage_policy.overwrite cannot be shared")
         runtime_id = record.get("runtime_id")
         if runtime_id is not None and (
             not isinstance(runtime_id, str) or not runtime_id.strip()

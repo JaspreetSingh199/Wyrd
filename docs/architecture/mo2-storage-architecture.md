@@ -148,3 +148,33 @@ The first implementation exposes \`inspect_mo2_storage()\`, a read-only view ove
 The metadata-only registry is implemented in \`qt-ui/wyrd_mo2_registry.py\`. Its schema is version 1 and separates installations, instances, games, and runtimes. Installations have an explicit \`wyrd\` or \`external\` owner label; instance records refer to an installation, a game, and optionally a runtime. Duplicate installation executable paths, duplicate instance paths, unknown references, invalid storage policies, malformed JSON, and unsupported schema versions are rejected.
 
 \`load_registry()\` treats a missing registry as an empty in-memory registry and does not create a file or parent directory. \`save_registry()\` is an explicit persistence operation: it validates before writing, uses a same-directory temporary file and atomic replace, and writes mode 0600. No discovery or adoption occurs in either function. This module is not yet wired into the GUI; registration must remain a deliberate user action after read-only inspection.
+
+
+## Registry discovery service
+
+`qt-ui/wyrd_mo2_registry_service.py` provides a bounded service layer over
+`inspect_mo2_storage()`. Discovery accepts one explicitly selected Proton
+prefix and one MO2 installation root; it does not crawl arbitrary disks or
+follow custom storage paths. It refuses symlinked roots, requires a regular
+`ModOrganizer.exe`, and validates any existing Wyrd ownership marker rather
+than silently treating a malformed marker as an external installation.
+
+An installation is labelled Wyrd-owned only when its own
+`.wyrd-managed.json` marker validates. Otherwise it remains external.
+A Wyrd prefix marker is separately validated before the managed-prefix
+inspection mode is used. Instance proposals distinguish portable instances
+(the INI is at the selected MO2 installation root) from global instances.
+All six storage categories and shared-path observations are returned as
+metadata; no storage tree is traversed.
+
+Discovery does not write the registry. The separate `register()` operation
+requires an explicit game association, validates installation ownership and
+proposal linkage, rejects duplicate registrations, and persists only the
+Wyrd registry through the existing atomic writer. A selected Proton runtime
+is optional but, when supplied, must satisfy registry referential integrity.
+No MO2 INI, profile, mod, download, save, or Proton prefix is modified.
+
+The Qt management surface is intentionally not wired to this service yet.
+The next step is a GUI integration that consumes these tested contracts and
+requires a visible preview plus a default-No confirmation before calling
+`register()`.
