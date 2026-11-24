@@ -805,7 +805,7 @@ class MainWindow(QMainWindow):
             if self.game_state.get("found")
             else {"installed": False}
         )
-        if not state.get("installed"):
+        if not state.get("installed") or not state.get("managed", True):
             QMessageBox.information(
                 self, "Nothing to reset",
                 "Wyrd could not verify a Wyrd-managed MO2 installation. External or unverified installations will not be removed.",
