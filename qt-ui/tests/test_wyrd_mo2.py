@@ -662,7 +662,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 popen.return_value.pid = 4242
                 result = launch_skyrim_via_mo2(
                     "SKSE", "Skyrim SE", root, log_path=log_path,
-                    expected_binary=skse, proton_path=proton, game_path=game,
+                    proton_path=proton, game_path=game,
                     prefix_root=prefix, install_root=install,
                 )
             self.assertTrue(result["ok"], result)
