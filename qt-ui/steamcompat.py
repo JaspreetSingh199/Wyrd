@@ -178,6 +178,125 @@ def inspect_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = Non
     return inspect_mo2_instances(Path(state["prefix"]), Path(state["install"]))
 
 
+
+def inspect_external_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = None) -> dict:
+    """Discover an unowned MO2 installation at the conventional Skyrim-prefix path.
+
+    This is read-only. The presence of ModOrganizer.exe is not treated as Wyrd
+    ownership and no marker is written or inferred.
+    """
+    home = (home or Path.home()).expanduser()
+    game = Path(game_path).expanduser()
+    if not game.is_dir():
+        return {"installed": False, "managed": False,
+                "message": "Skyrim game directory is missing."}
+    try:
+        steam_root = _steam_root_for_game(game, home)
+        prefix = steam_compat_prefix(steam_root)
+        if prefix.is_symlink() or not prefix.is_dir():
+            return {"installed": False, "managed": False,
+                    "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
+        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
+        proton_prefix = prefix / "pfx"
+        wine_drive = proton_prefix / "drive_c"
+        modding_root = wine_drive / "Modding"
+        install = modding_root / "MO2"
+        if any(path.is_symlink() for path in (proton_prefix, wine_drive, modding_root, install)):
+            return {"installed": False, "managed": False, "prefix": str(prefix),
+                    "install": str(install), "message": "Existing MO2 path contains a symlink; discovery was refused."}
+        executable = install / "ModOrganizer.exe"
+        if not wine_drive.is_dir() or not executable.is_file():
+            return {"installed": False, "managed": False, "prefix": str(prefix),
+                    "install": str(install), "message": "No existing MO2 executable was found at the conventional Skyrim-prefix location."}
+        marker = install / ".wyrd-managed.json"
+        if marker.exists():
+            # A present but invalid marker is not silently reclassified as external.
+            owned = inspect_skyrim_prefix_mo2_installation(game, home)
+            if owned.get("installed"):
+                return {**owned, "managed": True}
+            return {"installed": False, "managed": False, "prefix": str(prefix),
+                    "install": str(install), "message": "An ownership marker exists but could not be verified; refusing external adoption."}
+        return {
+            "installed": True, "managed": False, "executable": str(executable),
+            "prefix": str(prefix), "install": str(install), "steam_root": str(steam_root),
+            "message": "Existing externally managed MO2 installation found. It has not been modified.",
+        }
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"installed": False, "managed": False,
+                "message": f"Could not safely inspect existing MO2 installation: {error}"}
+
+
+def inspect_any_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = None) -> dict:
+    """Read-only inventory for either Wyrd-managed or external MO2 in Skyrim's prefix."""
+    managed = inspect_skyrim_prefix_mo2_installation(game_path, home)
+    state = managed if managed.get("installed") else inspect_external_skyrim_prefix_mo2_installation(game_path, home)
+    if not state.get("installed"):
+        return {"ok": False, "managed": False, "instances": [], "skyrim_instances": [],
+                "message": state.get("message", "MO2 installation was not found.")}
+    inventory = inspect_mo2_instances(
+        Path(state["prefix"]), Path(state["install"]), require_managed=False,
+    )
+    inventory["managed"] = bool(state.get("managed", managed.get("installed", False)))
+    inventory["installation"] = state
+    return inventory
+
+
+def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
+                                          home: Path | None = None,
+                                          instance_name: str | None = None,
+                                          xaudio2_compat: bool = False) -> dict:
+    """Launch an existing unowned MO2 installation without adopting or modifying it."""
+    home = (home or Path.home()).expanduser()
+    proton = Path(proton_path).expanduser()
+    game = Path(game_path).expanduser()
+    validation = inspect_proton_build(proton)
+    if not validation.get("ok"):
+        return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+    state = inspect_external_skyrim_prefix_mo2_installation(game, home)
+    if not state.get("installed") or state.get("managed"):
+        return {"ok": False, "message": state.get("message", "External MO2 installation is unavailable.")}
+    prefix, install = Path(state["prefix"]), Path(state["install"])
+    inventory = inspect_mo2_instances(prefix, install, require_managed=False)
+    if not inventory.get("ok"):
+        return {"ok": False, "message": inventory.get("message", "Could not inspect external MO2 instances.")}
+    candidates = inventory.get("skyrim_instances", [])
+    if instance_name is None:
+        if len(candidates) == 1:
+            instance_name = candidates[0]["name"]
+        elif candidates:
+            return {"ok": False, "needs_instance_selection": True,
+                    "instances": [item["name"] for item in candidates],
+                    "message": "Choose an MO2 Skyrim instance before launching."}
+        else:
+            return {"ok": False, "message": "No Skyrim Special Edition MO2 instance was found."}
+    if instance_name not in [item["name"] for item in candidates]:
+        return {"ok": False, "message": "The selected Skyrim MO2 instance is not present in the external installation."}
+    steam_root = Path(state["steam_root"])
+    env = _runtime_environment(proton, steam_root, prefix)
+    env.update({
+        "SteamAppId": APP_ID, "SteamGameId": APP_ID,
+        "STEAM_COMPAT_APP_ID": APP_ID,
+        "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
+    })
+    if xaudio2_compat:
+        current = env.get("WINEDLLOVERRIDES", "")
+        overrides = [item for item in current.split(";")
+                     if item and not item.lower().startswith("xaudio2_7=")]
+        overrides.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(overrides)
+    try:
+        process = subprocess.Popen(
+            [str(proton / "proton"), "run", str(Path(state["executable"])),
+             "--instance", instance_name],
+            cwd=str(install), env=env, start_new_session=True,
+        )
+    except OSError as error:
+        return {"ok": False, "message": f"Could not launch existing MO2: {error}"}
+    return {"ok": True, "pid": process.pid, "managed": False,
+            "prefix": str(prefix.resolve()), "instance": instance_name,
+            "message": f"Started externally managed MO2 instance '{instance_name}' through Skyrim's Steam prefix. Existing MO2 files were not changed by Wyrd."}
+
+
 from pathlib import Path
 
 def copy_wyrd_instance_to_skyrim_prefix(instance_name: str, home: Path | None = None) -> dict:
