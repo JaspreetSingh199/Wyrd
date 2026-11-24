@@ -598,8 +598,11 @@ class MainWindow(QMainWindow):
         if not proton_path:
             QMessageBox.warning(self, "Wyrd setup", "No compatible Proton build is selected.")
             return
-        state = inspect_skyrim_prefix_mo2_installation(Path(self.game_state["game_dir"]))
-        if state.get("installed"):
+        game_path = Path(self.game_state["game_dir"])
+        state = inspect_skyrim_prefix_mo2_installation(game_path)
+        if not state.get("installed"):
+            state = inspect_external_skyrim_prefix_mo2_installation(game_path)
+        if state.get("installed") or state.get("install"):
             self.refresh_all()
             return
         answer = QMessageBox.question(
