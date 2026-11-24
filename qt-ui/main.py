@@ -26,8 +26,11 @@ from wyrd_mo2 import (
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
     inspect_audio_compatibility, reset_mo2_compatdata,
 )
-from steamcompat import (launch_mo2_in_skyrim_prefix, inspect_skyrim_prefix_mo2_instances,
-                         copy_wyrd_instance_to_skyrim_prefix)
+from steamcompat import (
+    install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
+    inspect_skyrim_prefix_mo2_instances, launch_mo2_in_skyrim_prefix,
+    steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
+)
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -118,13 +121,33 @@ class InstallWorker(QThread):
         self.completed.emit(result)
 
 
+class SteamPrefixInstallWorker(QThread):
+    progress = Signal(int, str)
+    completed = Signal(dict)
+
+    def __init__(self, proton_path: str, game_path: str):
+        super().__init__()
+        self.proton_path = Path(proton_path)
+        self.game_path = Path(game_path)
+
+    def run(self) -> None:
+        try:
+            result = install_mo2_into_skyrim_prefix(
+                self.proton_path, self.game_path,
+                callback=lambda value, message: self.progress.emit(value, message),
+            )
+        except Exception as error:
+            result = {"ok": False, "message": str(error)}
+        self.completed.emit(result)
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
         self.resize(1040, 780)
         self.setMinimumSize(820, 640)
-        self.worker: InstallWorker | None = None
+        self.worker: QThread | None = None
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
@@ -235,9 +258,9 @@ class MainWindow(QMainWindow):
         self.launch_status_button.clicked.connect(self.check_launch_status)
         action_row.addWidget(self.install_button)
         action_row.addWidget(self.launch_button)
-        action_row.addWidget(self.launch_game_prefix_button)
-        action_row.addWidget(self.copy_instance_button)
-        action_row.addWidget(self.reset_prefix_button)
+        self.launch_game_prefix_button.hide()
+        self.copy_instance_button.hide()
+        self.reset_prefix_button.hide()
         action_row.addWidget(self.launch_game_button)
         action_row.addWidget(self.launch_direct_button)
         action_row.addWidget(self.diagnostics_button)
@@ -383,67 +406,48 @@ class MainWindow(QMainWindow):
             )
             self._log("No compatible Proton builds found.")
 
-        self.mo2_state = inspect_wyrd_installation()
-        if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
-            self.instance_state = inspect_mo2_instances(managed_paths()["prefix"], managed_paths()["install"])
-            self.launch_target_state = inspect_skyrim_launch_targets(
-                managed_paths()["prefix"],
-                Path(self.mo2_state["metadata"].get("game_path", "")),
-                install_root=managed_paths()["install"],
-            )
-        else:
-            self.instance_state = {"ok": False, "instances": [], "skyrim_instances": []}
-            self.launch_target_state = {"ok": False, "targets": []}
+        self.mo2_state = inspect_skyrim_prefix_mo2_installation(
+            Path(self.game_state["game_dir"])
+        ) if self.game_state.get("found") else {
+            "installed": False, "message": "Skyrim Special Edition was not detected."
+        }
         if self.mo2_state.get("installed"):
-            version = self.mo2_state.get("metadata", {}).get("version", "unknown version")
-            prefix = "ready" if self.mo2_state.get("prefix_ready") else "incomplete"
-            instance_summary = self.instance_state.get("message", "Instance inventory unavailable.")
-            skyrim_instances = self.instance_state.get("skyrim_instances", [])
-            if skyrim_instances:
-                executable_names = sorted({
-                    entry.get("title") or entry.get("binary", "")
-                    for instance in skyrim_instances for entry in instance.get("executables", [])
-                    if entry.get("title") or entry.get("binary")
-                })
-                instance_summary += "\nSkyrim SE instance: " + ", ".join(
-                    instance["name"] for instance in skyrim_instances
-                )
-                profiles = [
-                    f"{instance['name']}: {instance.get('selected_profile') or 'No profile selected'}"
-                    for instance in skyrim_instances
-                ]
-                instance_summary += "\nSelected MO2 profile: " + " | ".join(profiles)
-                if executable_names:
-                    instance_summary += "\nConfigured executables: " + ", ".join(executable_names)
-            elif self.instance_state.get("ok"):
-                instance_summary += "\nCreate a Skyrim Special Edition instance in MO2 to continue."
-            self.mo2_panel.detail_label.setText(
-                f"MO2 {version} is installed and verified.\n"
-                f'Executable: {self.mo2_state.get("executable")}\n'
-                f'Wyrd Proton prefix: {prefix}\n'
-                f'{instance_summary}'
-            )
-            self.launch_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.instance_state.get("ok")))
-            self.launch_game_prefix_button.setEnabled(bool(self.mo2_state.get("prefix_ready") and self.game_state.get("found")))
-            # Launch Skyrim availability is based on the detected Steam game and Wyrd's
-            # managed MO2 prefix, not on whether an MO2 instance already exists.
-            self.launch_game_button.setEnabled(bool(self.game_state.get("found")))
-            self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
-            self.install_button.setText("MO2 Ready" if self.mo2_state.get("prefix_ready") else "Repair MO2 runtime")
-            self._log("Wyrd MO2 inspection: verified " + version)
+            self.instance_state = inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
         else:
-            external = self.mo2_state.get("external_installations", [])
-            description = self.mo2_state.get("message", "MO2 is not installed.")
-            if external:
-                description += "\nExisting installation(s):\n" + "\n".join(external)
-                description += "\nThese copies are left untouched; Wyrd installs into its own managed location."
-            self.mo2_panel.detail_label.setText(description)
-            self.launch_button.setEnabled(False)
+            self.instance_state = {
+                "ok": False, "instances": [], "skyrim_instances": [],
+                "message": self.mo2_state.get("message", "MO2 is not installed.")
+            }
+        skyrim_instances = self.instance_state.get("skyrim_instances", [])
+        if self.mo2_state.get("installed"):
+            summary = self.instance_state.get("message", "MO2 instance inventory unavailable.")
+            if skyrim_instances:
+                summary += "\nSkyrim SE instance(s): " + ", ".join(x["name"] for x in skyrim_instances)
+                summary += "\nSelected MO2 profile: " + " | ".join(
+                    f'{x["name"]}: {x.get("selected_profile") or "No profile selected"}'
+                    for x in skyrim_instances
+                )
+            elif self.instance_state.get("ok"):
+                summary += "\nCreate a Skyrim Special Edition instance in MO2 to continue."
+            self.mo2_panel.detail_label.setText(
+                "Wyrd-managed MO2 is installed in Skyrim's Steam prefix.\n"
+                f'Executable: {self.mo2_state.get("executable")}\n'
+                f'Steam compatdata: {self.mo2_state.get("prefix")}\n{summary}'
+            )
+            self.install_button.setText("MO2 Ready")
+            self.install_button.setEnabled(False)
+            self.launch_button.setEnabled(True)
+            self.launch_game_button.setEnabled(bool(skyrim_instances))
             self.launch_game_prefix_button.setEnabled(False)
-            self.launch_game_button.setEnabled(False)
-            self.launch_direct_button.setEnabled(False)
+            self._log("Skyrim-prefix MO2 inspection: verified Wyrd-owned installation.")
+        else:
+            self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
-            self._log("Wyrd MO2 inspection: " + description)
+            self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
+            self.launch_button.setEnabled(False)
+            self.launch_game_button.setEnabled(False)
+            self.launch_game_prefix_button.setEnabled(False)
+        self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
         self._refresh_audio_status()
         prefix_path = managed_paths()['prefix']
@@ -571,27 +575,28 @@ class MainWindow(QMainWindow):
         if self.worker and self.worker.isRunning():
             return
         if not self.game_state.get("found"):
-            QMessageBox.warning(self, "Wyrd setup", "Skyrim Special Edition was not detected. Install it through Steam, then refresh.")
+            QMessageBox.warning(self, "Wyrd setup", "Skyrim Special Edition was not detected.")
             return
         proton_path = self.proton_combo.currentData()
         if not proton_path:
             QMessageBox.warning(self, "Wyrd setup", "No compatible Proton build is selected.")
             return
-        if self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"):
+        state = inspect_skyrim_prefix_mo2_installation(Path(self.game_state["game_dir"]))
+        if state.get("installed"):
             self.refresh_all()
             return
         answer = QMessageBox.question(
             self, "Install Mod Organizer 2",
-            "Wyrd will download the official MO2 release, install it into a Wyrd-managed folder, "
-            "and initialize a separate Proton prefix for MO2.\n\n"
-            "Your Skyrim files, Steam prefix, saves, and any existing MO2 installation will not be modified.\n\nContinue?",
+            "Install official MO2 inside Skyrim's existing Steam compatdata prefix? "
+            "The prefix must already be initialized by launching Skyrim through Steam. "
+            "Wyrd will not reset the prefix or overwrite an unowned MO2 directory. "
+            "Normal Proton/MO2 runtime files may be written there. Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        game_path = self.game_state["game_dir"]
-        self.worker = InstallWorker(str(proton_path), str(game_path))
+        self.worker = SteamPrefixInstallWorker(str(proton_path), self.game_state["game_dir"])
         self.worker.progress.connect(self._on_install_progress)
         self.worker.completed.connect(self._on_install_completed)
         self.install_button.setEnabled(False)
@@ -599,8 +604,8 @@ class MainWindow(QMainWindow):
         self.refresh_button.setEnabled(False)
         self.proton_combo.setEnabled(False)
         self.progress.setValue(0)
-        self.progress_label.setText("Starting MO2 setup…")
-        self._log("Starting Wyrd-owned MO2 installation.")
+        self.progress_label.setText("Installing MO2 into Skyrim's Steam prefix…")
+        self._log("Starting MO2 installation in Skyrim's Steam prefix.")
         self.worker.start()
 
     def _on_install_progress(self, value: int, message: str) -> None:
@@ -626,36 +631,38 @@ class MainWindow(QMainWindow):
         self.refresh_all()
 
     def _instance_inspection(self) -> dict:
-        """Return a fresh read-only inventory for the current managed prefix."""
-        paths = managed_paths()
-        return inspect_mo2_instances(paths["prefix"], paths["install"])
-
-    def _has_instance(self) -> bool:
-        state = self._instance_inspection()
-        return bool(state.get("ok") and state.get("instances"))
+        if not self.game_state.get("found"):
+            return {"ok": False, "instances": [], "skyrim_instances": [],
+                    "message": "Skyrim Special Edition was not detected."}
+        return inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
 
     def start_mo2(self) -> None:
-        state = self._instance_inspection()
-        if not state.get("ok"):
-            QMessageBox.warning(
-                self, "MO2 instance status unavailable",
-                state.get("message", "Wyrd could not safely inspect its managed MO2 prefix."),
-            )
-            self._log("MO2 instance inspection blocked launch: " +
-                      state.get("message", "unknown inspection error"))
+        game_path = Path(self.game_state.get("game_dir", ""))
+        proton_path = self.proton_combo.currentData()
+        if not game_path.is_dir() or not proton_path:
+            QMessageBox.warning(self, "Launch MO2", "Skyrim or the selected Proton build is unavailable.")
             return
-        first_run = not state.get("instances")
-        result = launch_mo2(pick_instance=first_run)
+        inventory = inspect_skyrim_prefix_mo2_instances(game_path)
+        if not inventory.get("ok"):
+            QMessageBox.warning(self, "MO2 instance status unavailable", inventory.get("message", "Could not inspect Skyrim's Steam prefix."))
+            return
+        candidates = inventory.get("skyrim_instances", [])
+        instance_name = None
+        if candidates:
+            instance_name, accepted = QInputDialog.getItem(
+                self, "Select MO2 instance", "Skyrim Special Edition instance:",
+                [x["name"] for x in candidates], 0, False,
+            )
+            if not accepted or not instance_name:
+                return
+        result = launch_mo2_in_skyrim_prefix(
+            Path(proton_path), game_path, instance_name=instance_name,
+            xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
+        )
         self._log(result.get("message", "MO2 launch failed."))
         if result.get("ok"):
-            self.progress_label.setText("MO2 launched through Proton.")
-            if first_run:
-                QMessageBox.information(
-                    self, "First MO2 launch",
-                    "MO2 has been opened in its instance picker.\n\n"
-                    "Create a new instance and select Skyrim Special Edition. "
-                    "Then choose Skyrim or SKSE in MO2's executable dropdown and press Run."
-                )
+            self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
+            QMessageBox.information(self, "Launch MO2", result["message"])
         else:
             QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
 
