@@ -324,8 +324,38 @@ class Mo2AdvancedSettings(QWidget):
         form.addRow("Steam AppID:",self.game_appid_edit)
         form.addRow("Game folder:",browse_row(self.game_path_edit,"Select game folder"))
         form.addRow("Proton runtime:",browse_row(self.proton_edit,"Select Proton runtime"))
-        layout.addWidget(QLabel("MO2 paths and game settings"))
+        paths_heading = QLabel("MO2 LOCATIONS")
+        paths_heading.setObjectName("section")
+        layout.addWidget(paths_heading)
+        paths_help = QLabel(
+            "These paths tell Wyrd where MO2, Skyrim and Proton are located. "
+            "Change them only if your setup uses a different location."
+        )
+        paths_help.setObjectName("muted")
+        paths_help.setWordWrap(True)
+        layout.addWidget(paths_help)
         layout.addLayout(form)
+
+        scan_row = QHBoxLayout()
+        self.scan_button = QPushButton("Scan these locations")
+        self.scan_button.clicked.connect(self.scan_locations)
+        self.scan_status = QLabel("Scan checks for MO2 instances without changing files.")
+        self.scan_status.setObjectName("muted")
+        self.scan_status.setWordWrap(True)
+        scan_row.addWidget(self.scan_button)
+        scan_row.addWidget(self.scan_status, 1)
+        layout.addLayout(scan_row)
+
+        instances_heading = QLabel("REGISTERED MO2 INSTANCES")
+        instances_heading.setObjectName("section")
+        layout.addWidget(instances_heading)
+        instances_help = QLabel(
+            "Choose an instance to change its Wyrd name, game link or storage settings. "
+            "Removing it here only disconnects it from Wyrd."
+        )
+        instances_help.setObjectName("muted")
+        instances_help.setWordWrap(True)
+        layout.addWidget(instances_help)
         self.installation_filter=QComboBox()
         self.installation_filter.addItem("All installations",None)
         self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
@@ -353,6 +383,16 @@ class Mo2AdvancedSettings(QWidget):
         actions.addWidget(self.unregister_instance_button); actions.addWidget(self.unregister_installation_button)
         layout.addLayout(actions)
 
+        storage_intro = QLabel("STORAGE AND SHARING")
+        storage_intro.setObjectName("section")
+        layout.addWidget(storage_intro)
+        storage_help = QLabel(
+            "Choose where this instance keeps mods, downloads and profiles. "
+            "External MO2 storage is read-only in Wyrd."
+        )
+        storage_help.setObjectName("muted")
+        storage_help.setWordWrap(True)
+        layout.addWidget(storage_help)
         storage_box=QGroupBox("Storage locations")
         storage_form=QFormLayout(storage_box)
         self.storage_fields={}; self.storage_browse_buttons={}
@@ -374,6 +414,37 @@ class Mo2AdvancedSettings(QWidget):
         storage_actions.addWidget(self.apply_storage_button); storage_actions.addWidget(self.restore_storage_button)
         layout.addLayout(storage_actions)
         self._refresh_registered()
+
+    def scan_locations(self):
+        """Read-only scan from the paths shown in Advanced settings."""
+        prefix = Path(self.prefix_edit.text()).expanduser()
+        install = Path(self.install_edit.text()).expanduser()
+        if not self.prefix_edit.text().strip() or not self.install_edit.text().strip():
+            self.scan_status.setText("Choose a Proton prefix and MO2 folder first.")
+            return
+        self.scan_button.setEnabled(False)
+        try:
+            result = self.service.discover(prefix, install)
+            if not result.get("ok"):
+                self.scan_status.setText(result.get("message", "Scan could not be completed."))
+                return
+            proposals = result.get("proposals", [])
+            registered = {
+                os.path.normcase(os.path.realpath(item.get("instance_path", "")))
+                for item in self.service.load().get("instances", [])
+            }
+            new_count = sum(
+                os.path.normcase(os.path.realpath(item.get("instance_path", ""))) not in registered
+                for item in proposals
+            )
+            self.scan_status.setText(
+                f"Found {len(proposals)} instance(s): {new_count} not connected to Wyrd. "
+                "Use Environment to connect a new instance."
+            )
+        except Exception as error:
+            self.scan_status.setText(f"Scan failed: {error}")
+        finally:
+            self.scan_button.setEnabled(True)
 
     def _browse_directory(self, title, field):
         selected=QFileDialog.getExistingDirectory(self,title,field.text())
