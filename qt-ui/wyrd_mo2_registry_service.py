@@ -116,6 +116,17 @@ class RegistryService:
             "shared_paths": [], "errors": [], "message": message,
         }
 
+    def replace_instance(self, updated: dict[str, Any]) -> dict[str, Any]:
+        """Persist user-approved metadata changes for a registered instance."""
+        current = self.load()
+        for index, item in enumerate(current["instances"]):
+            if item.get("id") == updated.get("id"):
+                current["instances"][index] = dict(updated)
+                validated = validate_registry(current)
+                save_registry(self.registry_path, validated)
+                return validated
+        raise RegistryError("registered MO2 instance was not found")
+
     def register(
         self, installation: dict[str, Any], proposal: dict[str, Any],
         game: dict[str, Any], runtime: dict[str, Any] | None = None,
@@ -150,6 +161,9 @@ class RegistryService:
             "runtime_id": runtime_record["id"] if runtime_record else None,
             "storage_policy": dict(proposal["default_storage_policy"]),
             "config": proposal["config"],
+            "storage_paths": dict(proposal.get("storage", {})),
+            "game_name": proposal.get("game_name", ""),
+            "is_skyrim_se": bool(proposal.get("is_skyrim_se")),
         }
         for collection, record in (
             ("installations", installation_record), ("games", game_record),
