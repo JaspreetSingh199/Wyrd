@@ -422,6 +422,7 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
         return {"ok": False, "message": "Wyrd installation ownership or path could not be verified; nothing was removed.", "removed": []}
     if (
         metadata.get("managed_by") != "Wyrd"
+        or metadata.get("game_app_id") != APP_ID
         or metadata.get("installation_mode") != "skyrim-steam-prefix"
         or Path(metadata.get("install", "")).expanduser() != install
         or not executable.is_file()
@@ -435,7 +436,7 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
     owned_install_ids: set[str] = set()
     owned_instance_dirs: list[Path] = []
 
-    # Read and validate all metadata before deleting any files.
+    # Metadata is read-only and fully validated before any deletion is attempted.
     if registry_path.exists() or registry_path.is_symlink():
         if registry_path.is_symlink() or not registry_path.is_file():
             return {"ok": False, "message": "Wyrd registry path is unsafe; reset refused.", "removed": []}
@@ -443,17 +444,19 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
             registry_payload = load_registry(registry_path)
         except Exception as error:
             return {"ok": False, "message": f"Wyrd registry could not be validated; reset refused: {error}", "removed": []}
-        owned_install_ids = {
-            item["id"] for item in registry_payload["installations"]
-            if item.get("owner") == "wyrd"
-            and Path(item.get("executable", "")).expanduser().resolve() == executable.resolve()
-        }
+        try:
+            owned_install_ids = {
+                item["id"] for item in registry_payload["installations"]
+                if item.get("owner") == "wyrd"
+                and Path(item.get("executable", "")).expanduser().resolve(strict=True) == executable.resolve(strict=True)
+            }
+        except (OSError, ValueError, RuntimeError, KeyError):
+            return {"ok": False, "message": "Wyrd installation registration could not be resolved safely; reset refused.", "removed": []}
 
         users_root = prefix / "pfx/drive_c/users"
         if users_root.is_symlink() or not users_root.is_dir():
             return {"ok": False, "message": "Proton user root is missing or unsafe; reset refused.", "removed": []}
         user_roots = [p for p in users_root.iterdir() if p.is_dir() and not p.is_symlink()]
-        global_roots = [p / "AppData/Local/ModOrganizer" for p in user_roots]
         for record in registry_payload["instances"]:
             if record.get("installation_id") not in owned_install_ids:
                 continue
@@ -461,22 +464,39 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
             config_file = Path(record.get("config", "")).expanduser()
             if instance_dir.is_symlink() or not instance_dir.is_dir() or config_file.is_symlink() or not config_file.is_file():
                 return {"ok": False, "message": f"Registered instance is missing or unsafe: {instance_dir}. Reset refused before deleting anything.", "removed": []}
-            valid_root = False
-            for root in global_roots:
+
+            valid_global = False
+            for user_root in user_roots:
+                components = [
+                    user_root / "AppData",
+                    user_root / "AppData/Local",
+                    user_root / "AppData/Local/ModOrganizer",
+                    instance_dir,
+                    config_file,
+                ]
+                # Reject symlinks in every component, including components that
+                # do not yet exist but could redirect traversal through a link.
+                if any(component.is_symlink() for component in components):
+                    continue
+                root = user_root / "AppData/Local/ModOrganizer"
                 try:
-                    if root.is_symlink():
-                        continue
-                    resolved_root = root.resolve(strict=False)
-                    resolved_root.relative_to(resolved_prefix)
+                    resolved_user = user_root.resolve(strict=True)
+                    resolved_user.relative_to(resolved_prefix)
+                    resolved_root = root.resolve(strict=True)
+                    resolved_root.relative_to(resolved_user)
                     resolved_instance = instance_dir.resolve(strict=True)
                     resolved_instance.relative_to(resolved_root)
-                    config_file.resolve(strict=True).relative_to(resolved_instance)
-                    valid_root = config_file.name.casefold() == "modorganizer.ini"
-                    if valid_root:
+                    resolved_config = config_file.resolve(strict=True)
+                    resolved_config.relative_to(resolved_instance)
+                    valid_global = (
+                        config_file.name.casefold() == "modorganizer.ini"
+                        and resolved_config.is_file()
+                    )
+                    if valid_global:
                         break
                 except (OSError, ValueError, RuntimeError):
                     continue
-            if valid_root:
+            if valid_global:
                 owned_instance_dirs.append(instance_dir)
             elif record.get("instance_type") == "portable":
                 try:
@@ -497,16 +517,37 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
         except (OSError, ValueError):
             return {"ok": False, "message": "Wyrd settings could not be read; reset refused.", "removed": []}
 
-    # Validate every deletion target before the first destructive operation.
+    # Reject duplicate and overlapping targets. A nested instance directory or an
+    # instance that overlaps the Wyrd install could otherwise cause order-dependent
+    # deletion and accidentally broaden the ownership boundary.
     targets = [(directory, "registered global instance") for directory in owned_instance_dirs]
     targets.append((install, "Wyrd MO2 installation"))
+    resolved_targets = []
     for target, _kind in targets:
         if target.is_symlink() or not target.is_dir():
             return {"ok": False, "message": f"Reset target changed or is unsafe: {target}", "removed": []}
         try:
-            target.resolve(strict=True).relative_to(resolved_prefix)
+            resolved = target.resolve(strict=True)
+            resolved.relative_to(resolved_prefix)
         except (OSError, ValueError, RuntimeError):
             return {"ok": False, "message": f"Reset target escaped the verified Skyrim prefix boundary: {target}", "removed": []}
+        for previous in resolved_targets:
+            if resolved == previous or resolved in previous.parents or previous in resolved.parents:
+                return {"ok": False, "message": f"Reset targets overlap or are duplicated: {target}", "removed": []}
+        resolved_targets.append(resolved)
+
+    # Revalidate the complete target set immediately before deletion to catch
+    # path replacement between inventory validation and the first rmtree call.
+    for target, _kind in targets:
+        if target.is_symlink() or not target.is_dir():
+            return {"ok": False, "message": f"Reset target changed or is unsafe immediately before deletion: {target}", "removed": []}
+        try:
+            current = target.resolve(strict=True)
+            current.relative_to(resolved_prefix)
+        except (OSError, ValueError, RuntimeError):
+            return {"ok": False, "message": f"Reset target changed or escaped the verified prefix: {target}", "removed": []}
+    if prefix.is_symlink() or prefix.resolve(strict=True) != resolved_prefix:
+        return {"ok": False, "message": "Steam's Skyrim prefix changed during reset validation; reset refused.", "removed": []}
 
     removed = []
     try:
@@ -517,7 +558,6 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
         return {"ok": False, "message": f"Reset stopped after a partial removal: {error}", "removed": removed}
 
     # Remove only registry records for this verified Wyrd installation.
-    # External and unrelated Wyrd registrations remain available.
     try:
         if registry_path.exists():
             registry_payload["instances"] = [
@@ -530,17 +570,13 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
             ]
             used_games = {item.get("game_id") for item in registry_payload["instances"]}
             used_runtimes = {item.get("runtime_id") for item in registry_payload["instances"]}
-            registry_payload["games"] = [
-                item for item in registry_payload["games"] if item.get("id") in used_games
-            ]
-            registry_payload["runtimes"] = [
-                item for item in registry_payload["runtimes"] if item.get("id") in used_runtimes
-            ]
+            registry_payload["games"] = [item for item in registry_payload["games"] if item.get("id") in used_games]
+            registry_payload["runtimes"] = [item for item in registry_payload["runtimes"] if item.get("id") in used_runtimes]
             save_registry(registry_path, registry_payload)
         if settings_payload is not None:
             settings_payload.pop("selected_mo2_instance_id", None)
             temporary = settings_path.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(settings_payload, indent=2) + "\n", encoding="utf-8")
+            temporary.write_text(json.dumps(settings_payload, indent=2) + "\\n", encoding="utf-8")
             os.replace(temporary, settings_path)
     except Exception as error:
         return {"ok": False, "message": f"MO2 files were removed but Wyrd metadata cleanup failed: {error}", "removed": removed}
@@ -548,7 +584,7 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
     return {
         "ok": True,
         "removed": removed,
-        "message": "Wyrd-managed MO2 installation and registered global instances were removed; Wyrd's MO2 registry and active selection were cleared. Skyrim's Steam compatdata/489830 prefix, game files, saves, external MO2 installations, and custom storage outside instance folders were preserved.",
+        "message": "Wyrd-managed MO2 installation and registered global instances were removed. Skyrim's Steam compatdata/489830 prefix, game files, saves, external MO2 installations, and custom storage outside verified instance folders were preserved.",
     }
 
 def _game_path_for_wyrd_install(home: Path) -> Path:
