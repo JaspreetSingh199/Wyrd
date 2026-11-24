@@ -1951,11 +1951,6 @@ class MainWindow(QMainWindow):
                     for item in process_scan.get("processes", []):
                         if _is_descendant_process(item["pid"], session.wrapper_pid):
                             session_processes.append({**item, "_launch_source": "descendant"})
-                if session.wrapper_pid and not session_processes:
-                    # Preserve confirmed tree attribution when available; the
-                    # prefix/token fallback is only for reparented processes.
-                    for item in process_scan.get("wyrd_processes", []):
-                        session_processes.append({**item, "_launch_source": "token-prefix"})
             elif session.wrapper_pid and session.target_binary:
                 # Generic scanner has already validated the exact launch token,
                 # registered prefix, and original wrapper identity.
