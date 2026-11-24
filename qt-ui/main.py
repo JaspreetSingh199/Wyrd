@@ -51,6 +51,7 @@ class LaunchSession:
     game_path: str | None = None
     app_id: str | None = None
     target_binary: str | None = None
+    launch_token: str | None = None
     state: str = "idle"
 
 
@@ -1236,7 +1237,10 @@ class MainWindow(QMainWindow):
             for key in ("SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"):
                 env.pop(key, None)
         env["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())
+        import uuid
+        launch_token = uuid.uuid4().hex
         env["WYRD_LAUNCHED"] = "1"
+        env["WYRD_LAUNCH_ID"] = launch_token
         command = [
             str(proton / "proton"), "run", str(executable),
             "--instance", instance_path.name, "run", "--executable", title,
@@ -1275,6 +1279,7 @@ class MainWindow(QMainWindow):
         self.launch_session.game_path = str(game_path.resolve())
         self.launch_session.app_id = app_id
         self.launch_session.target_binary = expected_binary.name
+        self.launch_session.launch_token = launch_token
         self.launch_session.state = "handoff"
         self.launch_session.poll_count = 0
         if app_id == "489830" or not app_id:
@@ -1516,6 +1521,7 @@ class MainWindow(QMainWindow):
             process_scan = detect_game_processes(
                 self.launch_session.wrapper_pid, self.launch_session.target_binary,
                 self.launch_session.prefix_root,
+                launch_token=self.launch_session.launch_token,
             )
             session_processes = process_scan.get("processes", []) if process_scan.get("ok") and wrapper_identity_matches else []
         else:
@@ -1660,7 +1666,8 @@ class MainWindow(QMainWindow):
         elif session.wrapper_pid and session.target_binary:
             from wyrd_mo2 import detect_game_processes
             process_scan = detect_game_processes(
-                session.wrapper_pid, session.target_binary, session.prefix_root
+                session.wrapper_pid, session.target_binary, session.prefix_root,
+                launch_token=session.launch_token,
             )
             self._log("Registered game process scan: " + process_scan.get("message", "Detection unavailable."))
         else:
