@@ -803,11 +803,14 @@ class MainWindow(QMainWindow):
         )
         if not accepted or not instance_name:
             return
+        game_path = Path(self.game_state["game_dir"])
+        mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
+        if not mo2_state.get("installed"):
+            QMessageBox.warning(self, "MO2 unavailable", mo2_state.get("message", "MO2 install is not verified."))
+            return
         target_state = inspect_skyrim_launch_targets(
-            managed_paths()["prefix"],
-            Path(self.mo2_state.get("metadata", {}).get("game_path", "")),
-            instance_name=instance_name,
-            install_root=managed_paths()["install"],
+            Path(mo2_state["prefix"]), game_path,
+            instance_name=instance_name, install_root=Path(mo2_state["install"]),
         )
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
@@ -849,6 +852,9 @@ class MainWindow(QMainWindow):
         result = launch_skyrim_via_mo2(
             selected, instance_name, expected_binary=selected_target["binary"],
             audio_mode=audio_mode,
+            proton_path=Path(self.proton_combo.currentData()),
+            game_path=game_path, prefix_root=Path(mo2_state["prefix"]),
+            install_root=Path(mo2_state["install"]),
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
@@ -899,7 +905,7 @@ class MainWindow(QMainWindow):
             self.launch_session.wrapper_start_time is None
             or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
-        process_scan = detect_skyrim_processes(managed_paths()["prefix"])
+        process_scan = detect_skyrim_processes(steam_compat_prefix(Path(self.game_state['game_dir']).parents[1]))
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
