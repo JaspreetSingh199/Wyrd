@@ -171,13 +171,13 @@ class Mo2LibraryDialog(QDialog):
         self.instances.currentRowChanged.connect(self._show_selected)
         setup_layout.addWidget(self.instances, 1)
 
-        advanced_layout.addWidget(QLabel("Inspection details"))
+        setup_layout.addWidget(QLabel("Discovery details"))
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
-        self.details.setMinimumHeight(80)
-        self.details.setMaximumHeight(150)
-        self.details.setPlaceholderText("Choose Discover MO2 to inspect the selected installation.")
-        advanced_layout.addWidget(self.details)
+        self.details.setMinimumHeight(72)
+        self.details.setMaximumHeight(120)
+        self.details.setPlaceholderText("Choose Discover MO2 instances to inspect the selected installation.")
+        setup_layout.addWidget(self.details)
 
         storage_box = QGroupBox("Selected instance storage")
         storage_form = QFormLayout(storage_box)
