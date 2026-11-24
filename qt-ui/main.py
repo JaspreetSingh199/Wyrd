@@ -1325,6 +1325,7 @@ class MainWindow(QMainWindow):
             self._launch_registered_skyrim_target(
                 selected_record, game, installation, runtime, target_state,
                 game_path, prefix, install_root, proton,
+                Path(game["steam_root"]) if game.get("steam_root") else None,
             )
             return
 
@@ -1359,11 +1360,13 @@ class MainWindow(QMainWindow):
             instance_name, target_state, game_path, Path(mo2_state["prefix"]),
             Path(mo2_state["install"]), Path(self.proton_combo.currentData()),
             bool(mo2_state.get("managed", True)),
+            Path(mo2_state["steam_root"]) if mo2_state.get("steam_root") else None,
         )
 
     def _launch_registered_skyrim_target(
         self, record: dict, game: dict, installation: dict, runtime: dict,
         target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
+        steam_root: Path | None = None,
     ) -> None:
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
@@ -1373,12 +1376,13 @@ class MainWindow(QMainWindow):
             return
         instance_name = Path(record["instance_path"]).name
         self._launch_skyrim_target_from_inventory(
-            instance_name, target_state, game_path, prefix, install_root, proton, False,
+            instance_name, target_state, game_path, prefix, install_root, proton, False, steam_root,
         )
 
     def _launch_skyrim_target_from_inventory(
         self, instance_name: str, target_state: dict, game_path: Path,
         prefix: Path, install_root: Path, proton: Path, require_managed: bool,
+        steam_root: Path | None = None,
     ) -> None:
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
@@ -1417,7 +1421,7 @@ class MainWindow(QMainWindow):
             selected, instance_name, expected_binary=selected_target["binary"],
             audio_mode=audio_mode, proton_path=proton, game_path=game_path,
             prefix_root=prefix, install_root=install_root,
-            require_managed=require_managed,
+            require_managed=require_managed, steam_root_path=steam_root,
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
