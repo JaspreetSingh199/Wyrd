@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QPlainTextEdit, QVBoxLayout,
+    QPlainTextEdit, QVBoxLayout, QCheckBox, QGroupBox, QInputDialog,
 )
 
 from wyrd_mo2 import managed_paths
@@ -32,6 +32,9 @@ class Mo2LibraryDialog(QDialog):
         self.service = RegistryService(managed_paths()["config"] / "mo2-registry.json")
         self.discovery: dict = {}
         self.registered = False
+        self.launch_requested = False
+        self.associations_updated = False
+        self.selected_instance_record: dict | None = None
 
         root = QVBoxLayout(self)
         intro = QLabel(
@@ -82,6 +85,10 @@ class Mo2LibraryDialog(QDialog):
         self.registered_instances.currentRowChanged.connect(self._select_registered)
         root.addWidget(self.registered_instances, 1)
         self._refresh_registered()
+        self._edit_associations_button = QPushButton("Edit game / Proton association")
+        self._edit_associations_button.setEnabled(False)
+        self._edit_associations_button.clicked.connect(self.edit_associations)
+        root.addWidget(self._edit_associations_button)
         self._launch_existing_button = QPushButton("Launch selected registered instance")
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
@@ -133,7 +140,6 @@ class Mo2LibraryDialog(QDialog):
         close = QPushButton("Close")
         close.clicked.connect(self.accept)
         footer.addWidget(self.register_button)
-        footer.addWidget(self.launch_selected_button)
         footer.addStretch(1)
         footer.addWidget(close)
         root.addLayout(footer)
@@ -174,6 +180,7 @@ class Mo2LibraryDialog(QDialog):
         if not isinstance(record, dict):
             self.selected_instance_record = None
             self._launch_existing_button.setEnabled(False)
+            self._edit_associations_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             return
         self.selected_instance_record = record
@@ -204,6 +211,7 @@ class Mo2LibraryDialog(QDialog):
                      and record.get("prefix_path"))
         self._launch_existing_button.setEnabled(ready)
         self.apply_storage_button.setEnabled(bool(record.get("config")))
+        self._edit_associations_button.setEnabled(True)
 
     def _choose_shared(self, category: str) -> None:
         path = QFileDialog.getExistingDirectory(
@@ -308,6 +316,80 @@ class Mo2LibraryDialog(QDialog):
             )
         except Exception as error:
             QMessageBox.warning(self, "Storage settings", str(error))
+
+    def edit_associations(self) -> None:
+        record = self.selected_instance_record
+        if not record:
+            return
+        try:
+            _registry, _installations, games, runtimes = self._registry_maps()
+            current_game = games[record["game_id"]]
+            current_runtime = runtimes.get(record.get("runtime_id"), {})
+            game_name, accepted = QInputDialog.getText(
+                self, "Edit game association", "Game name:", text=current_game.get("name", "")
+            )
+            if not accepted or not game_name.strip():
+                return
+            game_path = QFileDialog.getExistingDirectory(
+                self, "Select game installation directory", current_game.get("path", "")
+            )
+            if not game_path:
+                return
+            app_id, accepted = QInputDialog.getText(
+                self, "Edit game association", "Steam AppID (blank for non-Steam game):",
+                text=str(current_game.get("app_id", ""))
+            )
+            if not accepted:
+                return
+            prefix_path = QFileDialog.getExistingDirectory(
+                self, "Select initialized Proton prefix", str(record.get("prefix_path") or "")
+            )
+            if not prefix_path:
+                return
+            prefix = Path(prefix_path).expanduser()
+            if prefix.is_symlink() or not (prefix / "pfx/drive_c/users").is_dir():
+                raise ValueError("Selected prefix is not initialized or contains a symlink.")
+            runtime_path = QFileDialog.getExistingDirectory(
+                self, "Select Proton runtime", current_runtime.get("path", "")
+            )
+            if not runtime_path:
+                return
+            runtime = Path(runtime_path).expanduser()
+            if runtime.is_symlink() or not (runtime / "proton").is_file():
+                raise ValueError("Selected runtime does not contain a Proton launcher.")
+            game_id = "game-" + hashlib.sha256(
+                (game_path + "|" + app_id.strip()).encode()
+            ).hexdigest()[:16]
+            runtime_id = "proton-" + hashlib.sha256(str(runtime.resolve()).encode()).hexdigest()[:16]
+            game = {
+                "id": game_id, "name": game_name.strip(), "path": game_path,
+                "app_id": app_id.strip(),
+                "steam_root": str(Path(game_path).parents[2]) if app_id.strip() else "",
+                "prefix_path": str(prefix.resolve(strict=True)),
+            }
+            runtime_record = {
+                "id": runtime_id, "name": runtime.name, "path": str(runtime.resolve()),
+            }
+            answer = QMessageBox.question(
+                self, "Save game/runtime association",
+                "Update this registered instance's game and Proton association? "
+                "Only Wyrd registry metadata changes. MO2 and game files remain untouched.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.service.update_associations(record["id"], game=game, runtime=runtime_record)
+            self._refresh_registered()
+            for row in range(self.registered_instances.count()):
+                item = self.registered_instances.item(row)
+                data = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(data, dict) and data.get("id") == record["id"]:
+                    self.registered_instances.setCurrentRow(row)
+                    break
+            self.associations_updated = True
+        except Exception as error:
+            QMessageBox.warning(self, "Edit associations", str(error))
 
     def launch_selected(self) -> None:
         if not self.selected_instance_record:
@@ -425,7 +507,6 @@ class Mo2LibraryDialog(QDialog):
         item = self.instances.currentItem()
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
         installation = self.discovery.get("installation")
-        prefix_path = Path(self.prefix_edit.text()).expanduser()
         if not proposal or not installation or proposal.get("registration_status") == "registered":
             return
         game_id = self.game_id_edit.text().strip()
@@ -440,9 +521,6 @@ class Mo2LibraryDialog(QDialog):
             return
         if not game_id or not game_name or not game_path:
             QMessageBox.warning(self, "Register MO2 instance", "Game name, association ID, and game directory are required.")
-            return
-        if prefix_path.is_symlink() or not (prefix_path / "pfx/drive_c/users").is_dir():
-            QMessageBox.warning(self, "Register MO2 instance", "Select a valid initialized Proton prefix before registering.")
             return
         answer = QMessageBox.question(
             self, "Register MO2 instance",

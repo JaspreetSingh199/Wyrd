@@ -176,6 +176,7 @@ class MainWindow(QMainWindow):
         self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
+        self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         self._restoring_selection = True
 
         root = QWidget()
@@ -268,6 +269,9 @@ class MainWindow(QMainWindow):
         self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
         self.launch_status_button = QPushButton("Check launch status")
         self.launch_status_button.clicked.connect(self.check_launch_status)
+        self.active_instance_label = QLabel("Active MO2 instance: none selected")
+        self.active_instance_label.setObjectName("muted")
+        layout.addWidget(self.active_instance_label)
         self.mo2_library_button = QPushButton("MO2 Library / Instances")
         self.mo2_library_button.clicked.connect(self.manage_mo2_library)
         self.mo2_library_button.setEnabled(False)
@@ -491,7 +495,60 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
-        self.mo2_library_button.setEnabled(bool(self.game_state.get("found")))
+        self.mo2_library_button.setEnabled(True)
+
+    def _restore_registered_instance(self) -> dict | None:
+        """Resolve the saved primary instance from Wyrd's local registry."""
+        from wyrd_mo2_registry_service import RegistryService
+        try:
+            registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+        except Exception as error:
+            self._log(f"Could not load MO2 registry: {error}")
+            return None
+        record = next((item for item in registry["instances"]
+                       if item.get("id") == self.selected_mo2_instance_id), None)
+        if record is None:
+            self.active_instance_label.setText("Active MO2 instance: none selected")
+            return None
+        games = {item["id"]: item for item in registry["games"]}
+        game = games.get(record.get("game_id"), {})
+        label = Path(record.get("instance_path", "")).name
+        self.active_instance_label.setText(
+            f"Active MO2 instance: {label} · {game.get('name', 'unknown game')}"
+        )
+        return record
+
+    def _set_active_instance(self, record: dict | None) -> None:
+        if not record:
+            return
+        self.selected_mo2_instance_id = record.get("id", "")
+        settings = dict(self._saved_settings)
+        settings["selected_mo2_instance_id"] = self.selected_mo2_instance_id
+        self._saved_settings = settings
+        self._restore_registered_instance()
+        # Preserve the normal Proton/game/audio preferences while saving the
+        # additional selection key using the same atomic settings-file pattern.
+        import json, os, tempfile
+        path = managed_paths()["settings"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        payload["selected_mo2_instance_id"] = self.selected_mo2_instance_id
+        fd, temp_name = tempfile.mkstemp(prefix=".wyrd-settings-", dir=str(path.parent))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_name, path)
+        except Exception:
+            try:
+                os.unlink(temp_name)
+            except OSError:
+                pass
+            raise
 
     def manage_mo2_library(self) -> None:
         """Open the MO2 library; existing registry entries work without current Skyrim detection."""
@@ -508,6 +565,8 @@ class MainWindow(QMainWindow):
             game_path=saved_game or "", proton_path=self.proton_combo.currentData() or "",
         )
         dialog.exec()
+        if getattr(dialog, "selected_instance_record", None):
+            self._set_active_instance(dialog.selected_instance_record)
         if dialog.registered:
             self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
         if dialog.launch_requested and dialog.selected_instance_record:

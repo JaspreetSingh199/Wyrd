@@ -713,6 +713,7 @@ def write_settings(home: Path | None, proton_path: Path, game_path: Path,
     temporary.write_text(json.dumps({
         "proton": str(proton_path.resolve()), "game_path": str(game_path.resolve()),
         "xaudio2_compat": bool(xaudio2_compat),
+        "selected_mo2_instance_id": read_settings(home).get("selected_mo2_instance_id", ""),
         "updated": datetime.now(timezone.utc).isoformat(),
     }, indent=2), encoding="utf-8")
     os.replace(temporary, paths["settings"])
@@ -734,6 +735,9 @@ def read_settings(home: Path | None = None) -> dict:
         if isinstance(value, str) and value.strip():
             result[key] = value
     result["xaudio2_compat"] = bool(payload.get("xaudio2_compat", False))
+    selected_instance = payload.get("selected_mo2_instance_id")
+    if isinstance(selected_instance, str) and selected_instance.strip():
+        result["selected_mo2_instance_id"] = selected_instance.strip()
     return result
 
 def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list[Path]:

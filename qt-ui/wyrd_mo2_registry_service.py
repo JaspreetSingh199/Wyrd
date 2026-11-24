@@ -128,6 +128,35 @@ class RegistryService:
                 return validated
         raise RegistryError("registered MO2 instance was not found")
 
+    def update_associations(
+        self, instance_id: str, *, game: dict[str, Any], runtime: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Change only an existing instance's explicit game/runtime references."""
+        if not isinstance(game, dict) or not isinstance(runtime, dict):
+            raise RegistryError("game and runtime associations are required")
+        current = self.load()
+        for index, instance in enumerate(current["instances"]):
+            if instance.get("id") != instance_id:
+                continue
+            for collection, record in (("games", dict(game)), ("runtimes", dict(runtime))):
+                identifier = record.get("id")
+                if not isinstance(identifier, str) or not identifier.strip():
+                    raise RegistryError(f"{collection} association requires an ID")
+                existing = next((item for item in current[collection] if item.get("id") == identifier), None)
+                if existing is not None and existing != record:
+                    raise RegistryError(f"{collection} ID already exists with different metadata")
+                if existing is None:
+                    current[collection].append(record)
+            updated = dict(instance)
+            updated["game_id"] = game["id"]
+            updated["runtime_id"] = runtime["id"]
+            updated["prefix_path"] = game.get("prefix_path") or updated.get("prefix_path")
+            current["instances"][index] = updated
+            validated = validate_registry(current)
+            save_registry(self.registry_path, validated)
+            return validated
+        raise RegistryError(f"registered MO2 instance not found: {instance_id}")
+
     def register(
         self, installation: dict[str, Any], proposal: dict[str, Any],
         game: dict[str, Any], runtime: dict[str, Any] | None = None,
