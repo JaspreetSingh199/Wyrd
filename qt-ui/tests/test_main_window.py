@@ -142,7 +142,11 @@ class MainWindowSmokeTests(unittest.TestCase):
         )
         self.assertEqual(advanced.category_pages.count(), 3)
         self.assertEqual(advanced.category_list.currentRow(), 0)
-        self.assertFalse(advanced.scan_button.isEnabled())
+        # MainWindow now supplies detected Skyrim compatdata and the
+        # default MO2 destination during startup.
+        self.assertTrue(advanced.prefix_edit.text().endswith("/compatdata/489830"))
+        self.assertTrue(advanced.install_edit.text().endswith("/pfx/drive_c/Modding/MO2"))
+        self.assertTrue(advanced.scan_button.isEnabled())
         advanced.update_context(
             prefix_path="/test/compatdata/489830",
             install_path="/test/MO2",
