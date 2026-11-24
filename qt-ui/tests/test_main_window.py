@@ -381,6 +381,29 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("process identities are no longer present", window.log_view.toPlainText())
         window.close()
 
+    def test_launch_monitor_does_not_claim_wyrd_when_shared_prefix_marker_is_present(self):
+        window = self._window()
+        window.launch_session.wrapper_pid = 500
+        window.launch_session.wrapper_start_time = 900
+        ordinary_steam_process = {
+            "pid": 700, "binary": "skyrimse.exe",
+            "prefix_attributed": True, "attributed_to_wyrd": False,
+        }
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "main.launch_process_status", return_value={
+                "state": "running", "message": "wrapper still running"
+            }
+        ), patch("main.detect_skyrim_processes", return_value={
+            "ok": True, "processes": [ordinary_steam_process],
+            "wyrd_processes": [],
+        }), patch("main._is_descendant_process", return_value=False):
+            window._poll_launch_status()
+        self.assertEqual(window.launch_session.state, "idle")
+        self.assertEqual(window.launch_session.game_processes, [])
+        self.assertTrue(window._launch_monitor.isActive())
+        self.assertNotIn("detected-unconfirmed", window.launch_session.state)
+        window.close()
+
     def test_launch_monitor_stops_when_wrapper_exits_without_game(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
