@@ -133,6 +133,26 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
 
+    def test_mo2_advanced_uses_clear_category_navigation_and_scan(self):
+        window = self._window()
+        advanced = window.mo2_advanced_widget
+        self.assertEqual(
+            [advanced.category_list.item(i).text() for i in range(advanced.category_list.count())],
+            ["Locations", "Instances", "Storage"],
+        )
+        self.assertEqual(advanced.category_pages.count(), 3)
+        self.assertEqual(advanced.category_list.currentRow(), 0)
+        self.assertFalse(advanced.scan_button.isEnabled())
+        advanced.update_context(
+            prefix_path="/test/compatdata/489830",
+            install_path="/test/MO2",
+            game_path="/test/Skyrim",
+            proton_path="/test/Proton",
+        )
+        self.assertTrue(advanced.scan_button.isEnabled())
+        self.assertEqual(advanced.prefix_edit.text(), "/test/compatdata/489830")
+        window.close()
+
     def test_v1_does_not_expose_experimental_audio_override(self):
         window = self._window()
         self.assertFalse(hasattr(window, "native_xaudio2_checkbox"))
