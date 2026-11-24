@@ -717,6 +717,7 @@ class WyrdMO2Tests(unittest.TestCase):
                     "SKSE", "Skyrim SE", root, log_path=log_path,
                     proton_path=proton, game_path=game,
                     prefix_root=prefix, install_root=install,
+                    require_managed=False,
                 )
             self.assertTrue(result["ok"], result)
             command = popen.call_args.args[0]
