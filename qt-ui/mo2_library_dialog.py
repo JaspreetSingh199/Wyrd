@@ -70,6 +70,12 @@ class Mo2LibraryDialog(QDialog):
         actions.addStretch(1)
         root.addLayout(actions)
 
+        root.addWidget(QLabel("Already registered with Wyrd"))
+        self.registered_instances = QListWidget()
+        self.registered_instances.setMaximumHeight(120)
+        root.addWidget(self.registered_instances)
+        self._refresh_registered()
+
         root.addWidget(QLabel("Discovered instances"))
         self.instances = QListWidget()
         self.instances.currentRowChanged.connect(self._show_selected)
@@ -92,6 +98,28 @@ class Mo2LibraryDialog(QDialog):
         footer.addStretch(1)
         footer.addWidget(close)
         root.addLayout(footer)
+
+    def _refresh_registered(self) -> None:
+        self.registered_instances.clear()
+        try:
+            registry = self.service.load()
+        except Exception as error:
+            self.registered_instances.addItem(f"Registry unavailable: {error}")
+            return
+        games = {item.get("id"): item.get("name", item.get("id")) for item in registry.get("games", [])}
+        installations = {item.get("id"): item for item in registry.get("installations", [])}
+        self.registered_instances.addItem(
+            f"{len(registry.get('installations', []))} installation(s) · "
+            f"{len(registry.get('instances', []))} instance(s) registered"
+        )
+        for instance in registry.get("instances", []):
+            installation = installations.get(instance.get("installation_id"), {})
+            owner = installation.get("owner", "unknown")
+            game = games.get(instance.get("game_id"), instance.get("game_id", "unknown game"))
+            self.registered_instances.addItem(
+                f"{instance.get('instance_type', 'unknown')} · {game} · {owner}\n"
+                f"{instance.get('instance_path', '')}"
+            )
 
     def _browse_install(self) -> None:
         selected = QFileDialog.getExistingDirectory(
@@ -214,6 +242,7 @@ class Mo2LibraryDialog(QDialog):
             return
 
         self.registered = True
+        self._refresh_registered()
         item.setText(item.text() + "  ·  REGISTERED")
         item.setData(Qt.ItemDataRole.UserRole, {**proposal, "registration_status": "registered"})
         self.register_button.setEnabled(False)
