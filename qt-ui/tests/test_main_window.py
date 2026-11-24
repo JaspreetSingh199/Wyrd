@@ -507,6 +507,22 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window.launch_button.isEnabled())
         window.close()
 
+    def test_install_completion_rejects_failed_post_install_verification(self):
+        window = self._window()
+        window.game_state = {"found": True, "game_dir": "/games/Skyrim Special Edition"}
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
+            "installed": False, "message": "Ownership marker is missing."
+        }), patch("main.QMessageBox.information") as success, patch(
+            "main.QMessageBox.warning"
+        ) as warning:
+            window._on_install_completed({"ok": True, "message": "Installer finished."})
+        success.assert_not_called()
+        warning.assert_called_once()
+        self.assertIn("post-install ownership/executable verification failed", warning.call_args.args[2])
+        self.assertIn("Ownership marker is missing", warning.call_args.args[2])
+        self.assertIn("Setup stopped", window.progress_label.text())
+        window.close()
+
     def test_launch_skyrim_button_requires_verified_steam_prefix_instance(self):
         window = self._window()
         self.assertFalse(window.launch_game_button.isEnabled())
