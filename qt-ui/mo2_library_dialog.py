@@ -437,6 +437,9 @@ class Mo2LibraryDialog(QWidget):
             self.details.setPlainText(
                 "Instance reference removed from Wyrd. No MO2 or game files were changed."
             )
+            callback = getattr(self, "on_registry_changed", None)
+            if callable(callback):
+                callback(None, True)
         except Exception as error:
             QMessageBox.warning(self, "Unregister MO2 instance", str(error))
 
