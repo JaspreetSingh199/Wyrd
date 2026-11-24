@@ -1507,6 +1507,7 @@ class MainWindow(QMainWindow):
             self.launch_session.game_path = str(game_path.resolve())
             self.launch_session.app_id = "489830"
             self.launch_session.target_binary = Path(selected_target["binary"]).name
+            self.launch_session.launch_token = result.get("launch_token")
             self.launch_session.state = "handoff"
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
@@ -1551,12 +1552,21 @@ class MainWindow(QMainWindow):
             _steam_prefix_for_game_path(self.game_state.get("game_dir"))
         )
         if self.launch_session.app_id == "489830":
-            process_scan = detect_skyrim_processes(scan_prefix)
+            process_scan = detect_skyrim_processes(
+                scan_prefix, launch_token=self.launch_session.launch_token
+            )
             session_processes = []
+            seen_pids = set()
             if process_scan.get("ok") and wrapper_identity_matches:
                 for item in process_scan.get("processes", []):
                     if _is_descendant_process(item["pid"], self.launch_session.wrapper_pid):
-                        session_processes.append(item)
+                        session_processes.append({**item, "_launch_source": "descendant"})
+                        seen_pids.add(item["pid"])
+            if process_scan.get("ok"):
+                for item in process_scan.get("wyrd_processes", []):
+                    if item["pid"] not in seen_pids:
+                        session_processes.append({**item, "_launch_source": "token-prefix"})
+                        seen_pids.add(item["pid"])
         elif self.launch_session.target_binary:
             from wyrd_mo2 import detect_game_processes
             process_scan = detect_game_processes(
@@ -1576,9 +1586,16 @@ class MainWindow(QMainWindow):
             detected = ", ".join(
                 f"{item['binary']} (PID {item['pid']})" for item in session_processes
             )
+            skyrim_prefix_match = (
+                self.launch_session.app_id == "489830"
+                and any(item.get("_launch_source") == "token-prefix" for item in session_processes)
+                and not any(item.get("_launch_source") == "descendant" for item in session_processes)
+            )
             self.progress_label.setText(
                 "Skyrim/SKSE detected in this Wyrd launch process tree."
-                if self.launch_session.app_id == "489830"
+                if self.launch_session.app_id == "489830" and not skyrim_prefix_match
+                else "Skyrim/SKSE detected with this launch's unique Wyrd prefix token."
+                if skyrim_prefix_match
                 else "Configured game executable detected in this Wyrd launch process tree."
             )
             self.launch_session.detected_processes = list(session_processes)
@@ -1589,7 +1606,7 @@ class MainWindow(QMainWindow):
                 GameProcess(
                     pid=item["pid"], binary=item["binary"],
                     start_time=item.get("start_time"),
-                    detection_source="launch_process_tree",
+                    detection_source=item.get("_launch_source", "launch_process_tree"),
                     attribution_confidence="confirmed",
                 ) for item in session_processes
             ]
@@ -1689,7 +1706,9 @@ class MainWindow(QMainWindow):
             else _steam_prefix_for_game_path(game_dir)
         )
         if session.app_id == "489830" or (session.wrapper_pid is None and session.app_id is None):
-            process_scan = detect_skyrim_processes(steam_prefix)
+            process_scan = detect_skyrim_processes(
+                steam_prefix, launch_token=session.launch_token
+            )
             self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
             for item in process_scan.get("processes", []):
                 self._log(
@@ -1795,7 +1814,13 @@ class MainWindow(QMainWindow):
                 if wrapper_matches and session.wrapper_pid:
                     for item in process_scan.get("processes", []):
                         if _is_descendant_process(item["pid"], session.wrapper_pid):
-                            session_processes.append(item)
+                            session_processes.append({**item, "_launch_source": "descendant"})
+                if session.wrapper_pid:
+                    known_pids = {item["pid"] for item in session_processes}
+                    for item in process_scan.get("wyrd_processes", []):
+                        if item["pid"] not in known_pids:
+                            session_processes.append({**item, "_launch_source": "token-prefix"})
+                            known_pids.add(item["pid"])
             elif session.wrapper_pid and session.target_binary:
                 # Generic scanner has already validated the exact launch token,
                 # registered prefix, and original wrapper identity.
