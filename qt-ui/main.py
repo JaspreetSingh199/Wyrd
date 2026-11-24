@@ -307,11 +307,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.progress)
 
         instructions = panel(
-            "5. Launch Skyrim from MO2",
-            "On the first MO2 launch, create a new instance and choose “Skyrim Special Edition”. "
-            "MO2 runs in Skyrim’s existing Steam AppID 489830 prefix. Wyrd does not create or reset that prefix. "
-            "After the instance is created, select Skyrim or SKSE in MO2's executable dropdown and press Run. "
-            "MO2 then launches the game through its mod virtual filesystem.",
+            "5. Launch the active registered game",
+            "Choose an instance in MO2 Library / Instances to make it active. Wyrd uses that instance's "
+            "registered MO2 installation, game association, Proton runtime, and prefix. It lists the "
+            "executables configured in that instance and launches the selected target through MO2's virtual "
+            "filesystem. Skyrim Special Edition continues to use the dedicated Skyrim/SKSE launch and audio diagnostics.",
         )
         layout.addWidget(instructions)
 
@@ -519,7 +519,12 @@ class MainWindow(QMainWindow):
         if record is None:
             self.active_instance_label.setText("Active MO2 instance: none selected")
             if hasattr(self, "launch_game_button"):
-                self.launch_game_button.setEnabled(False)
+                legacy_ready = bool(
+                    self.game_state.get("found")
+                    and self.instance_state.get("skyrim_instances")
+                )
+                busy = bool(self.worker and self.worker.isRunning())
+                self.launch_game_button.setEnabled(legacy_ready and not busy)
             return None
         games = {item["id"]: item for item in registry["games"]}
         game = games.get(record.get("game_id"), {})
@@ -1071,6 +1076,9 @@ class MainWindow(QMainWindow):
 
         record = self._restore_registered_instance()
         if not record:
+            if self.game_state.get("found") and self.instance_state.get("skyrim_instances"):
+                self.start_skyrim()
+                return
             QMessageBox.warning(self, "No active MO2 instance", "Select or register an MO2 instance in the MO2 Library first.")
             return
         registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
