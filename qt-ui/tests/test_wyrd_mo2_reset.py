@@ -95,7 +95,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
             _steam, prefix, install, _instance, game, _custom, sentinel = self._managed_layout(home)
             with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "install": str(install), "prefix": str(prefix),
-            }):
+            }), patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
                 result = reset_wyrd_mo2(home, game)
             self.assertTrue(result["ok"], result)
             self.assertFalse(install.exists())
@@ -145,25 +145,28 @@ class WyrdMO2ResetTests(unittest.TestCase):
             self.assertTrue(install.exists())
             self.assertTrue(sentinel.exists())
 
-    def test_duplicate_registered_instance_target_is_refused(self):
+    def test_nested_registered_instance_target_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
             self._registry(home, install, instance)
+            nested = instance / "Nested"
+            nested.mkdir()
+            (nested / "ModOrganizer.ini").write_text("[General]\\n", encoding="utf-8")
             registry_path = managed_paths(home)["config"] / "mo2-registry.json"
             registry = json.loads(registry_path.read_text(encoding="utf-8"))
-            duplicate = dict(registry["instances"][0], id="duplicate-instance")
-            registry["instances"].append(duplicate)
+            nested_record = dict(registry["instances"][0], id="nested-instance", instance_path=str(nested), config=str(nested / "ModOrganizer.ini"))
+            registry["instances"].append(nested_record)
             save_registry(registry_path, registry)
             with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "install": str(install), "prefix": str(prefix),
-            }):
+            }), patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
                 result = reset_wyrd_mo2(home, game)
             self.assertFalse(result["ok"])
+            self.assertIn("overlap", result["message"])
             self.assertTrue(install.exists())
             self.assertTrue(instance.exists())
             self.assertTrue(sentinel.exists())
-
     def test_malformed_registry_refuses_reset_before_deletion(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
