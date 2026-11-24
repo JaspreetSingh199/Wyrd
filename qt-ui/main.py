@@ -550,9 +550,8 @@ class MainWindow(QMainWindow):
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
-        if not record:
-            return
-        self.selected_mo2_instance_id = record.get("id", "")
+        # Passing None explicitly clears a primary selection that was unregistered.
+        self.selected_mo2_instance_id = record.get("id", "") if record else ""
         settings = dict(self._saved_settings)
         settings["selected_mo2_instance_id"] = self.selected_mo2_instance_id
         self._saved_settings = settings
@@ -600,6 +599,20 @@ class MainWindow(QMainWindow):
         dialog.exec()
         if getattr(dialog, "selected_instance_record", None):
             self._set_active_instance(dialog.selected_instance_record)
+        else:
+            # An unregister operation can invalidate the persisted primary ID.
+            # Clear it immediately instead of leaving a dead selection in settings.
+            try:
+                from wyrd_mo2_registry_service import RegistryService
+                registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+                still_registered = any(
+                    item.get("id") == self.selected_mo2_instance_id
+                    for item in registry["instances"]
+                )
+                if self.selected_mo2_instance_id and not still_registered:
+                    self._set_active_instance(None)
+            except Exception as error:
+                self._log(f"Could not reconcile the saved MO2 selection after library changes: {error}")
         if dialog.registered:
             self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
         if dialog.launch_requested and dialog.selected_instance_record:
