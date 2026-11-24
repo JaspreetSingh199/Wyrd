@@ -452,8 +452,15 @@ class Mo2LibraryDialog(QDialog):
 
         self.registered = True
         self._refresh_registered()
-        item.setText(item.text() + "  ·  REGISTERED")
-        item.setData(Qt.ItemDataRole.UserRole, {**proposal, "registration_status": "registered"})
+        for row in range(self.instances.count()):
+            candidate = self.instances.item(row)
+            data = candidate.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("id") == proposal.get("id"):
+                data["registration_status"] = "registered"
+                candidate.setData(Qt.ItemDataRole.UserRole, data)
+                candidate.setText(candidate.text().replace("DISCOVERED", "REGISTERED"))
+                self.instances.setCurrentRow(row)
+                break
         self.register_button.setEnabled(False)
         self.details.appendPlainText("\n\nRegistered successfully in Wyrd's local MO2 registry.")
         QMessageBox.information(self, "MO2 instance registered", "Wyrd metadata was saved. No MO2 files or game data were changed.")
