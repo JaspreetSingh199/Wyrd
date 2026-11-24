@@ -1237,16 +1237,12 @@ class WyrdMO2Tests(unittest.TestCase):
             root = home / ".steam/steam"
             common = root / "steamapps/common"
             common.mkdir(parents=True)
-            names = [
-                "Proton-CachyOS Latest",
-                "GE-Proton Latest",
-                "Proton - Experimental",
-                "Proton 10.0",
-                "proton-cachyos-slr",
-                "Proton 9.0",
-            ]
-            for name in names:
+            official_names = ["Proton - Experimental", "Proton 10.0", "Proton 9.0", "Proton-CachyOS Latest"]
+            for name in official_names:
                 make_proton(common / name)
+            custom_root = root / "compatibilitytools.d"
+            for name in ["GE-Proton Latest", "proton-cachyos-slr"]:
+                make_proton(custom_root / name)
             with patch("wyrd_mo2.find_steam_roots", return_value=[root]):
                 with patch("pathlib.Path.home", return_value=home):
                     builds = discover_proton_builds(home, system_roots=[])
