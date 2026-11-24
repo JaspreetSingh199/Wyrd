@@ -50,6 +50,7 @@ class LaunchSession:
     prefix_root: str | None = None
     game_path: str | None = None
     app_id: str | None = None
+    target_binary: str | None = None
     state: str = "idle"
 
 
@@ -262,8 +263,8 @@ class MainWindow(QMainWindow):
         self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
         self.reset_prefix_button.setEnabled(False)
         self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
-        self.launch_game_button = QPushButton("Launch Skyrim (MO2)")
-        self.launch_game_button.clicked.connect(self.start_skyrim)
+        self.launch_game_button = QPushButton("Launch Active Game (MO2)")
+        self.launch_game_button.clicked.connect(self.start_active_game)
         self.launch_game_button.setEnabled(False)
         self.launch_direct_button = QPushButton("Launch Unmodded (Steam)")
         self.launch_direct_button.clicked.connect(self.start_skyrim_direct)
@@ -1052,6 +1053,215 @@ class MainWindow(QMainWindow):
             self, "Steam launch requested",
             "Steam was asked to launch Skyrim Special Edition directly. This is an unmodded launch and bypasses MO2.",
         )
+
+    def start_active_game(self) -> None:
+        """Launch the configured executable for the persistent registered instance."""
+        from wyrd_mo2_registry_service import RegistryService
+        from wyrd_mo2 import inspect_mo2_instances, _resolve_windows_path
+
+        record = self._restore_registered_instance()
+        if not record:
+            QMessageBox.warning(self, "No active MO2 instance", "Select or register an MO2 instance in the MO2 Library first.")
+            return
+        registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+        installations = {item["id"]: item for item in registry["installations"]}
+        games = {item["id"]: item for item in registry["games"]}
+        runtimes = {item["id"]: item for item in registry["runtimes"]}
+        game = games.get(record.get("game_id"), {})
+        if str(game.get("app_id") or "") == "489830":
+            self.start_skyrim()
+            return
+        installation = installations.get(record.get("installation_id"), {})
+        runtime = runtimes.get(record.get("runtime_id"), {})
+        executable = Path(installation.get("executable", "")).expanduser()
+        instance_path = Path(record.get("instance_path", "")).expanduser()
+        config = Path(record.get("config", "")).expanduser()
+        prefix = Path(record.get("prefix_path") or installation.get("prefix_path") or "").expanduser()
+        game_path = Path(game.get("path", "")).expanduser()
+        proton = Path(runtime.get("path", "")).expanduser()
+        if installation.get("owner") not in ("wyrd", "external"):
+            QMessageBox.warning(self, "MO2 launch unavailable", "Installation ownership is not verified.")
+            return
+        for path, label in (
+            (executable, "MO2 executable"), (instance_path, "MO2 instance"),
+            (config, "instance configuration"), (prefix, "Proton prefix"),
+            (game_path, "game directory"), (proton, "Proton runtime"),
+        ):
+            if path.is_symlink() or not path.exists():
+                QMessageBox.warning(self, "MO2 launch unavailable", f"Registered {label} is missing or unsafe: {path}")
+                return
+        if not executable.is_file() or not config.is_file() or not instance_path.is_dir() or not game_path.is_dir() or not proton.is_dir():
+            QMessageBox.warning(self, "MO2 launch unavailable", "A registered path does not have the expected file/directory type.")
+            return
+        if not (prefix / "pfx/drive_c/users").is_dir() or not (proton / "proton").is_file():
+            QMessageBox.warning(self, "MO2 launch unavailable", "The registered Proton prefix or Proton launcher is unavailable.")
+            return
+
+        inventory = inspect_mo2_instances(prefix, executable.parent, require_managed=False)
+        if not inventory.get("ok"):
+            QMessageBox.warning(self, "MO2 launch unavailable", inventory.get("message", "Could not inspect registered MO2 prefix."))
+            return
+        expected_instance = instance_path.resolve(strict=True)
+        discovered = next(
+            (item for item in inventory.get("instances", [])
+             if Path(item.get("path", "")).resolve() == expected_instance),
+            None,
+        )
+        if not discovered:
+            QMessageBox.warning(self, "MO2 launch unavailable", "The registered instance is no longer present in its associated prefix.")
+            return
+
+        targets = []
+        for entry in discovered.get("executables", []):
+            title = str(entry.get("title", "")).strip()
+            binary = _resolve_windows_path(str(entry.get("binary", "")), prefix, game_path)
+            if not title or binary is None or not binary.is_file() or binary.is_symlink():
+                continue
+            targets.append({**entry, "title": title, "resolved_binary": str(binary)})
+        if not targets:
+            QMessageBox.warning(
+                self, "No configured executable",
+                "This MO2 instance has no custom executable whose target can be safely resolved. "
+                "Add the game executable in MO2's Executables settings, then refresh the library."
+            )
+            return
+
+        labels = [
+            f"{item['title']} — {Path(item['resolved_binary']).name}"
+            for item in targets
+        ]
+        selected_label, accepted = QInputDialog.getItem(
+            self, "Launch active game", "Configured MO2 executable:", labels, 0, False
+        )
+        if not accepted or not selected_label:
+            return
+        target = targets[labels.index(selected_label)]
+        answer = QMessageBox.question(
+            self, "Confirm game launch",
+            f"Launch '{target['title']}' through MO2 instance '{instance_path.name}' "
+            f"for {game.get('name', 'the registered game')}? Wyrd will not edit the MO2 profile or executable settings.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = self._launch_registered_custom_executable(
+            record, installation, game, runtime, target
+        )
+        self._log(result.get("message", "Game launch handoff did not start."))
+        if not result.get("ok"):
+            QMessageBox.warning(self, "Game launch failed", result.get("message", "Could not start the configured executable."))
+            return
+        self.progress_label.setText("MO2 game launch handoff started; process detection is pending.")
+        self.launch_status_button.setEnabled(True)
+        QMessageBox.information(self, "Game launch handoff", result.get("message", ""))
+
+    def _launch_registered_custom_executable(
+        self, record: dict, installation: dict, game: dict, runtime: dict, target: dict
+    ) -> dict:
+        """Start an MO2 custom executable under its registered Proton/game context."""
+        import json
+        import subprocess
+        from datetime import datetime, timezone
+        from wyrd_mo2 import inspect_proton_build, _runtime_environment
+
+        executable = Path(installation.get("executable", "")).expanduser()
+        instance_path = Path(record.get("instance_path", "")).expanduser()
+        config = Path(record.get("config", "")).expanduser()
+        prefix = Path(record.get("prefix_path") or installation.get("prefix_path") or "").expanduser()
+        game_path = Path(game.get("path", "")).expanduser()
+        proton = Path(runtime.get("path", "")).expanduser()
+        expected_binary = Path(target.get("resolved_binary", "")).expanduser()
+        title = str(target.get("title", "")).strip()
+        if not title or executable.is_symlink() or not executable.is_file():
+            return {"ok": False, "message": "MO2 executable or configured title is invalid."}
+        if any(path.is_symlink() for path in (instance_path, config, prefix, game_path, proton, expected_binary)):
+            return {"ok": False, "message": "A registered launch path became a symlink; launch refused."}
+        if not instance_path.is_dir() or not config.is_file() or not game_path.is_dir():
+            return {"ok": False, "message": "MO2 instance, configuration, or game directory is missing."}
+        if not (prefix / "pfx/drive_c/users").is_dir() or not (proton / "proton").is_file():
+            return {"ok": False, "message": "Registered Proton prefix or runtime is unavailable."}
+        validation = inspect_proton_build(proton)
+        if not validation.get("ok"):
+            return {"ok": False, "message": validation.get("message", "Proton runtime validation failed.")}
+        if not expected_binary.is_file():
+            return {"ok": False, "message": "Configured game executable disappeared after selection."}
+        try:
+            config.resolve(strict=True).relative_to(instance_path.resolve(strict=True))
+            expected_binary.resolve(strict=True)
+        except (OSError, ValueError, RuntimeError):
+            return {"ok": False, "message": "Instance configuration or game executable no longer resolves safely."}
+
+        steam_root_text = game.get("steam_root")
+        if steam_root_text:
+            steam_root = Path(steam_root_text).expanduser()
+        else:
+            candidates = (
+                Path.home() / ".steam/steam",
+                Path.home() / ".local/share/Steam",
+                Path.home() / ".steam/root",
+            )
+            steam_root = next((path for path in candidates if path.is_dir()), Path(""))
+        if not steam_root.is_dir():
+            return {"ok": False, "message": "A Steam client install root is needed by this Proton runtime but was not found."}
+
+        env = _runtime_environment(proton, steam_root, prefix)
+        app_id = str(game.get("app_id") or "").strip()
+        if app_id:
+            env.update({"SteamAppId": app_id, "SteamGameId": app_id, "STEAM_COMPAT_APP_ID": app_id})
+        else:
+            for key in ("SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"):
+                env.pop(key, None)
+        env["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())
+        env["WYRD_LAUNCHED"] = "1"
+        command = [
+            str(proton / "proton"), "run", str(executable),
+            "--instance", instance_path.name, "run", "--executable", title,
+        ]
+        logs = managed_paths()["root"] / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+        log_path = logs / f"{record.get('id', 'instance')}-game-launch.log"
+        try:
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write("\n=== Wyrd registered game launch ===\n")
+                log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\n")
+                log.write(f"game: {game.get('name')}\ninstance: {instance_path}\ntitle: {title}\n")
+                log.write(f"binary: {expected_binary}\napp_id: {app_id or 'non-Steam'}\n")
+                log.write("command: " + json.dumps(command) + "\n")
+                log.flush()
+                process = subprocess.Popen(
+                    command, cwd=str(executable.parent), env=env,
+                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                log.write(f"wrapper_pid: {process.pid}\n")
+                log.flush()
+        except OSError as error:
+            return {"ok": False, "message": f"Could not launch configured MO2 executable: {error}"}
+
+        self.launch_session.wrapper_pid = process.pid
+        self.launch_session.wrapper_start_time = _proc_start_time(process.pid)
+        self.launch_session.log_path = str(log_path)
+        self.launch_session.instance_name = instance_path.name
+        self.launch_session.executable_title = title
+        self.launch_session.started_at = time.time()
+        self.launch_session.detected_processes = []
+        self.launch_session.process_identities = {}
+        self.launch_session.game_processes = []
+        self.launch_session.prefix_root = str(prefix.resolve())
+        self.launch_session.game_path = str(game_path.resolve())
+        self.launch_session.app_id = app_id
+        self.launch_session.target_binary = expected_binary.name
+        self.launch_session.state = "handoff"
+        self.launch_session.poll_count = 0
+        if app_id == "489830" or not app_id:
+            self._launch_monitor.start()
+        else:
+            self._launch_monitor.start()
+        return {
+            "ok": True, "pid": process.pid, "log_path": str(log_path),
+            "message": f"Started '{title}' through MO2 instance '{instance_path.name}'.",
+        }
 
     def start_skyrim(self) -> None:
         """Launch the active registered Skyrim instance, falling back to legacy discovery."""
