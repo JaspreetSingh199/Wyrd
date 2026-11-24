@@ -647,7 +647,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 f"base_directory={base}\n"
                 "mod_directory=%BASE_DIR%/missing\n"
                 "download_directory=%BASE_DIR%/link\n"
-                "cache_directory=C:\\\\..\\\\..\\\\outside\\\\cache\n", encoding="utf-8"
+                "cache_directory=C:\\\\outside\\\\cache\n", encoding="utf-8"
             )
             paths = inspect_mo2_storage(prefix, install)["instances"][0]["paths"]
             self.assertEqual(paths["mods"]["status"], "missing")

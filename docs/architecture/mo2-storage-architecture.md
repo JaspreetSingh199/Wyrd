@@ -141,3 +141,10 @@ Migration is opt-in per instance and per storage category. Require a preview and
 ## Read-only inventory API refinement
 
 The first implementation exposes \`inspect_mo2_storage()\`, a read-only view over known instance INIs. It reports Base, Mods, Downloads, Cache, Profiles, and Overwrite independently; distinguishes Wine C: paths outside the supplied prefix, symlinks, missing directories, and external paths; and identifies directory aliases referenced by multiple instances. It does not walk storage trees, calculate sizes, create directories, change INI values, or change ownership. Migration preview UI remains future work.
+
+
+## Registry implementation contract
+
+The metadata-only registry is implemented in \`qt-ui/wyrd_mo2_registry.py\`. Its schema is version 1 and separates installations, instances, games, and runtimes. Installations have an explicit \`wyrd\` or \`external\` owner label; instance records refer to an installation, a game, and optionally a runtime. Duplicate installation executable paths, duplicate instance paths, unknown references, invalid storage policies, malformed JSON, and unsupported schema versions are rejected.
+
+\`load_registry()\` treats a missing registry as an empty in-memory registry and does not create a file or parent directory. \`save_registry()\` is an explicit persistence operation: it validates before writing, uses a same-directory temporary file and atomic replace, and writes mode 0600. No discovery or adoption occurs in either function. This module is not yet wired into the GUI; registration must remain a deliberate user action after read-only inspection.
