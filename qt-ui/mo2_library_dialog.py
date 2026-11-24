@@ -53,6 +53,12 @@ class Mo2LibraryDialog(QWidget):
         self.discover_button.clicked.connect(self.discover)
         layout.addWidget(self.discover_button, 0, Qt.AlignmentFlag.AlignLeft)
 
+        self.connected_instances = QListWidget()
+        self.connected_instances.setMaximumHeight(90)
+        self.connected_instances.currentRowChanged.connect(self._select_connected)
+        self.connected_instances.hide()
+        layout.addWidget(self.connected_instances)
+
         self.instances = QListWidget()
         self.instances.setMinimumHeight(55)
         self.instances.setMaximumHeight(120)
@@ -67,10 +73,6 @@ class Mo2LibraryDialog(QWidget):
         self.register_button.hide()
         layout.addWidget(self.register_button, 0, Qt.AlignmentFlag.AlignLeft)
 
-        self.connected_label = QLabel()
-        self.connected_label.setObjectName("muted")
-        self.connected_label.setWordWrap(True)
-        layout.addWidget(self.connected_label)
         self._refresh_connected()
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
@@ -89,7 +91,6 @@ class Mo2LibraryDialog(QWidget):
         )
 
     def _refresh_connected(self):
-        self.connected_label.clear()
         try:
             registry, installations, games, runtimes = self._registry_maps()
         except Exception as error:
@@ -100,20 +101,18 @@ class Mo2LibraryDialog(QWidget):
         if record:
             game = games.get(record.get("game_id"), {})
             self.setup_status.setText(f"Connected: {record.get('display_name') or game.get('name', 'MO2')}")
-            self.connected_label.setText("Your MO2 instance is connected. Use Launch MO2 or Launch Modded Skyrim above.")
         elif self.connected_records:
             self.setup_status.setText(f"{len(self.connected_records)} MO2 instance(s) connected. Choose one below.")
-            self.connected_label.setText("Select a connected instance to make it active.")
-            self.instances.clear()
+            self.connected_instances.clear()
             for item in self.connected_records:
                 game = games.get(item.get("game_id"), {})
                 row = QListWidgetItem(record_name := f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}")
                 row.setData(Qt.ItemDataRole.UserRole, item)
-                self.instances.addItem(row)
-            self.instances.show()
+                self.connected_instances.addItem(row)
+            self.connected_instances.show()
         else:
             self.setup_status.setText("MO2 is not connected yet. Find your existing instance to get started.")
-            self.connected_label.setText("")
+            self.connected_instances.hide()
 
     def _select_connected(self, row: int):
         item = self.instances.item(row) if row >= 0 else None
