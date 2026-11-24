@@ -1522,6 +1522,7 @@ class MainWindow(QMainWindow):
                 self.launch_session.wrapper_pid, self.launch_session.target_binary,
                 self.launch_session.prefix_root,
                 launch_token=self.launch_session.launch_token,
+                ancestor_start_time=self.launch_session.wrapper_start_time,
             )
             session_processes = process_scan.get("processes", []) if process_scan.get("ok") and wrapper_identity_matches else []
         else:
@@ -1636,7 +1637,7 @@ class MainWindow(QMainWindow):
             Path(session.prefix_root) if session.prefix_root
             else _steam_prefix_for_game_path(game_dir)
         )
-        if session.app_id == "489830":
+        if session.app_id == "489830" or (session.wrapper_pid is None and session.app_id is None):
             process_scan = detect_skyrim_processes(steam_prefix)
             self._log("Skyrim process scan: " + process_scan.get("message", "Detection unavailable."))
             for item in process_scan.get("processes", []):
@@ -1668,6 +1669,7 @@ class MainWindow(QMainWindow):
             process_scan = detect_game_processes(
                 session.wrapper_pid, session.target_binary, session.prefix_root,
                 launch_token=session.launch_token,
+                ancestor_start_time=session.wrapper_start_time,
             )
             self._log("Registered game process scan: " + process_scan.get("message", "Detection unavailable."))
         else:
@@ -1689,7 +1691,7 @@ class MainWindow(QMainWindow):
                 f"{p.binary} (PID {p.pid}) — {p.attribution_confidence}"
                 for p in tracked
             )
-            is_skyrim = session.app_id == "489830" or not session.app_id
+            is_skyrim = session.app_id == "489830" or (session.wrapper_pid is None and session.app_id is None)
             self.progress_label.setText(
                 "Skyrim/SKSE is running; tracked process identity verified."
                 if is_skyrim else "Registered game process is running; tracked identity verified."
