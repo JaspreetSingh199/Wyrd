@@ -243,6 +243,22 @@ class MainWindow(QMainWindow):
         self.mo2_panel = panel("MOD ORGANIZER 2", "Checking Wyrd's managed installation…")
         setup_layout.addWidget(self.mo2_panel)
 
+        detected = detect_skyrim()
+        detected_game = detected.get("game_dir", "") if detected.get("found") else ""
+        detected_prefix = _steam_prefix_for_game_path(detected_game) if detected_game else None
+        detected_install = self.mo2_state.get("install") or (
+            str(detected_prefix / "pfx/drive_c/Modding/MO2") if detected_prefix else ""
+        )
+        self.mo2_library_widget = Mo2LibraryDialog(
+            self, prefix_path=str(detected_prefix) if detected_prefix else "",
+            install_path=detected_install, game_path=detected_game,
+            proton_path=self._saved_settings.get("proton", ""),
+            selected_instance_id=self.selected_mo2_instance_id,
+        )
+        self.mo2_library_widget.on_registry_changed = self._on_mo2_registry_changed
+        self.mo2_library_widget.on_launch_requested = self._launch_embedded_mo2_instance
+        setup_layout.addWidget(self.mo2_library_widget)
+
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self.install_button = QPushButton("Install MO2")
@@ -286,16 +302,10 @@ class MainWindow(QMainWindow):
         setup_layout.addLayout(game_actions)
 
         management_row = QHBoxLayout()
-        self.mo2_library_button = QPushButton("MO2 setup")
-        self.mo2_library_button.clicked.connect(self.manage_mo2_library)
-        self.mo2_library_button.setEnabled(False)
-        management_row.addWidget(self.mo2_library_button)
         self.reset_mo2_button = QPushButton("Reset MO2")
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         management_row.addWidget(self.reset_mo2_button)
-        management_hint = QLabel("Set up or change MO2 instances")
-        management_hint.setObjectName("muted")
-        management_row.addWidget(management_hint, 1)
+        management_row.addStretch(1)
         setup_layout.addLayout(management_row)
 
         self.progress_label = QLabel("Ready")
@@ -632,47 +642,34 @@ class MainWindow(QMainWindow):
             raise
 
     def manage_mo2_library(self) -> None:
-        """Manage all registered MO2 installations and persist the active instance."""
-        saved_game = self.game_state.get("game_dir")
+        """Refresh the embedded MO2 setup panel from current application state."""
+        saved_game = self.game_state.get("game_dir", "")
         prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
-        install_path = self.mo2_state.get("install") if saved_game else None
-        if not install_path and saved_game and self.mo2_state.get("executable"):
-            install_path = str(Path(self.mo2_state["executable"]).parent)
-        if not install_path and prefix is not None:
-            install_path = str(prefix / "pfx/drive_c/Modding/MO2")
-        dialog = Mo2LibraryDialog(
-            self, prefix_path=str(prefix) if prefix else "",
-            install_path=install_path or "", game_path=saved_game or "",
-            proton_path=self.proton_combo.currentData() or "",
-            selected_instance_id=self.selected_mo2_instance_id,
+        install_path = self.mo2_state.get("install") or (
+            str(Path(self.mo2_state["executable"]).parent)
+            if self.mo2_state.get("executable") else
+            str(prefix / "pfx/drive_c/Modding/MO2") if prefix else ""
         )
-        dialog.exec()
-        selected = getattr(dialog, "selected_instance_record", None)
-        if selected:
-            self._set_active_instance(selected)
-        elif getattr(dialog, "selection_changed", False):
+        self.mo2_library_widget.prefix_edit.setText(str(prefix) if prefix else "")
+        self.mo2_library_widget.install_edit.setText(install_path)
+        self.mo2_library_widget.game_path_edit.setText(saved_game or "")
+        self.mo2_library_widget.proton_edit.setText(self.proton_combo.currentData() or "")
+        self.mo2_library_widget._refresh_registered()
+
+    def _on_mo2_registry_changed(self, record: dict | None, changed: bool = False) -> None:
+        if record:
+            self._set_active_instance(record)
+        elif changed:
             self._set_active_instance(None)
-        else:
-            try:
-                from wyrd_mo2_registry_service import RegistryService
-                registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
-                if self.selected_mo2_instance_id and not any(
-                    item.get("id") == self.selected_mo2_instance_id for item in registry["instances"]
-                ):
-                    self._set_active_instance(None)
-            except Exception as error:
-                self._log(f"Could not reconcile active MO2 instance after library changes: {error}")
-        if dialog.registered:
-            self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
         self._restore_registered_instance()
-        if dialog.launch_requested and selected:
-            result = self._launch_registered_instance(selected)
-            self._log(result.get("message", "MO2 launch did not start."))
-            if result.get("ok"):
-                self.progress_label.setText("Selected registered MO2 instance started.")
-                QMessageBox.information(self, "MO2 launch", result["message"])
-            else:
-                QMessageBox.warning(self, "MO2 launch refused", result.get("message", "Could not launch selected instance."))
+
+    def _launch_embedded_mo2_instance(self, record: dict) -> None:
+        result = self._launch_registered_instance(record)
+        self._log(result.get("message", "MO2 launch did not start."))
+        if result.get("ok"):
+            self.progress_label.setText("Selected MO2 instance started.")
+        else:
+            QMessageBox.warning(self, "MO2 launch refused", result.get("message", "Could not launch selected instance."))
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
