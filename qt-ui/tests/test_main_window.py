@@ -547,6 +547,15 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.install_button.text(), "Install MO2")
         window.close()
 
+    def test_primary_runtime_and_audio_copy_describe_shared_steam_prefix(self):
+        window = self._window()
+        labels = window.findChildren(QLabel)
+        label_text = "\\n".join(label.text() for label in labels)
+        self.assertIn("existing Steam AppID 489830 prefix", label_text)
+        self.assertIn("legacy-only", label_text)
+        self.assertEqual(window.audio_check_button.text(), "Inspect Legacy Audio Libraries")
+        window.close()
+
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
         with patch("main.inspect_audio_compatibility", return_value={
             "ok": True, "safe": True, "prefix": "/home/test/.local/share/wyrd/compatdata/mo2-skyrim",
