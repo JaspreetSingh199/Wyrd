@@ -593,6 +593,27 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(info["ownership_scope"], "external")
             self.assertEqual(info["path"], str(external))
 
+    def test_wine_c_drive_path_escape_is_rejected_even_when_target_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix, install = root / "prefix", root / "install"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim"
+            instance.mkdir(parents=True)
+            install.mkdir()
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\ngameName=Skyrim Special Edition\n"
+                "[Settings]\n"
+                "cache_directory=C:\\\\..\\\\..\\\\..\\\\..\\\\not-created\\\\cache\n",
+                encoding="utf-8",
+            )
+            result = inspect_mo2_storage(prefix, install)
+            self.assertEqual(
+                result["instances"][0]["paths"]["cache"]["status"], "outside-prefix"
+            )
+
     def test_storage_inspection_reports_missing_symlink_and_out_of_prefix_c_drive(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

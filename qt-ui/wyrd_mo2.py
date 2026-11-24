@@ -1003,6 +1003,9 @@ def _resolve_mo2_storage_path(raw_value: str, base_directory: Path,
     elif drive == "c:":
         relative = normalized[2:].lstrip("\\").replace("\\", "/")
         root = (Path(prefix_root) / "pfx/drive_c").resolve(strict=False)
+        # Normalize the Windows path before joining it to the Wine drive root.
+        # Path(root / "../../x") can otherwise hide an escape in the lexical
+        # relation to root until after a missing target is resolved.
         lexical = Path(os.path.normpath(str(root / relative)))
         try:
             lexical.relative_to(root)
