@@ -1200,41 +1200,71 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
 def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
                           home: Path | None = None, log_path: Path | None = None,
                           expected_binary: Path | str | None = None,
-                          audio_mode: str = "default") -> dict:
-    """Start MO2's configured-executable handoff and retain a diagnostic log.
+                          audio_mode: str = "default",
+                          proton_path: Path | None = None,
+                          game_path: Path | None = None,
+                          prefix_root: Path | None = None,
+                          install_root: Path | None = None) -> dict:
+    """Start an MO2 configured-executable handoff with explicit runtime paths.
 
-    A successful return means only that the Proton wrapper process was spawned.
-    It does not assert that MO2 accepted the executable or that Skyrim started.
+    Supplying prefix_root/install_root selects the already-initialized Steam
+    AppID prefix. The legacy Wyrd prefix remains supported for compatibility.
     """
     home = (home or Path.home()).expanduser()
     title = executable_title.strip()
     instance = instance_name.strip()
     if not title or not instance:
         return {"ok": False, "message": "An MO2 instance and configured executable title are required."}
-    if any(char in title + instance for char in ("\\x00", "\\r", "\\n")):
+    if any(char in title + instance for char in ("\x00", "\r", "\n")):
         return {"ok": False, "message": "The selected MO2 instance or executable title is invalid."}
-    state = inspect_wyrd_installation(home)
-    if not state.get("installed") or not state.get("prefix_ready"):
-        return {"ok": False, "message": "Wyrd-managed MO2 and its dedicated prefix must be ready before launching Skyrim."}
-    metadata = state.get("metadata", {})
-    proton_path = Path(metadata.get("proton", ""))
-    game_path = Path(metadata.get("game_path", ""))
-    paths = managed_paths(home)
-    if not proton_path.is_dir() or not game_path.is_dir():
-        return {"ok": False, "message": "The saved Proton runtime or Skyrim directory is missing."}
-    validation = inspect_proton_build(proton_path)
+
+    explicit_prefix = prefix_root is not None or install_root is not None
+    if explicit_prefix and (prefix_root is None or install_root is None or proton_path is None or game_path is None):
+        return {"ok": False, "message": "Steam-prefix launch requires explicit Proton, game, prefix and MO2 install paths."}
+    if explicit_prefix:
+        proton = Path(proton_path).expanduser()
+        game = Path(game_path).expanduser()
+        prefix = Path(prefix_root).expanduser()
+        install = Path(install_root).expanduser()
+        if prefix.is_symlink() or not prefix.is_dir():
+            return {"ok": False, "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
+        try:
+            prefix.resolve(strict=True).relative_to(prefix.parent.resolve(strict=True))
+        except (OSError, ValueError, RuntimeError):
+            return {"ok": False, "message": "The selected compatdata prefix is outside its expected Steam compatdata directory."}
+        if install.is_symlink() or not install.is_dir() or not (install / "ModOrganizer.exe").is_file():
+            return {"ok": False, "message": "The selected MO2 install directory is missing or unsafe."}
+        state_ok = True
+        steam_root = prefix.parent.parent
+    else:
+        state = inspect_wyrd_installation(home)
+        if not state.get("installed") or not state.get("prefix_ready"):
+            return {"ok": False, "message": "Wyrd-managed MO2 and its dedicated prefix must be ready before launching Skyrim."}
+        metadata = state.get("metadata", {})
+        proton = Path(metadata.get("proton", ""))
+        game = Path(metadata.get("game_path", ""))
+        paths = managed_paths(home)
+        prefix, install = paths["prefix"], paths["install"]
+        steam_root = Path(metadata.get("steam_root", ""))
+        if not proton.is_dir() or not game.is_dir():
+            return {"ok": False, "message": "The saved Proton runtime or Skyrim directory is missing."}
+        state_ok = True
+
+    if not proton.is_dir() or not game.is_dir():
+        return {"ok": False, "message": "Selected Proton runtime or Skyrim directory is unavailable."}
+    validation = inspect_proton_build(proton)
     if not validation.get("ok"):
         return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
-    prefix_check = inspect_mo2_instances(paths["prefix"], paths["install"])
+
+    prefix_check = inspect_mo2_instances(prefix, install, require_managed=not explicit_prefix)
     instance_match = next(
-        (item for item in prefix_check.get("skyrim_instances", [])
-         if item["name"] == instance), None
+        (item for item in prefix_check.get("skyrim_instances", []) if item["name"] == instance),
+        None,
     ) if prefix_check.get("ok") else None
     if not instance_match:
-        return {"ok": False, "message": "The selected Skyrim instance is no longer present in Wyrd's managed prefix."}
+        return {"ok": False, "message": "The selected Skyrim instance is no longer present in the selected MO2 prefix."}
     target_state = inspect_skyrim_launch_targets(
-        paths["prefix"], game_path, instance_name=instance,
-        install_root=paths["install"],
+        prefix, game, instance_name=instance, install_root=install,
     )
     expected_path = None
     if expected_binary is not None:
@@ -1259,7 +1289,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     target_match = matching_targets[0]
     if audio_mode not in {"default", "xaudio2_compat"}:
         return {"ok": False, "message": "Unknown audio compatibility test mode."}
-    env = _runtime_environment(proton_path, Path(metadata["steam_root"]), paths["prefix"])
+    env = _runtime_environment(proton, steam_root, prefix)
     if audio_mode == "xaudio2_compat":
         current_overrides = env.get("WINEDLLOVERRIDES", "")
         overrides = [
@@ -1268,36 +1298,28 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         ]
         overrides.append("xaudio2_7=n,b")
         env["WINEDLLOVERRIDES"] = ";".join(overrides)
-        # Skyrim's Proton audio workaround commonly pairs the XAudio override
-        # with PulseAudio latency tuning. Keep both scoped to this launch.
-        env["PULSE_LATENCY_MSEC"] = "90"
-    # MO2 parses global options before the command name. Keep --instance
-    # ahead of ModOrganizer.exe's "run" subcommand so it selects the intended
-    # game instance rather than becoming an unparsed subcommand argument.
+
     command = [
-        str(proton_path / "proton"), "run",
-        str(paths["install"] / "ModOrganizer.exe"),
-        "--instance", instance,
-        "run", "--executable", title,
+        str(proton / "proton"), "run", str(install / "ModOrganizer.exe"),
+        "--instance", instance, "run", "--executable", title,
     ]
-    diagnostics = Path(log_path) if log_path else paths["root"] / "logs" / "skyrim-launch.log"
+    diagnostics = Path(log_path) if log_path else managed_paths(home)["root"] / "logs" / "skyrim-launch.log"
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
-            log.write("\\n=== Wyrd Skyrim launch handoff ===\\n")
-            log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\\n")
-            log.write(f"instance: {instance}\\nexecutable: {title}\\nbinary: {target_match['binary']}\\naudio_mode: {audio_mode}\\npid: pending\\n")
-            log.write("command: " + json.dumps(command) + "\\n")
-            log.write("audio_override: " + ("WINEDLLOVERRIDES=" + env.get("WINEDLLOVERRIDES", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\\n")
-            log.write("audio_latency: " + ("PULSE_LATENCY_MSEC=" + env.get("PULSE_LATENCY_MSEC", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\\n")
-            log.write("stdout/stderr are redirected to this diagnostic log.\\n")
+            log.write("\n=== Wyrd Skyrim launch handoff ===\n")
+            log.write(f"timestamp: {datetime.now(timezone.utc).isoformat()}\n")
+            log.write(f"instance: {instance}\nexecutable: {title}\nbinary: {target_match['binary']}\naudio_mode: {audio_mode}\n")
+            log.write("command: " + json.dumps(command) + "\n")
+            log.write("audio_override: " + ("WINEDLLOVERRIDES=" + env.get("WINEDLLOVERRIDES", "") if audio_mode == "xaudio2_compat" else "none; Proton defaults retained") + "\n")
+            log.write("stdout/stderr are redirected to this diagnostic log.\n")
             log.flush()
             process = subprocess.Popen(
-                command, cwd=str(paths["install"]), env=env,
+                command, cwd=str(install), env=env,
                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.write(f"wrapper_pid: {process.pid}\n")
             log.flush()
     except OSError as error:
         return {"ok": False, "message": f"Could not start MO2 executable handoff: {error}"}
@@ -1310,6 +1332,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             f"Diagnostics: {diagnostics}"
         ),
     }
+
 
 
 def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
