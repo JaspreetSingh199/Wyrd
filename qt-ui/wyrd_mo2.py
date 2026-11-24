@@ -1576,17 +1576,17 @@ def detect_game_processes(
         entries = list(Path(proc_root).iterdir())
     except OSError as error:
         return {"ok": False, "processes": [], "message": f"Could not inspect process table: {error}"}
+    ancestor_identity = _proc_identity(ancestor_pid, proc_root)
+    ancestor_valid = (
+        ancestor_start_time is not None
+        and ancestor_identity.get("start_time") == ancestor_start_time
+    )
     for entry in entries:
         if not entry.name.isdigit():
             continue
         pid = int(entry.name)
         if pid == ancestor_pid:
             continue
-        ancestor_identity = _proc_identity(ancestor_pid, proc_root)
-        ancestor_valid = (
-            ancestor_start_time is None
-            or ancestor_identity.get("start_time") == ancestor_start_time
-        )
         descendant = ancestor_valid and _is_descendant_process(pid, ancestor_pid, proc_root)
         try:
             argv_bytes = (entry / "cmdline").read_bytes()
