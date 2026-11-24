@@ -204,6 +204,11 @@ class WyrdMO2Tests(unittest.TestCase):
                 saved = read_settings(home)
                 self.assertEqual(saved["proton"], str(proton.resolve()))
                 self.assertEqual(saved["game_path"], str(game.resolve()))
+                self.assertFalse(saved["xaudio2_compat"])
+                write_settings(home, proton, game, xaudio2_compat=True)
+                self.assertTrue(read_settings(home)["xaudio2_compat"])
+                write_settings(home, proton, game, xaudio2_compat=False)
+                self.assertFalse(read_settings(home)["xaudio2_compat"])
                 settings_path = managed_paths(home)["settings"]
                 settings_path.write_text("{invalid", encoding="utf-8")
                 self.assertEqual(read_settings(home), {})
