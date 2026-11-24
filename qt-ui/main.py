@@ -1186,6 +1186,29 @@ class MainWindow(QMainWindow):
             return {"ok": False, "message": validation.get("message", "Proton runtime validation failed.")}
         if not expected_binary.is_file():
             return {"ok": False, "message": "Configured game executable disappeared after selection."}
+
+        # Re-read the actual MO2 INI at launch time. The executable list shown
+        # before the confirmation dialog is only a preview and may have changed.
+        from wyrd_mo2 import inspect_mo2_instances, _resolve_windows_path
+        inventory = inspect_mo2_instances(prefix, executable.parent, require_managed=False)
+        if not inventory.get("ok"):
+            return {"ok": False, "message": inventory.get("message", "Could not re-inspect the selected MO2 prefix.")}
+        live_instance = next(
+            (item for item in inventory.get("instances", [])
+             if Path(item.get("path", "")).resolve() == instance_path.resolve()),
+            None,
+        )
+        if live_instance is None or Path(live_instance.get("config", "")).resolve() != config.resolve():
+            return {"ok": False, "message": "The registered MO2 instance or its configuration changed after selection."}
+        live_targets = []
+        for entry in live_instance.get("executables", []):
+            if str(entry.get("title", "")).strip() != title:
+                continue
+            binary = _resolve_windows_path(str(entry.get("binary", "")), prefix, game_path)
+            if binary and binary.is_file() and not binary.is_symlink():
+                live_targets.append(binary.resolve())
+        if len(live_targets) != 1 or live_targets[0] != expected_binary.resolve():
+            return {"ok": False, "message": "The selected executable is no longer uniquely verified in the current MO2 configuration."}
         try:
             config.resolve(strict=True).relative_to(instance_path.resolve(strict=True))
             expected_binary.resolve(strict=True)
