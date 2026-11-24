@@ -971,8 +971,8 @@ class WyrdMO2Tests(unittest.TestCase):
             game = home / ".steam/steam/steamapps/common/Skyrim Special Edition"
             game.mkdir(parents=True)
             proton = make_proton(home / "Proton")
-            with patch("wyrd_mo2.inspect_proton_build", return_value={"ok": True}), \\
-                 patch("wyrd_mo2._runtime_environment", return_value={}), \\
+            with patch("wyrd_mo2.inspect_proton_build", return_value={"ok": True}), \
+                 patch("wyrd_mo2._runtime_environment", return_value={}), \
                  patch("wyrd_mo2.subprocess.Popen") as popen:
                 popen.return_value.pid = 456
                 result = launch_skyrim_via_mo2(
