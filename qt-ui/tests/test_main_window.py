@@ -42,6 +42,13 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("main.read_settings", return_value={}),
             patch("main.write_settings"),
+            # Default-deny dialogs keep offscreen tests deterministic. Individual
+            # tests may override these mocks when asserting a specific interaction.
+            patch("main.QMessageBox.information"),
+            patch("main.QMessageBox.warning"),
+            patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.No),
+            patch("main.QInputDialog.getItem", return_value=("", False)),
+            patch("main.QInputDialog.getText", return_value=("", False)),
             patch("main.inspect_mo2_instances", return_value={
                 "ok": True, "instances": [], "skyrim_instances": [],
                 "message": "No MO2 instances were found in the known prefix locations."
