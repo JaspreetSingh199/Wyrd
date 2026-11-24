@@ -917,6 +917,8 @@ class MainWindow(QMainWindow):
             )
             if not live or Path(live.get("config", "")).resolve() != config.resolve():
                 return {"ok": False, "message": "The registered MO2 instance is no longer present in the selected prefix."}
+            if record.get("instance_type") == "portable" and instance_path.resolve() != executable.parent.resolve():
+                return {"ok": False, "message": "Portable instance root does not match the registered installation."}
         except (OSError, ValueError, RuntimeError) as error:
             return {"ok": False, "message": f"Registered instance validation failed safely: {error}"}
 
