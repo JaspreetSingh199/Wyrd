@@ -65,7 +65,7 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual([item["pid"] for item in result["wyrd_processes"]], [101])
             self.assertFalse(result["processes"][0]["attributed_to_wyrd"])
             self.assertTrue(result["processes"][0]["prefix_attributed"])
-            self.assertFalse(result["processes"][1]["prefix_attributed"] is False)
+            self.assertTrue(result["processes"][1]["prefix_attributed"])
             self.assertEqual(
                 result["processes"][1]["audio_runtime_environment"],
                 {"WINEDLLOVERRIDES": "xaudio2_7=n,b", "PULSE_LATENCY_MSEC": "90"},
