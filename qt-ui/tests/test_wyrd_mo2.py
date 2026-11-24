@@ -628,6 +628,57 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(popen.call_count, 1)
 
 
+    def test_explicit_steam_prefix_launch_uses_selected_proton_and_defaults_without_xaudio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            steam = root / ".local/share/Steam"
+            prefix = steam / "steamapps/compatdata/489830"
+            install = prefix / "pfx/drive_c/Modding/MO2"
+            proton = make_proton(root / "Proton - Experimental")
+            game = steam / "steamapps/common/Skyrim Special Edition"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
+            install.mkdir(parents=True)
+            (install / "ModOrganizer.exe").write_bytes(b"MO2")
+            instance.mkdir(parents=True)
+            game.mkdir(parents=True)
+            (game / "SkyrimSE.exe").write_bytes(b"Skyrim")
+            skse = game / "skse64_loader.exe"
+            skse.write_bytes(b"SKSE")
+            win_game = str(game).replace("/", "\\\\")
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                f"gamePath=Z:{win_game}\\n"
+                "[customExecutables]\\n"
+                "size=1\\n"
+                "1\\\\title=SKSE\\n"
+                f"1\\\\binary=Z:{win_game}\\\\skse64_loader.exe\\n",
+                encoding="utf-8",
+            )
+            log_path = root / "logs/skyrim-launch.log"
+            with patch.dict(os.environ, {"WINEDLLOVERRIDES": ""}), patch(
+                "wyrd_mo2.subprocess.Popen"
+            ) as popen:
+                popen.return_value.pid = 4242
+                result = launch_skyrim_via_mo2(
+                    "SKSE", "Skyrim SE", root, log_path=log_path,
+                    expected_binary=skse, proton_path=proton, game_path=game,
+                    prefix_root=prefix, install_root=install,
+                )
+            self.assertTrue(result["ok"], result)
+            command = popen.call_args.args[0]
+            env = popen.call_args.kwargs["env"]
+            self.assertEqual(command[:3], [str(proton / "proton"), "run", str(install / "ModOrganizer.exe")])
+            self.assertIn("--instance", command)
+            self.assertEqual(env["STEAM_COMPAT_DATA_PATH"], str(prefix))
+            self.assertEqual(env["STEAM_COMPAT_CLIENT_INSTALL_PATH"], str(steam))
+            self.assertEqual(env["SteamAppId"], "489830")
+            self.assertEqual(env["SteamGameId"], "489830")
+            self.assertNotIn("xaudio2_7=n,b", env.get("WINEDLLOVERRIDES", ""))
+            self.assertNotIn("PULSE_LATENCY_MSEC", env)
+            self.assertEqual(result["pid"], 4242)
+
+
     def test_launch_handoff_xaudio2_override_is_per_process_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
