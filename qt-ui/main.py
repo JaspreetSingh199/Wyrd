@@ -541,8 +541,6 @@ class MainWindow(QMainWindow):
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
         self._refresh_audio_status()
-        prefix_path = managed_paths()['prefix']
-        self.reset_prefix_button.setEnabled(prefix_path.exists() and not prefix_path.is_symlink())
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(
             ready
