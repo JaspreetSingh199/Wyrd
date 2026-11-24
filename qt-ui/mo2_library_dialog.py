@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QComboBox, QDialog, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
     QPlainTextEdit, QVBoxLayout, QCheckBox, QGroupBox, QInputDialog,
+    QScrollArea, QWidget,
 )
 
 from wyrd_mo2 import managed_paths
@@ -39,15 +40,27 @@ class Mo2LibraryDialog(QDialog):
         self.preferred_instance_id = selected_instance_id
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(8)
+        scroll.setWidget(content)
+        content_layout.addWidget(scroll, 1)
+
         intro = QLabel(
             "Discover MO2 installations and instances in a known Proton prefix. "
             "Discovery is read-only. Registration stores Wyrd metadata only; it does "
             "not adopt ownership, rewrite ModOrganizer.ini, move files, or change profiles."
         )
         intro.setWordWrap(True)
-        root.addWidget(intro)
+        content_layout.addWidget(intro)
 
         form = QFormLayout()
+        form.setVerticalSpacing(8)
+        form.setHorizontalSpacing(10)
         self.prefix_edit = QLineEdit(str(prefix_path))
         self.install_edit = QLineEdit(str(install_path))
         install_row = QHBoxLayout()
@@ -73,6 +86,10 @@ class Mo2LibraryDialog(QDialog):
         browse_game.clicked.connect(self._browse_game)
         game_row.addWidget(browse_game)
         self.proton_edit = QLineEdit(str(proton_path or ""))
+        for field in (self.prefix_edit, self.install_edit, self.game_name_edit,
+                      self.game_id_edit, self.game_appid_edit, self.game_path_edit,
+                      self.proton_edit):
+            field.setMinimumHeight(30)
         runtime_row = QHBoxLayout()
         runtime_row.addWidget(self.proton_edit, 1)
         browse_runtime = QPushButton("Browse Proton…")
@@ -83,39 +100,41 @@ class Mo2LibraryDialog(QDialog):
         form.addRow("Optional Steam AppID:", self.game_appid_edit)
         form.addRow("Game directory:", game_row)
         form.addRow("Proton runtime:", runtime_row)
-        root.addLayout(form)
+        content_layout.addLayout(form)
 
         actions = QHBoxLayout()
         self.discover_button = QPushButton("Discover MO2")
         self.discover_button.clicked.connect(self.discover)
         actions.addWidget(self.discover_button)
         actions.addStretch(1)
-        root.addLayout(actions)
+        content_layout.addLayout(actions)
 
-        root.addWidget(QLabel("Registered installations"))
+        content_layout.addWidget(QLabel("Registered installations"))
         self.installation_filter = QComboBox()
         self.installation_filter.addItem("All installations", None)
         self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
-        root.addWidget(self.installation_filter)
+        content_layout.addWidget(self.installation_filter)
         self.installation_summary = QLabel("Select an installation to inspect its registry references.")
         self.installation_summary.setWordWrap(True)
-        root.addWidget(self.installation_summary)
-        root.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
+        content_layout.addWidget(self.installation_summary)
+        content_layout.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
         self.registered_instances = QListWidget()
+        self.registered_instances.setMinimumHeight(100)
+        self.registered_instances.setMaximumHeight(150)
         self.registered_instances.currentRowChanged.connect(self._select_registered)
-        root.addWidget(self.registered_instances, 1)
+        content_layout.addWidget(self.registered_instances, 1)
         self._edit_associations_button = QPushButton("Edit game / Proton association")
         self._edit_associations_button.setEnabled(False)
         self._edit_associations_button.clicked.connect(self.edit_associations)
-        root.addWidget(self._edit_associations_button)
+        content_layout.addWidget(self._edit_associations_button)
         self.rename_instance_button = QPushButton("Rename Wyrd display name…")
         self.rename_instance_button.setEnabled(False)
         self.rename_instance_button.clicked.connect(self.rename_selected_instance)
-        root.addWidget(self.rename_instance_button)
+        content_layout.addWidget(self.rename_instance_button)
         self._launch_existing_button = QPushButton("Launch selected registered instance")
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
-        root.addWidget(self._launch_existing_button)
+        content_layout.addWidget(self._launch_existing_button)
         management_actions = QHBoxLayout()
         self.unregister_instance_button = QPushButton("Unregister selected instance")
         self.unregister_instance_button.setEnabled(False)
@@ -125,19 +144,22 @@ class Mo2LibraryDialog(QDialog):
         self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
         management_actions.addWidget(self.unregister_instance_button)
         management_actions.addWidget(self.unregister_installation_button)
-        root.addLayout(management_actions)
+        content_layout.addLayout(management_actions)
 
-        root.addWidget(QLabel("Discovered instances"))
+        content_layout.addWidget(QLabel("Discovered instances"))
         self.instances = QListWidget()
+        self.instances.setMinimumHeight(90)
+        self.instances.setMaximumHeight(140)
         self.instances.currentRowChanged.connect(self._show_selected)
-        root.addWidget(self.instances, 1)
+        content_layout.addWidget(self.instances, 1)
 
-        root.addWidget(QLabel("Inspection details"))
+        content_layout.addWidget(QLabel("Inspection details"))
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
-        self.details.setMaximumHeight(170)
+        self.details.setMinimumHeight(80)
+        self.details.setMaximumHeight(150)
         self.details.setPlaceholderText("Choose Discover MO2 to inspect the selected installation.")
-        root.addWidget(self.details)
+        content_layout.addWidget(self.details)
 
         storage_box = QGroupBox("Selected instance storage")
         storage_form = QFormLayout(storage_box)
@@ -147,6 +169,7 @@ class Mo2LibraryDialog(QDialog):
                            ("cache", "Cache"), ("profiles", "Profiles"), ("overwrite", "Overwrite")):
             row = QHBoxLayout()
             field = QLineEdit()
+            field.setMinimumHeight(30)
             field.setReadOnly(True)
             browse = QPushButton("Browse…")
             browse.setEnabled(False)
@@ -156,16 +179,16 @@ class Mo2LibraryDialog(QDialog):
             row.addWidget(field, 1)
             row.addWidget(browse)
             storage_form.addRow(label, row)
-        root.addWidget(storage_box)
+        content_layout.addWidget(storage_box)
 
         self.share_mods_check = QCheckBox("Explicitly share Mods directory with other registered instances")
         self.share_downloads_check = QCheckBox("Explicitly share Downloads directory with other registered instances")
-        root.addWidget(self.share_mods_check)
-        root.addWidget(self.share_downloads_check)
+        content_layout.addWidget(self.share_mods_check)
+        content_layout.addWidget(self.share_downloads_check)
         self.create_storage_check = QCheckBox(
             "Create missing empty storage folders (never move or copy existing data)"
         )
-        root.addWidget(self.create_storage_check)
+        content_layout.addWidget(self.create_storage_check)
         storage_actions = QHBoxLayout()
         self.apply_storage_button = QPushButton("Apply storage settings")
         self.restore_storage_button = QPushButton("Restore INI backup…")
@@ -175,7 +198,7 @@ class Mo2LibraryDialog(QDialog):
         self.restore_storage_button.clicked.connect(self.restore_config_backup)
         storage_actions.addWidget(self.apply_storage_button)
         storage_actions.addWidget(self.restore_storage_button)
-        root.addLayout(storage_actions)
+        content_layout.addLayout(storage_actions)
 
         footer = QHBoxLayout()
         self.register_button = QPushButton("Register discovered instance")
