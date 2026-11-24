@@ -104,29 +104,34 @@ class Mo2LibraryDialog(QWidget):
         elif self.connected_records:
             self.setup_status.setText(f"{len(self.connected_records)} MO2 instance(s) connected. Choose one below.")
         if self.connected_records:
-            self.connected_instances.clear()
-            for item in self.connected_records:
-                game = games.get(item.get("game_id"), {})
-                label = f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}"
-                if item.get("id") == self.preferred_instance_id:
-                    label += " · Active"
-                row = QListWidgetItem(label)
-                row.setData(Qt.ItemDataRole.UserRole, item)
-                self.connected_instances.addItem(row)
-            self.connected_instances.show()
-            if record:
-                for row_index in range(self.connected_instances.count()):
-                    row = self.connected_instances.item(row_index)
-                    value = row.data(Qt.ItemDataRole.UserRole)
-                    if isinstance(value, dict) and value.get("id") == record.get("id"):
-                        self.connected_instances.setCurrentRow(row_index)
-                        break
+            if len(self.connected_records) > 1:
+                self.connected_instances.clear()
+                for item in self.connected_records:
+                    game = games.get(item.get("game_id"), {})
+                    label = f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}"
+                    if item.get("id") == self.preferred_instance_id:
+                        label += " · Active"
+                    row = QListWidgetItem(label)
+                    row.setData(Qt.ItemDataRole.UserRole, item)
+                    self.connected_instances.addItem(row)
+                self.connected_instances.blockSignals(True)
+                if record:
+                    for row_index in range(self.connected_instances.count()):
+                        row = self.connected_instances.item(row_index)
+                        value = row.data(Qt.ItemDataRole.UserRole)
+                        if isinstance(value, dict) and value.get("id") == record.get("id"):
+                            self.connected_instances.setCurrentRow(row_index)
+                            break
+                self.connected_instances.blockSignals(False)
+                self.connected_instances.show()
+            else:
+                self.connected_instances.hide()
         else:
             self.setup_status.setText("MO2 is not connected yet. Find your existing instance to get started.")
             self.connected_instances.hide()
 
     def _select_connected(self, row: int):
-        item = self.instances.item(row) if row >= 0 else None
+        item = self.connected_instances.item(row) if row >= 0 else None
         record = item.data(Qt.ItemDataRole.UserRole) if item else None
         if not isinstance(record, dict):
             self.selected_instance_record = None
@@ -136,6 +141,9 @@ class Mo2LibraryDialog(QWidget):
         self.preferred_instance_id = record.get("id", "")
         if callable(self.on_registry_changed):
             self.on_registry_changed(self.selected_instance_record, False)
+        self.setup_status.setText(
+            f"Active: {self.selected_instance_record.get('display_name') or self.selected_instance_record.get('instance_type', 'MO2')}"
+        )
 
     def discover(self):
         self.instances.clear()
