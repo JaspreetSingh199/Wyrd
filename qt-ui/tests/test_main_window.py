@@ -172,11 +172,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value={
             "ok": False, "instances": [], "skyrim_instances": [],
             "message": "The Steam prefix could not be safely inspected."
-        }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2_in_skyrim_prefix") as launch, patch("main.launch_mo2") as legacy_launch:
+        }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2_in_skyrim_prefix") as launch, patch("main.launch_external_mo2_in_skyrim_prefix") as external_launch, patch("main.launch_mo2") as legacy_launch:
             window = self._window(state=state)
             window.start_mo2()
             warning.assert_called_once()
             launch.assert_not_called()
+            external_launch.assert_not_called()
             legacy_launch.assert_not_called()
             window.close()
 
