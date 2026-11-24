@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
         runtime_layout.setContentsMargins(17, 15, 17, 15)
         runtime_heading = QLabel("2. Proton runtime")
         runtime_heading.setObjectName("section")
-        runtime_detail = QLabel("Wyrd uses a compatible Proton build to run MO2 in its own isolated prefix.")
+        runtime_detail = QLabel("Wyrd uses the selected Proton build to run MO2 inside Skyrim’s existing Steam AppID 489830 prefix. The prefix is shared with Steam; Wyrd does not create or reset it.")
         runtime_detail.setObjectName("muted")
         runtime_detail.setWordWrap(True)
         runtime_layout.addWidget(runtime_heading)
@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
 
         self.audio_panel = panel(
             "4. Audio compatibility",
-            "Inspect XACT/XAudio libraries in Wyrd's isolated MO2 prefix. Dialogue audio remains runtime-unverified.",
+            "The library check below is legacy-only: it inspects Wyrd’s old isolated MO2 prefix, not Skyrim’s Steam prefix. Skyrim audio must be verified in an actual game launch.",
         )
         audio_layout = self.audio_panel.layout()
         self.audio_detail = QLabel("Audio library inventory will be checked during detection.")
@@ -219,7 +219,7 @@ class MainWindow(QMainWindow):
         self.audio_detail.setWordWrap(True)
         audio_layout.addWidget(self.audio_detail)
         audio_actions = QHBoxLayout()
-        self.audio_check_button = QPushButton("Check Audio Libraries")
+        self.audio_check_button = QPushButton("Inspect Legacy Audio Libraries")
         self.audio_check_button.clicked.connect(self.check_audio_libraries)
         audio_actions.addWidget(self.audio_check_button)
         self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
@@ -279,7 +279,7 @@ class MainWindow(QMainWindow):
         instructions = panel(
             "5. Launch Skyrim from MO2",
             "On the first MO2 launch, create a new instance and choose “Skyrim Special Edition”. "
-            "Wyrd registers your detected game path only inside its own Proton prefix. "
+            "MO2 runs in Skyrim’s existing Steam AppID 489830 prefix. Wyrd does not create or reset that prefix. "
             "After the instance is created, select Skyrim or SKSE in MO2's executable dropdown and press Run. "
             "MO2 then launches the game through its mod virtual filesystem.",
         )
