@@ -1543,8 +1543,8 @@ class MainWindow(QMainWindow):
             self.launch_session.wrapper_pid, self.launch_session.wrapper_start_time
         )
         wrapper_identity_matches = (
-            self.launch_session.wrapper_start_time is None
-            or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
+            self.launch_session.wrapper_start_time is not None
+            and wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
         scan_prefix = (
             Path(self.launch_session.prefix_root)
@@ -1800,8 +1800,8 @@ class MainWindow(QMainWindow):
 
         wrapper_identity = _proc_identity(session.wrapper_pid)
         wrapper_matches = (
-            session.wrapper_start_time is None
-            or wrapper_identity.get("start_time") == session.wrapper_start_time
+            session.wrapper_start_time is not None
+            and wrapper_identity.get("start_time") == session.wrapper_start_time
         )
         result = launch_process_status(session.wrapper_pid, session.wrapper_start_time)
         self._log(
