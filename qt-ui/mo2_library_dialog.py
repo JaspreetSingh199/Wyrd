@@ -244,12 +244,37 @@ class Mo2LibraryDialog(QDialog):
         if selected:
             self.storage_fields[category].setText(selected)
 
+    @staticmethod
+    def _restore_ini_atomically(backup: Path, destination: Path) -> None:
+        """Restore a saved INI with an atomic same-directory replacement."""
+        fd, temporary = tempfile.mkstemp(
+            prefix=".wyrd-ini-rollback-", suffix=".ini", dir=str(destination.parent)
+        )
+        try:
+            with os.fdopen(fd, "wb") as target, backup.open("rb") as source:
+                while True:
+                    chunk = source.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    target.write(chunk)
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(temporary, destination)
+        except Exception:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+            raise
+
     def _backup_instance_ini(self, record: dict, config: Path) -> Path:
         """Back up only the instance INI; never copy or migrate mod data."""
         from datetime import datetime
         import shutil
 
         backup_root = managed_paths()["config"] / "mo2-config-backups"
+        if backup_root.is_symlink():
+            raise ValueError("The Wyrd INI backup directory is a symlink; backup creation refused.")
         backup_root.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         backup = backup_root / f"{record['id']}-{stamp}.ini"
@@ -297,7 +322,13 @@ class Mo2LibraryDialog(QDialog):
                 except OSError:
                     pass
                 raise
-            self.service.replace_instance(record)
+            try:
+                self.service.replace_instance(record)
+            except Exception:
+                # A failed registry write must not leave the restored INI paired
+                # with stale Wyrd metadata.
+                self._restore_ini_atomically(current_backup, config)
+                raise
             self._refresh_registered()
             QMessageBox.information(
                 self, "INI restored",
@@ -410,7 +441,13 @@ class Mo2LibraryDialog(QDialog):
                 record["storage_paths"][category] = {
                     "path": str(path), "status": "available",
                 }
-            self.service.replace_instance(record)
+            try:
+                self.service.replace_instance(record)
+            except Exception:
+                # If the INI changed but registry metadata did not, restore the
+                # exact pre-change INI bytes from the backup.
+                self._restore_ini_atomically(backup, config)
+                raise
             self._refresh_registered()
             QMessageBox.information(
                 self, "Storage settings saved",
