@@ -352,7 +352,7 @@ class Mo2LibraryDialog(QDialog):
                     if not both_opted_into_shared:
                         raise ValueError(
                             f"{category.title()} path is already registered by another instance. "
-                            "To share Mods/Downloads, explicitly opt in on every participating instance."
+                            "For Mods/Downloads, every participating instance must explicitly opt in."
                         )
                     if category not in shared:
                         raise ValueError(f"{category.title()} cannot be shared between instances.")
