@@ -62,6 +62,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
             },
         ]
         save_registry(managed_paths(home)["config"] / "mo2-registry.json", registry)
+        return registry
 
     def test_removes_only_owned_install_and_registered_instance(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -150,12 +151,11 @@ class WyrdMO2ResetTests(unittest.TestCase):
             home = Path(tmp)
             _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
             with patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
-                self._registry(home, install, instance)
+                registry = self._registry(home, install, instance)
             nested = instance / "Nested"
             nested.mkdir()
             (nested / "ModOrganizer.ini").write_text("[General]\\n", encoding="utf-8")
             registry_path = home / ".config/wyrd/mo2-registry.json"
-            registry = json.loads(registry_path.read_text(encoding="utf-8"))
             nested_record = dict(registry["instances"][0], id="nested-instance", instance_path=str(nested), config=str(nested / "ModOrganizer.ini"))
             registry["instances"].append(nested_record)
             with patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
