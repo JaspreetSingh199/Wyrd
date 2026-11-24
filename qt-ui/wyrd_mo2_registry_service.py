@@ -58,8 +58,11 @@ class RegistryService:
         if executable.is_symlink() or not executable.is_file():
             return self._failure("Selected installation has no regular ModOrganizer.exe.")
 
-        prefix_managed, prefix_app_id = self._marker_owner(prefix)
-        install_managed, _ = self._marker_owner(install)
+        try:
+            prefix_managed, prefix_app_id = self._marker_owner(prefix)
+            install_managed, _ = self._marker_owner(install)
+        except RegistryError as error:
+            return self._failure(str(error))
         if prefix_managed and prefix_app_id not in (None, "489830"):
             return self._failure("Wyrd prefix marker belongs to a different game.")
         owner = "wyrd" if install_managed else "external"
