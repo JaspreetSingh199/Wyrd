@@ -675,13 +675,15 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertTrue(result["ok"], result)
             env = popen.call_args.kwargs["env"]
             self.assertEqual(env["WINEDLLOVERRIDES"], "d3d11=n;dxgi=n;xaudio2_7=n,b")
-            self.assertEqual(env["PULSE_LATENCY_MSEC"], "90")
+            # Wyrd only adds the opt-in XAudio override. It must not inject
+            # PulseAudio latency settings into the Steam/Proton runtime.
+            self.assertNotIn("PULSE_LATENCY_MSEC", env)
             self.assertEqual(env["STEAM_COMPAT_DATA_PATH"], str(paths["prefix"]))
             self.assertIn("WINEDLLOVERRIDES", env)
             log = Path(result["log_path"]).read_text(encoding="utf-8")
             self.assertIn("audio_mode: xaudio2_compat", log)
             self.assertIn("xaudio2_7=n,b", log)
-            self.assertIn("audio_latency: PULSE_LATENCY_MSEC=90", log)
+            self.assertNotIn("audio_latency:", log)
 
 
     def test_launch_handoff_rejects_ambiguous_duplicate_title_without_binary_identity(self):
