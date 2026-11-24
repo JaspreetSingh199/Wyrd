@@ -28,7 +28,9 @@ jobs:
       - name: Python compile checks
         run: python3 -m compileall -q qt-ui
       - name: Python unit tests
-        run: python3 -m unittest discover -s qt-ui/tests -p 'test_*.py'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python3 -m unittest discover -v -s qt-ui/tests -p 'test_*.py'
       - name: Qt offscreen smoke tests
         env:
           QT_QPA_PLATFORM: offscreen
