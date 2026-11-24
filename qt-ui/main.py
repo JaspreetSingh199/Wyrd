@@ -959,34 +959,6 @@ class MainWindow(QMainWindow):
             self._stop_launch_monitor("Skyrim/SKSE process detected")
             self._start_game_process_watch()
             return
-        if process_scan.get("ok") and process_scan.get("wyrd_processes"):
-            detected = ", ".join(
-                f"{item['binary']} (PID {item['pid']})"
-                for item in process_scan["wyrd_processes"]
-            )
-            self.progress_label.setText(
-                "Skyrim detected in Wyrd's prefix; launch-session ancestry is unconfirmed."
-            )
-            self._log(
-                "Prefix-attributed Skyrim process(es), ancestry unconfirmed: " + detected
-            )
-            self._log_audio_runtime_environment(process_scan["wyrd_processes"])
-            self.launch_session.detected_processes = list(process_scan["wyrd_processes"])
-            self.launch_session.process_identities = {
-                item["pid"]: item.get("start_time") for item in process_scan["wyrd_processes"]
-            }
-            self.launch_session.game_processes = [
-                GameProcess(
-                    pid=item["pid"], binary=item["binary"],
-                    start_time=item.get("start_time"),
-                    detection_source="managed_prefix",
-                    attribution_confidence="prefix",
-                ) for item in process_scan["wyrd_processes"]
-            ]
-            self.launch_session.state = "detected-unconfirmed"
-            self._stop_launch_monitor("managed-prefix Skyrim process detected")
-            self._start_game_process_watch()
-            return
         if result["state"] in {"exited", "invalid"}:
             self.progress_label.setText(
                 "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
