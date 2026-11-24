@@ -197,6 +197,12 @@ class Mo2LibraryDialog(QDialog):
             registry, installations, games, _runtimes = self._registry_maps()
         except Exception as error:
             self.registered_instances.addItem(f"Registry unavailable: {error}")
+            self.unregister_instance_button.setEnabled(False)
+            self.unregister_installation_button.setEnabled(False)
+            self._launch_existing_button.setEnabled(False)
+            self._edit_associations_button.setEnabled(False)
+            self.apply_storage_button.setEnabled(False)
+            self.restore_storage_button.setEnabled(False)
             return
 
         self.installation_filter.blockSignals(True)
