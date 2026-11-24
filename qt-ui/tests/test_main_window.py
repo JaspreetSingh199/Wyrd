@@ -71,7 +71,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_skyrim_launch_buttons_route_modded_and_unmodded_launches(self):
         window = self._window()
-        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (MO2)")
+        self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
         self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded (Steam)")
         window.launch_game_button.setEnabled(True)
         with patch.object(window, "start_skyrim") as mo2_launch:
@@ -313,6 +313,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_monitor_rejects_reused_wrapper_pid_for_tree_attribution(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
             "main.launch_process_status", return_value={
@@ -350,6 +351,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_session_records_detected_process_start_times(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         scan = {
             "ok": True,
@@ -389,6 +391,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_monitor_stops_when_session_game_process_is_detected(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         scan = {
             "ok": True,
@@ -427,6 +430,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_monitor_does_not_claim_wyrd_when_shared_prefix_marker_is_present(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         ordinary_steam_process = {
             "pid": 700, "binary": "skyrimse.exe",
@@ -450,6 +454,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_monitor_stops_when_wrapper_exits_without_game(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         with patch("main.launch_process_status", return_value={
             "state": "exited", "message": "wrapper exited"
@@ -478,6 +483,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_status_prefers_process_tree_attribution(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         process_scan = {
             "ok": True,
@@ -507,6 +513,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_launch_status_falls_back_to_prefix_attribution_when_tree_is_gone(self):
         window = self._window()
         window.launch_session.wrapper_pid = 500
+        window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
         process_scan = {
             "ok": True,
@@ -580,7 +587,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(window.game_state["found"])
         self.assertEqual(window.proton_combo.count(), 1)
         self.assertEqual(window.install_button.text(), "Install MO2")
-        self.assertEqual(window.launch_game_button.text(), "Launch Skyrim (MO2)")
+        self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
         self.assertFalse(window.launch_button.isEnabled())
         self.assertFalse(hasattr(window, "nav"))
         window.close()
@@ -636,12 +643,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.install_button.text(), "Install MO2")
         window.close()
 
-    def test_primary_runtime_and_audio_copy_describe_shared_steam_prefix(self):
+    def test_primary_runtime_and_audio_copy_keep_audio_advanced_and_unverified(self):
         window = self._window()
         labels = window.findChildren(QLabel)
         label_text = "\\n".join(label.text() for label in labels)
-        self.assertIn("existing Steam AppID 489830 prefix", label_text)
-        self.assertIn("legacy-only", label_text)
+        self.assertIn("Advanced diagnostics only", label_text)
+        self.assertEqual(window.tabs.count(), 2)
         self.assertEqual(window.audio_check_button.text(), "Inspect Legacy Audio Libraries")
         window.close()
 
