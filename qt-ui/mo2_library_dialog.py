@@ -174,7 +174,6 @@ class Mo2LibraryDialog(QDialog):
         if not isinstance(record, dict):
             self.selected_instance_record = None
             self._launch_existing_button.setEnabled(False)
-            self._launch_existing_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             return
         self.selected_instance_record = record
@@ -185,7 +184,7 @@ class Mo2LibraryDialog(QDialog):
             runtime = runtimes.get(record.get("runtime_id"), {})
         except Exception as error:
             self.details.setPlainText(f"Registry entry is incomplete: {error}")
-            self.launch_selected_button.setEnabled(False)
+            self._launch_existing_button.setEnabled(False)
             return
         self.details.setPlainText(
             f"Instance: {record.get('instance_path')}\n"
@@ -203,7 +202,7 @@ class Mo2LibraryDialog(QDialog):
         self.share_downloads_check.setChecked(policies.get("downloads") == "shared")
         ready = bool(installation.get("executable") and game.get("path") and runtime.get("path")
                      and record.get("prefix_path"))
-        self.launch_selected_button.setEnabled(ready)
+        self._launch_existing_button.setEnabled(ready)
         self._launch_existing_button.setEnabled(ready)
         self.apply_storage_button.setEnabled(bool(record.get("config")))
 
