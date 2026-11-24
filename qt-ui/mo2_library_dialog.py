@@ -55,7 +55,7 @@ class Mo2LibraryDialog(QWidget):
         advanced_layout.setContentsMargins(10, 10, 10, 10)
         advanced_layout.setSpacing(8)
         advanced_scroll.setWidget(advanced_page)
-        self.tabs.addTab(setup_scroll, "MO2")
+        self.tabs.addTab(setup_scroll, "Instances")
         self.tabs.addTab(advanced_scroll, "Advanced")
         root.addWidget(self.tabs, 1)
 
@@ -294,6 +294,9 @@ class Mo2LibraryDialog(QWidget):
 
         if not registry["instances"]:
             self.registered_instances.addItem("No instances added to Wyrd yet.")
+            self.setup_status.setText(
+                "MO2 is not connected yet. Find your existing instance, select it, then choose Add to Wyrd."
+            )
             return
         visible_count = 0
         for record in registry["instances"]:
@@ -313,6 +316,16 @@ class Mo2LibraryDialog(QWidget):
                 self.registered_instances.setCurrentItem(item)
         if not visible_count:
             self.registered_instances.addItem("No instances found for this installation.")
+        if self.preferred_instance_id and any(
+            record.get("id") == self.preferred_instance_id for record in registry["instances"]
+        ):
+            self.setup_status.setText(
+                "MO2 is connected to Wyrd. Select an instance below to use it, or find another one."
+            )
+        else:
+            self.setup_status.setText(
+                f"{len(registry['instances'])} instance(s) connected to Wyrd. Select one below, or find another."
+            )
 
     def _select_registered(self, row: int) -> None:
         item = self.registered_instances.item(row) if row >= 0 else None
