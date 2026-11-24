@@ -154,11 +154,12 @@ class WyrdMO2ResetTests(unittest.TestCase):
             nested = instance / "Nested"
             nested.mkdir()
             (nested / "ModOrganizer.ini").write_text("[General]\\n", encoding="utf-8")
-            registry_path = managed_paths(home)["config"] / "mo2-registry.json"
+            registry_path = home / ".config/wyrd/mo2-registry.json"
             registry = json.loads(registry_path.read_text(encoding="utf-8"))
             nested_record = dict(registry["instances"][0], id="nested-instance", instance_path=str(nested), config=str(nested / "ModOrganizer.ini"))
             registry["instances"].append(nested_record)
-            save_registry(registry_path, registry)
+            with patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
+                save_registry(registry_path, registry)
             with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "install": str(install), "prefix": str(prefix),
             }), patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
