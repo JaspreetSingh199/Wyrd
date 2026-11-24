@@ -72,7 +72,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_skyrim_launch_buttons_route_modded_and_unmodded_launches(self):
         window = self._window()
         self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
-        self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded (Steam)")
+        self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded")
         window.launch_game_button.setEnabled(True)
         with patch.object(window, "start_skyrim") as mo2_launch:
             window.launch_game_button.click()
@@ -657,7 +657,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         label_text = "\\n".join(label.text() for label in labels)
         self.assertIn("Advanced diagnostics only", label_text)
         self.assertEqual(window.tabs.count(), 2)
-        self.assertEqual(window.audio_check_button.text(), "Inspect Legacy Audio Libraries")
+        self.assertEqual(window.audio_check_button.text(), "Inspect audio libraries")
         window.close()
 
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
