@@ -1231,6 +1231,37 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertFalse(mismatch["ok"])
             self.assertIn("x86_64", mismatch["message"])
 
+    def test_proton_discovery_prefers_official_then_ge_then_other_builds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            root = home / ".steam/steam"
+            common = root / "steamapps/common"
+            common.mkdir(parents=True)
+            names = [
+                "Proton-CachyOS Latest",
+                "GE-Proton Latest",
+                "Proton - Experimental",
+                "Proton 10.0",
+                "proton-cachyos-slr",
+                "Proton 9.0",
+            ]
+            for name in names:
+                make_proton(common / name)
+            with patch("wyrd_mo2.find_steam_roots", return_value=[root]):
+                with patch("pathlib.Path.home", return_value=home):
+                    builds = discover_proton_builds(home, system_roots=[])
+            self.assertEqual(
+                [item["name"] for item in builds],
+                [
+                    "Proton 10.0",
+                    "Proton 9.0",
+                    "Proton - Experimental",
+                    "GE-Proton Latest",
+                    "Proton-CachyOS Latest",
+                    "proton-cachyos-slr",
+                ],
+            )
+
     def test_wrong_architecture_build_is_not_offered_in_qt_runtime_list(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
