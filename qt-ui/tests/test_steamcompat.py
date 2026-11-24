@@ -269,3 +269,24 @@ def test_external_launch_uses_skyrim_prefix_and_does_not_write_marker(monkeypatc
     assert captured["command"][-3] == str(exe)
     assert exe.read_bytes() == before
     assert not (exe.parent / ".wyrd-managed.json").exists()
+
+
+def test_external_prefix_inventory_uses_validated_install_and_is_read_only(monkeypatch, tmp_path):
+    root, game, prefix, exe = _external_game_layout(tmp_path)
+    instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
+    instance.mkdir(parents=True)
+    config = instance / "ModOrganizer.ini"
+    config.write_text(
+        "[General]\\ngameName=Skyrim Special Edition\\n"
+        "[Settings]\\nbase_directory=%BASE_DIR%\\nprofiles_directory=%BASE_DIR%/profiles\\n",
+        encoding="utf-8",
+    )
+    (instance / "profiles/Default").mkdir(parents=True)
+    before = config.read_bytes()
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    result = steamcompat.inspect_any_skyrim_prefix_mo2_instances(game, tmp_path)
+    assert result["ok"]
+    assert result["managed"] is False
+    assert [item["name"] for item in result["skyrim_instances"]] == ["Skyrim Special Edition"]
+    assert config.read_bytes() == before
+    assert not (exe.parent / ".wyrd-managed.json").exists()
