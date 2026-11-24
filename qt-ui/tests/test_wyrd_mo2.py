@@ -953,6 +953,37 @@ class WyrdMO2Tests(unittest.TestCase):
             popen.assert_not_called()
 
 
+
+    def test_external_prefix_launch_can_be_explicitly_authorized(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            prefix = home / ".steam/steam/steamapps/compatdata/489830"
+            install = prefix / "pfx/drive_c/Modding/MO2"
+            install.mkdir(parents=True)
+            (install / "ModOrganizer.exe").write_bytes(b"MZ")
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
+            instance.mkdir(parents=True)
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\ngameName=Skyrim Special Edition\\n"
+                "[Settings]\\nbase_directory=%BASE_DIR%\\n",
+                encoding="utf-8",
+            )
+            game = home / ".steam/steam/steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            proton = make_proton(home / "Proton")
+            with patch("wyrd_mo2.inspect_proton_build", return_value={"ok": True}), \\
+                 patch("wyrd_mo2._runtime_environment", return_value={}), \\
+                 patch("wyrd_mo2.subprocess.Popen") as popen:
+                popen.return_value.pid = 456
+                result = launch_skyrim_via_mo2(
+                    "Skyrim", "Skyrim Special Edition", expected_binary=None,
+                    proton_path=proton, game_path=game, prefix_root=prefix,
+                    install_root=install, require_managed=False,
+                )
+            self.assertFalse(result["ok"])
+            self.assertIn("executable", result["message"].lower())
+            popen.assert_not_called()
+
     def test_launch_process_status_validates_process_start_time(self):
         with patch("wyrd_mo2.os.kill", return_value=None), patch(
             "wyrd_mo2._proc_start_time", return_value=500
