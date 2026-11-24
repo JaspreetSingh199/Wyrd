@@ -270,15 +270,6 @@ class MainWindow(QMainWindow):
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
-        self.launch_game_prefix_button = QPushButton("Launch MO2 in Skyrim Prefix")
-        self.launch_game_prefix_button.clicked.connect(self.start_mo2_in_skyrim_prefix)
-        self.launch_game_prefix_button.setEnabled(False)
-        self.copy_instance_button = QPushButton("Copy Existing Skyrim Instance")
-        self.copy_instance_button.clicked.connect(self.copy_instance_to_skyrim_prefix)
-        self.copy_instance_button.setEnabled(False)
-        self.reset_prefix_button = QPushButton("Nuke MO2 Compatdata")
-        self.reset_prefix_button.setEnabled(False)
-        self.reset_prefix_button.clicked.connect(self.reset_mo2_prefix)
         self.launch_game_button = QPushButton("Launch Modded Skyrim")
         self.launch_game_button.clicked.connect(self.start_active_game)
         self.launch_game_button.setEnabled(False)
@@ -382,9 +373,6 @@ class MainWindow(QMainWindow):
         advanced_layout.addStretch(1)
         self.tabs.addTab(advanced_page, "ADVANCED")
 
-        self.launch_game_prefix_button.hide()
-        self.copy_instance_button.hide()
-        self.reset_prefix_button.hide()
 
         from PySide6.QtWidgets import QScrollArea
         scroll = QScrollArea()
