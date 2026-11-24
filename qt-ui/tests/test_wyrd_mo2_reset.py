@@ -149,7 +149,8 @@ class WyrdMO2ResetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
-            self._registry(home, install, instance)
+            with patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
+                self._registry(home, install, instance)
             nested = instance / "Nested"
             nested.mkdir()
             (nested / "ModOrganizer.ini").write_text("[General]\\n", encoding="utf-8")
@@ -162,7 +163,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
                 "installed": True, "install": str(install), "prefix": str(prefix),
             }), patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
                 result = reset_wyrd_mo2(home, game)
-            self.assertFalse(result["ok"])
+            self.assertFalse(result["ok"], result)
             self.assertIn("overlap", result["message"])
             self.assertTrue(install.exists())
             self.assertTrue(instance.exists())
