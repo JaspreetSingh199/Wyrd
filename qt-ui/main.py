@@ -31,6 +31,7 @@ from steamcompat import (
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_external_mo2_in_skyrim_prefix,
     launch_mo2_in_skyrim_prefix, steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
+    reset_wyrd_mo2,
 )
 from mo2_library_dialog import Mo2LibraryDialog
 @dataclass
@@ -289,7 +290,10 @@ class MainWindow(QMainWindow):
         self.mo2_library_button.clicked.connect(self.manage_mo2_library)
         self.mo2_library_button.setEnabled(False)
         management_row.addWidget(self.mo2_library_button)
-        management_hint = QLabel("Instances, storage and registration")
+        self.reset_mo2_button = QPushButton("Reset MO2")
+        self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
+        management_row.addWidget(self.reset_mo2_button)
+        management_hint = QLabel("Instances and storage")
         management_hint.setObjectName("muted")
         management_row.addWidget(management_hint, 1)
         setup_layout.addLayout(management_row)
@@ -786,6 +790,49 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "MO2 compatdata reset failed", result.get("message", "Reset failed."))
         self.refresh_all()
+
+
+    def reset_managed_mo2(self) -> None:
+        """Remove only Wyrd-owned MO2 files; never reset Steam's Skyrim prefix."""
+        if self.worker and self.worker.isRunning():
+            QMessageBox.information(self, "MO2 is busy", "Wait for the current setup operation to finish before resetting MO2.")
+            return
+        state = (
+            inspect_skyrim_prefix_mo2_installation(Path(self.game_state["game_dir"]))
+            if self.game_state.get("found")
+            else {"installed": False}
+        )
+        if not state.get("installed"):
+            QMessageBox.information(
+                self, "Nothing to reset",
+                "Wyrd could not verify a Wyrd-managed MO2 installation. External or unverified installations will not be removed.",
+            )
+            return
+        install = state.get("install", "Wyrd-managed MO2 directory")
+        answer = QMessageBox.warning(
+            self, "Reset Wyrd-managed MO2?",
+            "This permanently removes Wyrd's verified MO2 installation and registered global instances. "
+            "Instance-local modding data is removed with those instances. Custom storage outside the instance folders is preserved.\n\n"
+            "It will also clear Wyrd's registry entries and active instance selection for this installation.\n\n"
+            "NEVER DELETED: Skyrim's Steam compatdata/489830 prefix, Skyrim/game files, saves, external MO2 installations, "
+            "and custom storage outside the managed instance folders.\n\n"
+            f"Installation: {install}\n\nThis cannot be undone. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = reset_wyrd_mo2()
+        self._log(result.get("message", "MO2 reset attempted."))
+        if result.get("ok"):
+            self.selected_mo2_instance_id = ""
+            self._saved_settings.pop("selected_mo2_instance_id", None)
+            self.progress_label.setText("Wyrd-managed MO2 reset complete.")
+            QMessageBox.information(self, "MO2 reset complete", result["message"])
+        else:
+            QMessageBox.warning(self, "MO2 reset incomplete", result.get("message", "Reset failed safely."))
+        self.refresh_all()
+        self._restore_registered_instance()
 
     def install_mo2(self) -> None:
         if self.worker and self.worker.isRunning():
