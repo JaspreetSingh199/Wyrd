@@ -155,6 +155,7 @@ class RegistryService:
         installation_record = dict(installation)
         game_record = dict(game)
         game_record.setdefault("prefix_path", installation_record.get("prefix_path"))
+        game_record.setdefault("steam_root", installation_record.get("steam_root"))
         runtime_record = dict(runtime) if runtime is not None else None
         instance = {
             "id": proposal["id"], "installation_id": installation_record["id"],
