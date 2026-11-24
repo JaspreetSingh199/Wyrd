@@ -1290,6 +1290,9 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if audio_mode not in {"default", "xaudio2_compat"}:
         return {"ok": False, "message": "Unknown audio compatibility test mode."}
     env = _runtime_environment(proton, steam_root, prefix)
+    # Prefix identity alone is not Wyrd attribution: Steam-launched Skyrim
+    # shares this AppID prefix. This marker is inherited by the MO2 handoff.
+    env["WYRD_LAUNCHED"] = "1"
     if audio_mode == "xaudio2_compat":
         current_overrides = env.get("WINEDLLOVERRIDES", "")
         overrides = [
@@ -1424,7 +1427,9 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
         if not matches:
             continue
         env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
-        attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
+        prefix_attributed = bool(prefix and (any(prefix in part for part in env_parts) or prefix in " ".join(argv)))
+        wyrd_marker = any(part == "WYRD_LAUNCHED=1" for part in env_parts)
+        attributed = bool(prefix_attributed and wyrd_marker)
         # Only expose a small, non-secret audio-related environment allowlist.
         # This reads the actual Skyrim/SKSE process environment, not the Proton wrapper.
         audio_runtime = {}
@@ -1461,7 +1466,8 @@ def detect_skyrim_processes(prefix_root: Path | None = None,
             "audio_module_mappings_readable": maps_readable,
             "audio_module_mappings_error": maps_error,
             "start_time": _proc_start_time(int(entry.name), Path(proc_root)),
-            "attributed_to_wyrd": attributed, "prefix": prefix if attributed else None,
+            "attributed_to_wyrd": attributed, "prefix_attributed": prefix_attributed,
+            "prefix": prefix if prefix_attributed else None,
             "audio_runtime_environment": audio_runtime,
             "audio_runtime_environment_readable": env_readable,
             "audio_runtime_environment_error": env_error,
