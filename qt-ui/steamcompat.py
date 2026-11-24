@@ -514,6 +514,10 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
             settings_payload = json.loads(settings_path.read_text(encoding="utf-8"))
             if not isinstance(settings_payload, dict):
                 return {"ok": False, "message": "Wyrd settings file is not a JSON object; reset refused.", "removed": []}
+        except FileNotFoundError:
+            # Settings are optional; a clean installation may not have written
+            # them yet. Unsafe or malformed existing settings still fail closed.
+            settings_payload = None
         except (OSError, ValueError):
             return {"ok": False, "message": "Wyrd settings could not be read; reset refused.", "removed": []}
 
