@@ -91,6 +91,11 @@ class Mo2LibraryDialog(QDialog):
         actions.addStretch(1)
         root.addLayout(actions)
 
+        root.addWidget(QLabel("Registered installations"))
+        self.installation_filter = QComboBox()
+        self.installation_filter.addItem("All installations", None)
+        self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
+        root.addWidget(self.installation_filter)
         root.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
         self.registered_instances = QListWidget()
         self.registered_instances.currentRowChanged.connect(self._select_registered)
@@ -171,7 +176,8 @@ class Mo2LibraryDialog(QDialog):
             {x["id"]: x for x in registry["runtimes"]},
         )
 
-    def _refresh_registered(self) -> None:
+    def _refresh_registered(self, _index: int = -1) -> None:
+        selected_filter = self.installation_filter.currentData() if self.installation_filter.count() else None
         self.registered_instances.clear()
         self.selected_instance_record = None
         try:
@@ -179,10 +185,32 @@ class Mo2LibraryDialog(QDialog):
         except Exception as error:
             self.registered_instances.addItem(f"Registry unavailable: {error}")
             return
+
+        self.installation_filter.blockSignals(True)
+        self.installation_filter.clear()
+        self.installation_filter.addItem("All installations", None)
+        for installation in sorted(
+            registry["installations"],
+            key=lambda item: Path(item.get("executable", "")).parent.name.casefold(),
+        ):
+            executable = Path(installation.get("executable", ""))
+            label = (
+                f"{executable.parent.name or 'MO2'} · {installation.get('owner', 'unknown')} · "
+                f"{installation.get('executable', '')}"
+            )
+            self.installation_filter.addItem(label, installation.get("id"))
+        selected_index = self.installation_filter.findData(selected_filter)
+        self.installation_filter.setCurrentIndex(max(0, selected_index))
+        self.installation_filter.blockSignals(False)
+        active_filter = self.installation_filter.currentData()
+
         if not registry["instances"]:
             self.registered_instances.addItem("No MO2 instances registered yet.")
             return
+        visible_count = 0
         for record in registry["instances"]:
+            if active_filter and record.get("installation_id") != active_filter:
+                continue
             installation = installations.get(record.get("installation_id"), {})
             game = games.get(record.get("game_id"), {})
             item = QListWidgetItem(
@@ -191,8 +219,11 @@ class Mo2LibraryDialog(QDialog):
             )
             item.setData(Qt.ItemDataRole.UserRole, record)
             self.registered_instances.addItem(item)
+            visible_count += 1
             if record.get("id") == self.preferred_instance_id:
                 self.registered_instances.setCurrentItem(item)
+        if not visible_count:
+            self.registered_instances.addItem("No instances belong to this MO2 installation.")
 
     def _select_registered(self, row: int) -> None:
         item = self.registered_instances.item(row) if row >= 0 else None
@@ -665,6 +696,19 @@ class Mo2LibraryDialog(QDialog):
         game_id = self.game_id_edit.text().strip()
         game_name = self.game_name_edit.text().strip()
         game_path = self.game_path_edit.text().strip()
+        app_id = self.game_appid_edit.text().strip()
+        if app_id and not app_id.isdigit():
+            QMessageBox.warning(self, "Register MO2 instance", "Steam AppID must contain digits only, or be blank for a non-Steam game.")
+            return
+        if app_id == "489830" and "skyrim" not in game_name.casefold():
+            QMessageBox.warning(
+                self, "Register MO2 instance",
+                "The AppID field still contains Skyrim's 489830. Clear it for a non-Steam game or enter the correct Steam AppID."
+            )
+            return
+        if game_id == "steam-489830" and app_id != "489830":
+            identity = hashlib.sha256((str(Path(game_path).expanduser()) + "|" + app_id).encode()).hexdigest()[:16]
+            game_id = f"steam-{app_id}" if app_id else f"game-{identity}"
         selected_prefix = Path(self.prefix_edit.text()).expanduser()
         if selected_prefix.is_symlink() or not (selected_prefix / "pfx/drive_c/users").is_dir():
             QMessageBox.warning(
@@ -690,10 +734,6 @@ class Mo2LibraryDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
 
-        app_id = self.game_appid_edit.text().strip()
-        if app_id and not app_id.isdigit():
-            QMessageBox.warning(self, "Register MO2 instance", "Steam AppID must contain digits only, or be blank for a non-Steam game.")
-            return
         steam_root = ""
         if app_id:
             game_dir = Path(game_path).expanduser().resolve()
