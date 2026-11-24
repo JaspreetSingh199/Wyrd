@@ -410,10 +410,17 @@ class MainWindow(QMainWindow):
         self.mo2_state = inspect_skyrim_prefix_mo2_installation(
             Path(self.game_state["game_dir"])
         ) if self.game_state.get("found") else {
-            "installed": False, "message": "Skyrim Special Edition was not detected."
+            "installed": False, "managed": False,
+            "message": "Skyrim Special Edition was not detected."
         }
+        if not self.mo2_state.get("installed") and self.game_state.get("found"):
+            self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
+                Path(self.game_state["game_dir"])
+            )
         if self.mo2_state.get("installed"):
-            self.instance_state = inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
+            self.instance_state = inspect_any_skyrim_prefix_mo2_instances(
+                Path(self.game_state["game_dir"])
+            )
         else:
             self.instance_state = {
                 "ok": False, "instances": [], "skyrim_instances": [],
@@ -430,17 +437,18 @@ class MainWindow(QMainWindow):
                 )
             elif self.instance_state.get("ok"):
                 summary += "\nCreate a Skyrim Special Edition instance in MO2 to continue."
+            owner = "Wyrd-managed" if self.mo2_state.get("managed", True) else "External (read-only)"
             self.mo2_panel.detail_label.setText(
-                "Wyrd-managed MO2 is installed in Skyrim's Steam prefix.\n"
+                f"{owner} MO2 is available in Skyrim's Steam prefix.\n"
                 f'Executable: {self.mo2_state.get("executable")}\n'
                 f'Steam compatdata: {self.mo2_state.get("prefix")}\n{summary}'
             )
-            self.install_button.setText("MO2 Ready")
+            self.install_button.setText("MO2 Ready" if self.mo2_state.get("managed", True) else "Use Existing MO2")
             self.install_button.setEnabled(False)
             self.launch_button.setEnabled(True)
             self.launch_game_button.setEnabled(bool(skyrim_instances))
             self.launch_game_prefix_button.setEnabled(False)
-            self._log("Skyrim-prefix MO2 inspection: verified Wyrd-owned installation.")
+            self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
@@ -666,7 +674,7 @@ class MainWindow(QMainWindow):
         if not game_path.is_dir() or not proton_path:
             QMessageBox.warning(self, "Launch MO2", "Skyrim or the selected Proton build is unavailable.")
             return
-        inventory = inspect_skyrim_prefix_mo2_instances(game_path)
+        inventory = inspect_any_skyrim_prefix_mo2_instances(game_path)
         if not inventory.get("ok"):
             QMessageBox.warning(self, "MO2 instance status unavailable", inventory.get("message", "Could not inspect Skyrim's Steam prefix."))
             return
@@ -679,10 +687,16 @@ class MainWindow(QMainWindow):
             )
             if not accepted or not instance_name:
                 return
-        result = launch_mo2_in_skyrim_prefix(
-            Path(proton_path), game_path, instance_name=instance_name,
-            xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
-        )
+        if inventory.get("managed", True):
+            result = launch_mo2_in_skyrim_prefix(
+                Path(proton_path), game_path, instance_name=instance_name,
+                xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
+            )
+        else:
+            result = launch_external_mo2_in_skyrim_prefix(
+                Path(proton_path), game_path, instance_name=instance_name,
+                xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
+            )
         self._log(result.get("message", "MO2 launch failed."))
         if result.get("ok"):
             self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
