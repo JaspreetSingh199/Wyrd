@@ -180,11 +180,7 @@ def inspect_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = Non
 
 
 def inspect_external_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = None) -> dict:
-    """Discover an unowned MO2 installation at the conventional Skyrim-prefix path.
-
-    This is read-only. The presence of ModOrganizer.exe is not treated as Wyrd
-    ownership and no marker is written or inferred.
-    """
+    """Discover an unowned MO2 installation in Skyrim's prefix without mutation."""
     home = (home or Path.home()).expanduser()
     game = Path(game_path).expanduser()
     if not game.is_dir():
@@ -196,26 +192,34 @@ def inspect_external_skyrim_prefix_mo2_installation(game_path: Path, home: Path 
         if prefix.is_symlink() or not prefix.is_dir():
             return {"installed": False, "managed": False,
                     "message": "Skyrim's Steam compatdata prefix is missing or unsafe."}
-        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
-        proton_prefix = prefix / "pfx"
-        wine_drive = proton_prefix / "drive_c"
-        modding_root = wine_drive / "Modding"
-        install = modding_root / "MO2"
-        if any(path.is_symlink() for path in (proton_prefix, wine_drive, modding_root, install)):
+        resolved_steam = steam_root.resolve(strict=True)
+        resolved_prefix = prefix.resolve(strict=True)
+        resolved_prefix.relative_to(resolved_steam)
+        pfx = prefix / "pfx"
+        drive = pfx / "drive_c"
+        modding = drive / "Modding"
+        install = modding / "MO2"
+        for component in (pfx, drive, modding, install):
+            if component.is_symlink():
+                return {"installed": False, "managed": False, "prefix": str(prefix),
+                        "install": str(install), "message": "Existing MO2 path contains a symlink; discovery was refused."}
+        if not drive.is_dir():
             return {"installed": False, "managed": False, "prefix": str(prefix),
-                    "install": str(install), "message": "Existing MO2 path contains a symlink; discovery was refused."}
+                    "install": str(install), "message": "Skyrim's Proton prefix is not initialized."}
         executable = install / "ModOrganizer.exe"
-        if not wine_drive.is_dir() or not executable.is_file():
-            return {"installed": False, "managed": False, "prefix": str(prefix),
-                    "install": str(install), "message": "No existing MO2 executable was found at the conventional Skyrim-prefix location."}
         marker = install / ".wyrd-managed.json"
+        if marker.is_symlink():
+            return {"installed": False, "managed": False, "prefix": str(prefix),
+                    "install": str(install), "message": "MO2 ownership marker is a symlink; discovery was refused."}
         if marker.exists():
-            # A present but invalid marker is not silently reclassified as external.
             owned = inspect_skyrim_prefix_mo2_installation(game, home)
             if owned.get("installed"):
                 return {**owned, "managed": True}
             return {"installed": False, "managed": False, "prefix": str(prefix),
-                    "install": str(install), "message": "An ownership marker exists but could not be verified; refusing external adoption."}
+                    "install": str(install), "message": "An ownership marker exists but cannot be verified; external adoption was refused."}
+        if not executable.is_file() or executable.is_symlink():
+            return {"installed": False, "managed": False, "prefix": str(prefix),
+                    "install": str(install), "message": "No external MO2 executable was found at the conventional Skyrim-prefix location."}
         return {
             "installed": True, "managed": False, "executable": str(executable),
             "prefix": str(prefix), "install": str(install), "steam_root": str(steam_root),
