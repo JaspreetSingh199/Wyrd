@@ -480,6 +480,9 @@ class MainWindow(QMainWindow):
         self.mo2_target_occupied = bool(
             self.mo2_state.get("installed") or self.mo2_state.get("install")
         )
+        self.reset_mo2_button.setEnabled(bool(
+            self.mo2_state.get("installed") and self.mo2_state.get("managed", True)
+        ))
         if self.mo2_state.get("installed"):
             self.instance_state = inspect_any_skyrim_prefix_mo2_instances(
                 Path(self.game_state["game_dir"])
