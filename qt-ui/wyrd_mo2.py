@@ -1553,6 +1553,7 @@ def detect_game_processes(
     prefix_root: Path | str | None = None,
     proc_root: Path = Path("/proc"),
     launch_token: str | None = None,
+    ancestor_start_time: int | None = None,
 ) -> dict:
     """Find the configured game executable under a Wyrd-launched Proton context.
 
@@ -1581,7 +1582,12 @@ def detect_game_processes(
         pid = int(entry.name)
         if pid == ancestor_pid:
             continue
-        descendant = _is_descendant_process(pid, ancestor_pid, proc_root)
+        ancestor_identity = _proc_identity(ancestor_pid, proc_root)
+        ancestor_valid = (
+            ancestor_start_time is None
+            or ancestor_identity.get("start_time") == ancestor_start_time
+        )
+        descendant = ancestor_valid and _is_descendant_process(pid, ancestor_pid, proc_root)
         try:
             argv_bytes = (entry / "cmdline").read_bytes()
         except OSError:
