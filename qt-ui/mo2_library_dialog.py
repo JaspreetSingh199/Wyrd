@@ -24,7 +24,7 @@ class Mo2LibraryDialog(QDialog):
     def __init__(
         self, parent=None, *, prefix_path: Path | str = "",
         install_path: Path | str = "", game_path: Path | str = "",
-        proton_path: Path | str = "",
+        proton_path: Path | str = "", selected_instance_id: str = "",
     ):
         super().__init__(parent)
         self.setWindowTitle("Wyrd — MO2 Library and Instances")
@@ -35,6 +35,7 @@ class Mo2LibraryDialog(QDialog):
         self.launch_requested = False
         self.associations_updated = False
         self.selected_instance_record: dict | None = None
+        self.preferred_instance_id = selected_instance_id
 
         root = QVBoxLayout(self)
         intro = QLabel(
@@ -173,6 +174,8 @@ class Mo2LibraryDialog(QDialog):
             )
             item.setData(Qt.ItemDataRole.UserRole, record)
             self.registered_instances.addItem(item)
+            if record.get("id") == self.preferred_instance_id:
+                self.registered_instances.setCurrentItem(item)
 
     def _select_registered(self, row: int) -> None:
         item = self.registered_instances.item(row) if row >= 0 else None
