@@ -693,6 +693,51 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.check_launch_status()
         window.close()
 
+    def test_reset_mo2_refuses_external_installation(self):
+        window = self._window()
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
+            "installed": True, "managed": False, "install": "/external/MO2",
+        }), patch("main.QMessageBox.information") as info, patch(
+            "main.reset_wyrd_mo2"
+        ) as reset:
+            window.reset_managed_mo2()
+        info.assert_called_once()
+        reset.assert_not_called()
+        window.close()
+
+    def test_reset_mo2_cancel_never_calls_reset_service(self):
+        window = self._window()
+        window.selected_mo2_instance_id = "wyrd-instance"
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
+            "installed": True, "managed": True, "install": "/managed/MO2",
+        }), patch("main.QMessageBox.warning", return_value=QMessageBox.StandardButton.Cancel), patch(
+            "main.reset_wyrd_mo2"
+        ) as reset:
+            window.reset_managed_mo2()
+        reset.assert_not_called()
+        self.assertEqual(window.selected_mo2_instance_id, "wyrd-instance")
+        window.close()
+
+    def test_reset_mo2_success_clears_selection_and_refreshes_setup(self):
+        window = self._window()
+        window.selected_mo2_instance_id = "wyrd-instance"
+        window._saved_settings["selected_mo2_instance_id"] = "wyrd-instance"
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
+            "installed": True, "managed": True, "install": "/managed/MO2",
+        }), patch("main.QMessageBox.warning", return_value=QMessageBox.StandardButton.Yes), patch(
+            "main.reset_wyrd_mo2", return_value={"ok": True, "message": "Reset complete."}
+        ) as reset, patch("main.QMessageBox.information"), patch.object(
+            window, "refresh_all"
+        ) as refresh, patch.object(window, "_restore_registered_instance") as restore:
+            window.reset_managed_mo2()
+        reset.assert_called_once()
+        refresh.assert_called_once()
+        restore.assert_called_once()
+        self.assertEqual(window.selected_mo2_instance_id, "")
+        self.assertNotIn("selected_mo2_instance_id", window._saved_settings)
+        self.assertIn("reset complete", window.progress_label.text().lower())
+        window.close()
+
 
 if __name__ == "__main__":
     unittest.main()
