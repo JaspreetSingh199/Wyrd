@@ -107,6 +107,10 @@ class Mo2LibraryDialog(QDialog):
         self._edit_associations_button.setEnabled(False)
         self._edit_associations_button.clicked.connect(self.edit_associations)
         root.addWidget(self._edit_associations_button)
+        self.rename_instance_button = QPushButton("Rename Wyrd display name…")
+        self.rename_instance_button.setEnabled(False)
+        self.rename_instance_button.clicked.connect(self.rename_selected_instance)
+        root.addWidget(self.rename_instance_button)
         self._launch_existing_button = QPushButton("Launch selected registered instance")
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
@@ -198,6 +202,7 @@ class Mo2LibraryDialog(QDialog):
         except Exception as error:
             self.registered_instances.addItem(f"Registry unavailable: {error}")
             self.unregister_instance_button.setEnabled(False)
+            self.rename_instance_button.setEnabled(False)
             self.unregister_installation_button.setEnabled(False)
             self._launch_existing_button.setEnabled(False)
             self._edit_associations_button.setEnabled(False)
@@ -252,8 +257,9 @@ class Mo2LibraryDialog(QDialog):
             installation = installations.get(record.get("installation_id"), {})
             game = games.get(record.get("game_id"), {})
             item = QListWidgetItem(
-                f"{game.get('name', 'Unknown game')} · {record.get('instance_type', 'unknown')} · "
-                f"{installation.get('owner', 'unknown')}\n{record.get('instance_path', '')}"
+                f"{record.get('display_name') or game.get('name', 'Unknown game')} · "
+                f"{record.get('instance_type', 'unknown')} · {installation.get('owner', 'unknown')}\n"
+                f"{record.get('instance_path', '')}"
             )
             item.setData(Qt.ItemDataRole.UserRole, record)
             self.registered_instances.addItem(item)
@@ -272,9 +278,11 @@ class Mo2LibraryDialog(QDialog):
             self._edit_associations_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
             self.unregister_instance_button.setEnabled(False)
+            self.rename_instance_button.setEnabled(False)
             return
         self.selected_instance_record = record
         self.unregister_instance_button.setEnabled(True)
+        self.rename_instance_button.setEnabled(True)
         try:
             registry, installations, games, runtimes = self._registry_maps()
             installation = installations[record["installation_id"]]
@@ -311,6 +319,36 @@ class Mo2LibraryDialog(QDialog):
         for button in self.storage_browse_buttons.values():
             button.setEnabled(bool(record.get("config")))
         self._edit_associations_button.setEnabled(True)
+
+    def rename_selected_instance(self) -> None:
+        """Rename only Wyrd's display label; never rename MO2 directories or profiles."""
+        record = self.selected_instance_record
+        if not record:
+            return
+        current = record.get("display_name", "")
+        name, accepted = QInputDialog.getText(
+            self, "Rename MO2 instance",
+            "Display name in Wyrd (leave blank to use the game's name):",
+            QLineEdit.EchoMode.Normal, current,
+        )
+        if not accepted:
+            return
+        name = name.strip()
+        try:
+            self.service.rename_instance(record["id"], name)
+            updated = dict(record)
+            if name:
+                updated["display_name"] = name
+            else:
+                updated.pop("display_name", None)
+            self.selected_instance_record = updated
+            self._refresh_registered()
+            self.details.setPlainText(
+                "Wyrd display name updated. MO2's instance directory, INI, profiles, mods, "
+                "downloads and game files were not changed."
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Rename MO2 instance", str(error))
 
     def unregister_selected_instance(self) -> None:
         """Forget a selected instance in Wyrd without changing its files."""
