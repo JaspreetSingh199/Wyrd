@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QInputDialog, QVBoxLayout, QWidget,
+    QInputDialog, QVBoxLayout, QWidget, QStackedWidget,
 )
 
 from wyrd_mo2 import managed_paths
@@ -298,9 +298,52 @@ class Mo2AdvancedSettings(QWidget):
         self.selected_instance_record = None
         self.associations_updated = False
         self.advanced_page = self
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        form = QFormLayout()
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(10)
+
+        heading = QLabel("MO2 SETTINGS")
+        heading.setObjectName("section")
+        intro = QLabel("Pick a section on the left. Most Skyrim setups only need the Environment page.")
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        root.addWidget(heading)
+        root.addWidget(intro)
+
+        content = QHBoxLayout()
+        content.setSpacing(12)
+        self.category_list = QListWidget()
+        self.category_list.setObjectName("mo2AdvancedCategories")
+        self.category_list.setFixedWidth(190)
+        self.category_list.setSpacing(3)
+        self.category_pages = QStackedWidget()
+        content.addWidget(self.category_list)
+        content.addWidget(self.category_pages, 1)
+        root.addLayout(content, 1)
+
+        def add_category(title, page, description):
+            page_layout = QVBoxLayout(page)
+            page_layout.setContentsMargins(14, 12, 14, 12)
+            page_layout.setSpacing(10)
+            label = QLabel(title.upper())
+            label.setObjectName("section")
+            help_text = QLabel(description)
+            help_text.setObjectName("muted")
+            help_text.setWordWrap(True)
+            page_layout.addWidget(label)
+            page_layout.addWidget(help_text)
+            self.category_list.addItem(title)
+            self.category_pages.addWidget(page)
+            return page_layout
+
+        locations_page = QWidget()
+        locations_layout = add_category(
+            "Locations",
+            locations_page,
+            "Where Wyrd finds MO2, Skyrim and Proton. These are normally detected for you."
+        )
+        paths_box = QGroupBox("Folders and runtime")
+        form = QFormLayout(paths_box)
         self.prefix_edit = QLineEdit()
         self.install_edit = QLineEdit()
         self.game_name_edit = QLineEdit("Skyrim Special Edition")
@@ -311,108 +354,117 @@ class Mo2AdvancedSettings(QWidget):
         for field in (self.prefix_edit,self.install_edit,self.game_name_edit,self.game_id_edit,
                       self.game_appid_edit,self.game_path_edit,self.proton_edit):
             field.setMinimumHeight(30)
+        self.prefix_edit.setPlaceholderText("Detected Skyrim Proton prefix")
+        self.install_edit.setPlaceholderText("Detected MO2 installation folder")
+        self.game_path_edit.setPlaceholderText("Detected Skyrim game folder")
+        self.proton_edit.setPlaceholderText("Selected Proton runtime")
         def browse_row(field, title):
-            row=QHBoxLayout(); row.addWidget(field,1)
+            row=QHBoxLayout()
+            row.addWidget(field,1)
             button=QPushButton("Browse…")
             button.clicked.connect(lambda: self._browse_directory(title, field))
             row.addWidget(button)
             return row
         form.addRow("Proton prefix:", browse_row(self.prefix_edit,"Select Proton prefix"))
         form.addRow("MO2 folder:", browse_row(self.install_edit,"Select MO2 folder"))
-        form.addRow("Game name:",self.game_name_edit)
-        form.addRow("Game ID:",self.game_id_edit)
-        form.addRow("Steam AppID:",self.game_appid_edit)
-        form.addRow("Game folder:",browse_row(self.game_path_edit,"Select game folder"))
-        form.addRow("Proton runtime:",browse_row(self.proton_edit,"Select Proton runtime"))
-        paths_heading = QLabel("MO2 LOCATIONS")
-        paths_heading.setObjectName("section")
-        layout.addWidget(paths_heading)
-        paths_help = QLabel(
-            "These paths tell Wyrd where MO2, Skyrim and Proton are located. "
-            "Change them only if your setup uses a different location."
-        )
-        paths_help.setObjectName("muted")
-        paths_help.setWordWrap(True)
-        layout.addWidget(paths_help)
-        layout.addLayout(form)
+        form.addRow("Game folder:", browse_row(self.game_path_edit,"Select game folder"))
+        form.addRow("Proton runtime:", browse_row(self.proton_edit,"Select Proton runtime"))
+        identity_box = QGroupBox("Game identity")
+        identity_form = QFormLayout(identity_box)
+        identity_form.addRow("Game name:", self.game_name_edit)
+        identity_form.addRow("Game ID:", self.game_id_edit)
+        identity_form.addRow("Steam AppID:", self.game_appid_edit)
+        identity_box.setToolTip("Reference values used when Wyrd links an MO2 instance to Skyrim.")
+        locations_layout.addWidget(paths_box)
+        locations_layout.addWidget(identity_box)
 
         scan_row = QHBoxLayout()
-        self.scan_button = QPushButton("Scan these locations")
+        self.scan_button = QPushButton("Scan for MO2 instances")
         self.scan_button.clicked.connect(self.scan_locations)
-        self.scan_status = QLabel("Scan checks for MO2 instances without changing files.")
+        self.scan_status = QLabel("Read-only scan. Nothing will be changed.")
         self.scan_status.setObjectName("muted")
         self.scan_status.setWordWrap(True)
         scan_row.addWidget(self.scan_button)
         scan_row.addWidget(self.scan_status, 1)
-        layout.addLayout(scan_row)
+        locations_layout.addLayout(scan_row)
+        locations_layout.addStretch(1)
 
-        instances_heading = QLabel("REGISTERED MO2 INSTANCES")
-        instances_heading.setObjectName("section")
-        layout.addWidget(instances_heading)
-        instances_help = QLabel(
-            "Choose an instance to change its Wyrd name, game link or storage settings. "
-            "Removing it here only disconnects it from Wyrd."
+        instances_page = QWidget()
+        instances_layout = add_category(
+            "Instances",
+            instances_page,
+            "Choose which MO2 instance Wyrd uses. Removing a connection never deletes MO2 files."
         )
-        instances_help.setObjectName("muted")
-        instances_help.setWordWrap(True)
-        layout.addWidget(instances_help)
         self.installation_filter=QComboBox()
         self.installation_filter.addItem("All installations",None)
         self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
-        layout.addWidget(QLabel("Registered installations"))
-        layout.addWidget(self.installation_filter)
+        instances_layout.addWidget(QLabel("Installation"))
+        instances_layout.addWidget(self.installation_filter)
         self.installation_summary=QLabel("Select an installation.")
         self.installation_summary.setWordWrap(True)
-        layout.addWidget(self.installation_summary)
+        self.installation_summary.setObjectName("muted")
+        instances_layout.addWidget(self.installation_summary)
+        instances_layout.addWidget(QLabel("Connected instances"))
         self.registered_instances=QListWidget()
-        self.registered_instances.setMaximumHeight(120)
+        self.registered_instances.setMaximumHeight(220)
         self.registered_instances.currentRowChanged.connect(self._select_registered)
-        layout.addWidget(QLabel("Registered instances"))
-        layout.addWidget(self.registered_instances)
-        self._edit_associations_button=QPushButton("Change game or Proton")
+        instances_layout.addWidget(self.registered_instances, 1)
+        instance_actions = QHBoxLayout()
+        self._edit_associations_button=QPushButton("Change game / Proton")
         self._edit_associations_button.clicked.connect(self.edit_associations)
-        layout.addWidget(self._edit_associations_button)
-        self.rename_instance_button=QPushButton("Rename in Wyrd")
+        self.rename_instance_button=QPushButton("Rename")
         self.rename_instance_button.clicked.connect(self.rename_selected_instance)
-        layout.addWidget(self.rename_instance_button)
-        actions=QHBoxLayout()
-        self.unregister_instance_button=QPushButton("Remove instance from Wyrd")
+        instance_actions.addWidget(self._edit_associations_button)
+        instance_actions.addWidget(self.rename_instance_button)
+        instances_layout.addLayout(instance_actions)
+        unregister_actions=QHBoxLayout()
+        self.unregister_instance_button=QPushButton("Disconnect instance")
         self.unregister_instance_button.clicked.connect(self.unregister_selected_instance)
-        self.unregister_installation_button=QPushButton("Remove unused installation from Wyrd")
+        self.unregister_installation_button=QPushButton("Remove unused installation")
         self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
-        actions.addWidget(self.unregister_instance_button); actions.addWidget(self.unregister_installation_button)
-        layout.addLayout(actions)
+        unregister_actions.addWidget(self.unregister_instance_button)
+        unregister_actions.addWidget(self.unregister_installation_button)
+        instances_layout.addLayout(unregister_actions)
 
-        storage_intro = QLabel("STORAGE AND SHARING")
-        storage_intro.setObjectName("section")
-        layout.addWidget(storage_intro)
-        storage_help = QLabel(
-            "Choose where this instance keeps mods, downloads and profiles. "
-            "External MO2 storage is read-only in Wyrd."
+        storage_page = QWidget()
+        storage_layout = add_category(
+            "Storage",
+            storage_page,
+            "Choose where mods, downloads and profiles live. External MO2 storage stays read-only."
         )
-        storage_help.setObjectName("muted")
-        storage_help.setWordWrap(True)
-        layout.addWidget(storage_help)
-        storage_box=QGroupBox("Storage locations")
+        storage_box=QGroupBox("Storage folders")
         storage_form=QFormLayout(storage_box)
         self.storage_fields={}; self.storage_browse_buttons={}
         for key,label in (("base","Base"),("mods","Mods"),("downloads","Downloads"),("cache","Cache"),("profiles","Profiles"),("overwrite","Overwrite")):
-            row=QHBoxLayout(); field=QLineEdit(); field.setReadOnly(True)
-            browse=QPushButton("Browse…"); browse.clicked.connect(lambda _checked=False, category=key: self._choose_storage_path(category))
-            row.addWidget(field,1); row.addWidget(browse); self.storage_fields[key]=field; self.storage_browse_buttons[key]=browse
+            row=QHBoxLayout()
+            field=QLineEdit()
+            field.setReadOnly(True)
+            browse=QPushButton("Browse…")
+            browse.clicked.connect(lambda _checked=False, category=key: self._choose_storage_path(category))
+            row.addWidget(field,1)
+            row.addWidget(browse)
+            self.storage_fields[key]=field
+            self.storage_browse_buttons[key]=browse
             storage_form.addRow(label,row)
-        layout.addWidget(storage_box)
-        self.share_mods_check=QCheckBox("Share Mods folder")
-        self.share_downloads_check=QCheckBox("Share Downloads folder")
-        self.create_storage_check=QCheckBox("Create missing folders (existing files are never moved or copied)")
-        layout.addWidget(self.share_mods_check); layout.addWidget(self.share_downloads_check); layout.addWidget(self.create_storage_check)
+        storage_layout.addWidget(storage_box)
+        self.share_mods_check=QCheckBox("Share Mods folder with other instances")
+        self.share_downloads_check=QCheckBox("Share Downloads folder with other instances")
+        self.create_storage_check=QCheckBox("Create missing empty folders when saving")
+        storage_layout.addWidget(self.share_mods_check)
+        storage_layout.addWidget(self.share_downloads_check)
+        storage_layout.addWidget(self.create_storage_check)
         storage_actions=QHBoxLayout()
         self.apply_storage_button=QPushButton("Save storage settings")
-        self.restore_storage_button=QPushButton("Restore settings backup…")
+        self.restore_storage_button=QPushButton("Restore INI backup…")
         self.apply_storage_button.clicked.connect(self.apply_storage)
         self.restore_storage_button.clicked.connect(self.restore_config_backup)
-        storage_actions.addWidget(self.apply_storage_button); storage_actions.addWidget(self.restore_storage_button)
-        layout.addLayout(storage_actions)
+        storage_actions.addWidget(self.apply_storage_button)
+        storage_actions.addWidget(self.restore_storage_button)
+        storage_layout.addLayout(storage_actions)
+        storage_layout.addStretch(1)
+
+        self.category_list.currentRowChanged.connect(self.category_pages.setCurrentIndex)
+        self.category_list.setCurrentRow(0)
         self._refresh_registered()
 
     def scan_locations(self):
