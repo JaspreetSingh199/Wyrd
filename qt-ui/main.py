@@ -33,7 +33,7 @@ from steamcompat import (
     launch_mo2_in_skyrim_prefix, steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
     reset_wyrd_mo2,
 )
-from mo2_library_dialog import Mo2LibraryDialog
+from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -258,6 +258,10 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget.on_registry_changed = self._on_mo2_registry_changed
         self.mo2_library_widget.on_launch_requested = self._launch_embedded_mo2_instance
         setup_layout.addWidget(self.mo2_library_widget)
+        self.mo2_advanced_widget = Mo2AdvancedSettings(
+            self, selected_instance_id=self.selected_mo2_instance_id
+        )
+        self.mo2_advanced_widget.on_registry_changed = self._on_mo2_registry_changed
 
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
@@ -316,7 +320,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         setup_layout.addWidget(self.progress)
         setup_layout.addStretch(1)
-        self.tabs.addTab(setup_page, "SETUP")
+        self.tabs.addTab(setup_page, "ENVIRONMENT")
 
         advanced_page = QWidget()
         advanced_layout = QVBoxLayout(advanced_page)
@@ -333,7 +337,7 @@ class MainWindow(QMainWindow):
         mo2_advanced_help.setObjectName("muted")
         mo2_advanced_help.setWordWrap(True)
         advanced_layout.addWidget(mo2_advanced_help)
-        advanced_layout.addWidget(self.mo2_library_widget.advanced_page)
+        advanced_layout.addWidget(self.mo2_advanced_widget)
 
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
@@ -653,7 +657,7 @@ class MainWindow(QMainWindow):
             raise
 
     def manage_mo2_library(self) -> None:
-        """Refresh the embedded MO2 setup panel from current application state."""
+        """Refresh context for the embedded Environment and Advanced widgets."""
         saved_game = self.game_state.get("game_dir", "")
         prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
         install_path = self.mo2_state.get("install") or (
@@ -661,17 +665,26 @@ class MainWindow(QMainWindow):
             if self.mo2_state.get("executable") else
             str(prefix / "pfx/drive_c/Modding/MO2") if prefix else ""
         )
-        self.mo2_library_widget.prefix_edit.setText(str(prefix) if prefix else "")
-        self.mo2_library_widget.install_edit.setText(install_path)
-        self.mo2_library_widget.game_path_edit.setText(saved_game or "")
-        self.mo2_library_widget.proton_edit.setText(self.proton_combo.currentData() or "")
-        self.mo2_library_widget._refresh_registered()
+        context = dict(
+            prefix_path=str(prefix) if prefix else "",
+            install_path=install_path or "",
+            game_path=saved_game or "",
+            proton_path=self.proton_combo.currentData() or "",
+        )
+        self.mo2_library_widget.update_context(**context)
+        self.mo2_advanced_widget.update_context(**context)
+        self.mo2_advanced_widget._refresh_registered()
+        self.mo2_library_widget._refresh_connected()
 
     def _on_mo2_registry_changed(self, record: dict | None, changed: bool = False) -> None:
         if record:
             self._set_active_instance(record)
         elif changed:
             self._set_active_instance(None)
+        self.mo2_advanced_widget.preferred_instance_id = self.selected_mo2_instance_id
+        self.mo2_advanced_widget._refresh_registered()
+        self.mo2_library_widget.preferred_instance_id = self.selected_mo2_instance_id
+        self.mo2_library_widget._refresh_connected()
         self._restore_registered_instance()
 
     def _launch_embedded_mo2_instance(self, record: dict) -> None:
