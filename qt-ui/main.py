@@ -905,7 +905,7 @@ class MainWindow(QMainWindow):
             self.launch_session.wrapper_start_time is None
             or wrapper_identity.get("start_time") == self.launch_session.wrapper_start_time
         )
-        process_scan = detect_skyrim_processes(steam_compat_prefix(Path(self.game_state['game_dir']).parents[1]))
+        process_scan = detect_skyrim_processes(steam_compat_prefix(Path(self.game_state['game_dir']).parents[2]))
         session_processes = []
         if process_scan.get("ok") and wrapper_identity_matches:
             for item in process_scan.get("processes", []):
