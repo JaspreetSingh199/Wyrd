@@ -1111,6 +1111,18 @@ class MainWindow(QMainWindow):
         if not discovered:
             QMessageBox.warning(self, "MO2 launch unavailable", "The registered instance is no longer present in its associated prefix.")
             return
+        configured_game = str(discovered.get("game_name", "")).strip()
+        registered_game = str(game.get("name", "")).strip()
+        if configured_game and registered_game:
+            configured_folded = configured_game.casefold()
+            registered_folded = registered_game.casefold()
+            if configured_folded not in registered_folded and registered_folded not in configured_folded:
+                QMessageBox.warning(
+                    self, "Game association mismatch",
+                    f"The MO2 instance reports '{configured_game}', but Wyrd associates it with "
+                    f"'{registered_game}'. Update the association in MO2 Library before launching."
+                )
+                return
 
         targets = []
         for entry in discovered.get("executables", []):
