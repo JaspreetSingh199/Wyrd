@@ -120,28 +120,35 @@ class Mo2LibraryDialog(QDialog):
         storage_box = QGroupBox("Selected instance storage")
         storage_form = QFormLayout(storage_box)
         self.storage_fields = {}
+        self.storage_browse_buttons = {}
         for key, label in (("base", "Base"), ("mods", "Mods"), ("downloads", "Downloads"),
                            ("cache", "Cache"), ("profiles", "Profiles"), ("overwrite", "Overwrite")):
+            row = QHBoxLayout()
             field = QLineEdit()
             field.setReadOnly(True)
+            browse = QPushButton("Browse…")
+            browse.setEnabled(False)
+            browse.clicked.connect(lambda _checked=False, category=key: self._choose_storage_path(category))
             self.storage_fields[key] = field
-            storage_form.addRow(label, field)
+            self.storage_browse_buttons[key] = browse
+            row.addWidget(field, 1)
+            row.addWidget(browse)
+            storage_form.addRow(label, row)
         root.addWidget(storage_box)
 
-        self.share_mods_check = QCheckBox("Explicitly share Mods directory")
-        self.share_downloads_check = QCheckBox("Explicitly share Downloads directory")
+        self.share_mods_check = QCheckBox("Explicitly share Mods directory with other registered instances")
+        self.share_downloads_check = QCheckBox("Explicitly share Downloads directory with other registered instances")
         root.addWidget(self.share_mods_check)
         root.addWidget(self.share_downloads_check)
         storage_actions = QHBoxLayout()
-        self.choose_mods_button = QPushButton("Choose shared Mods…")
-        self.choose_downloads_button = QPushButton("Choose shared Downloads…")
         self.apply_storage_button = QPushButton("Apply storage settings")
-        for control in (self.choose_mods_button, self.choose_downloads_button, self.apply_storage_button):
-            control.setEnabled(False)
-            storage_actions.addWidget(control)
-        self.choose_mods_button.clicked.connect(lambda: self._choose_shared("mods"))
-        self.choose_downloads_button.clicked.connect(lambda: self._choose_shared("downloads"))
+        self.restore_storage_button = QPushButton("Restore latest INI backup")
+        self.apply_storage_button.setEnabled(False)
+        self.restore_storage_button.setEnabled(False)
         self.apply_storage_button.clicked.connect(self.apply_storage)
+        self.restore_storage_button.clicked.connect(self.restore_config_backup)
+        storage_actions.addWidget(self.apply_storage_button)
+        storage_actions.addWidget(self.restore_storage_button)
         root.addLayout(storage_actions)
 
         footer = QHBoxLayout()
@@ -224,15 +231,80 @@ class Mo2LibraryDialog(QDialog):
                      and record.get("prefix_path"))
         self._launch_existing_button.setEnabled(ready)
         self.apply_storage_button.setEnabled(bool(record.get("config")))
+        self.restore_storage_button.setEnabled(bool(record.get("config_backups")))
+        for button in self.storage_browse_buttons.values():
+            button.setEnabled(bool(record.get("config")))
         self._edit_associations_button.setEnabled(True)
 
-    def _choose_shared(self, category: str) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, f"Select shared {category} directory", self.storage_fields[category].text()
+    def _choose_storage_path(self, category: str) -> None:
+        current = self.storage_fields[category].text()
+        selected = QFileDialog.getExistingDirectory(
+            self, f"Select {category} directory", current
         )
-        if path:
-            self.storage_fields[category].setText(path)
-            (self.share_mods_check if category == "mods" else self.share_downloads_check).setChecked(True)
+        if selected:
+            self.storage_fields[category].setText(selected)
+
+    def _backup_instance_ini(self, record: dict, config: Path) -> Path:
+        """Back up only the instance INI; never copy or migrate mod data."""
+        from datetime import datetime
+        import shutil
+
+        backup_root = managed_paths()["config"] / "mo2-config-backups"
+        backup_root.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        backup = backup_root / f"{record['id']}-{stamp}.ini"
+        shutil.copy2(config, backup)
+        record.setdefault("config_backups", []).append(str(backup))
+        return backup
+
+    def restore_config_backup(self) -> None:
+        record = self.selected_instance_record
+        if not record:
+            return
+        try:
+            _registry, installations, _games, _runtimes = self._registry_maps()
+            if installations[record["installation_id"]].get("owner") != "wyrd":
+                raise ValueError("External MO2 configuration is read-only in Wyrd.")
+            backups = record.get("config_backups", [])
+            if not backups:
+                raise ValueError("No Wyrd-created ModOrganizer.ini backups are recorded.")
+            backup = Path(backups[-1]).expanduser()
+            config = Path(record.get("config", "")).expanduser()
+            if backup.is_symlink() or not backup.is_file():
+                raise ValueError("The latest INI backup is missing or unsafe.")
+            if config.is_symlink() or not config.is_file():
+                raise ValueError("The current ModOrganizer.ini is missing or unsafe.")
+            answer = QMessageBox.question(
+                self, "Restore ModOrganizer.ini",
+                f"Restore the latest Wyrd backup?\n\n{backup}\n\n"
+                "This restores configuration only. It does not restore, move, or delete mod files.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            current_backup = self._backup_instance_ini(record, config)
+            fd, temporary = tempfile.mkstemp(prefix=".wyrd-restore-", suffix=".ini", dir=str(config.parent))
+            try:
+                with os.fdopen(fd, "wb") as handle, backup.open("rb") as source:
+                    handle.write(source.read())
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, config)
+            except Exception:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
+                raise
+            self.service.replace_instance(record)
+            self._refresh_registered()
+            QMessageBox.information(
+                self, "INI restored",
+                f"Configuration restored. The pre-restore INI was backed up to:\n{current_backup}"
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Restore INI backup", str(error))
 
     def apply_storage(self) -> None:
         record = self.selected_instance_record
@@ -242,63 +314,75 @@ class Mo2LibraryDialog(QDialog):
             registry, installations, _games, _runtimes = self._registry_maps()
             installation = installations[record["installation_id"]]
             if installation.get("owner") != "wyrd":
-                QMessageBox.warning(
-                    self, "External MO2 is read-only",
-                    "Wyrd will not modify ModOrganizer.ini for an externally owned installation."
-                )
-                return
+                raise ValueError("External MO2 is read-only. Wyrd will not rewrite its ModOrganizer.ini.")
             config = Path(record.get("config", "")).expanduser()
             if config.is_symlink() or not config.is_file():
                 raise ValueError("The instance ModOrganizer.ini is missing or symlinked.")
+
+            categories = ("base", "mods", "downloads", "cache", "profiles", "overwrite")
+            chosen = {key: Path(self.storage_fields[key].text()).expanduser() for key in categories}
+            for category, path in chosen.items():
+                if path.is_symlink() or not path.is_dir():
+                    raise ValueError(f"{category.title()} must be an existing, non-symlink directory.")
+                chosen[category] = path.resolve(strict=True)
+
+            instance_root = Path(record["instance_path"]).resolve(strict=True)
             shared = {
                 "mods": self.share_mods_check.isChecked(),
                 "downloads": self.share_downloads_check.isChecked(),
             }
-            chosen = {key: self.storage_fields[key].text().strip() for key in shared}
-            for category, enabled in shared.items():
-                if not enabled:
-                    continue
-                candidate = Path(chosen[category]).expanduser()
-                if candidate.is_symlink() or not candidate.is_dir():
-                    raise ValueError(f"Shared {category} must already exist and must not be a symlink.")
-                resolved = candidate.resolve(strict=True)
-                instance_root = Path(record["instance_path"]).resolve(strict=True)
-                if resolved == instance_root or instance_root in resolved.parents:
-                    raise ValueError(f"Shared {category} cannot be inside this instance directory.")
+            for category in categories:
+                path = chosen[category]
+                if category in ("profiles", "overwrite") and path != instance_root and instance_root not in path.parents:
+                    # External per-instance paths are allowed, but must never be reused by another instance.
+                    pass
                 for other in registry["instances"]:
                     if other.get("id") == record["id"]:
                         continue
-                    other_path = other.get("storage_paths", {}).get(category, {}).get("path")
-                    if other_path and os.path.normcase(os.path.realpath(other_path)) == os.path.normcase(str(resolved)):
+                    other_info = other.get("storage_paths", {}).get(category, {})
+                    other_path_text = other_info.get("path")
+                    if not other_path_text:
+                        continue
+                    other_path = os.path.normcase(os.path.realpath(other_path_text))
+                    selected_path = os.path.normcase(str(path))
+                    if other_path != selected_path:
+                        continue
+                    other_is_shared = other.get("storage_policy", {}).get(category) == "shared"
+                    both_opted_into_shared = category in shared and shared[category] and other_is_shared
+                    if not both_opted_into_shared:
                         raise ValueError(
-                            f"Shared {category} conflicts with another registered instance's configured directory. "
-                            "Review that instance before sharing this path."
+                            f"{category.title()} path is already registered by another instance. "
+                            "To share Mods/Downloads, explicitly opt in on every participating instance."
                         )
+                    if category not in shared:
+                        raise ValueError(f"{category.title()} cannot be shared between instances.")
+
             answer = QMessageBox.question(
                 self, "Apply storage settings",
-                "Update only this instance's MO2 path settings? This does not move, merge, "
-                "or delete any files. The destination must already contain the data MO2 should use. "
-                "Profiles and Overwrite remain instance-local. Continue?",
+                "Update the six storage paths in this instance's ModOrganizer.ini?\n\n"
+                "Wyrd will create a timestamped backup of this INI first. No folders or mod files "
+                "will be copied, moved, merged, created, or deleted. The selected directories must "
+                "already contain the data MO2 should use. Profiles and Overwrite are never shared.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
+
             parser = configparser.ConfigParser(interpolation=None)
             with config.open("r", encoding="utf-8-sig") as handle:
                 parser.read_file(handle)
             if not parser.has_section("Settings"):
                 parser.add_section("Settings")
-            existing = record.get("storage_paths", {})
-            base = Path(existing.get("base", {}).get("path") or record["instance_path"]).expanduser()
-            if base.is_symlink() or not base.is_dir():
-                raise ValueError("Base directory must already exist and must not be a symlink.")
-            parser["Settings"]["base_directory"] = str(base)
-            parser["Settings"]["mod_directory"] = chosen["mods"] if shared["mods"] else str(base / "mods")
-            parser["Settings"]["download_directory"] = chosen["downloads"] if shared["downloads"] else str(base / "downloads")
-            parser["Settings"]["profiles_directory"] = str(existing.get("profiles", {}).get("path") or base / "profiles")
-            parser["Settings"]["cache_directory"] = str(existing.get("cache", {}).get("path") or base / "webcache")
-            parser["Settings"]["overwrite_directory"] = str(existing.get("overwrite", {}).get("path") or base / "overwrite")
+            ini_keys = {
+                "base": "base_directory", "mods": "mod_directory",
+                "downloads": "download_directory", "cache": "cache_directory",
+                "profiles": "profiles_directory", "overwrite": "overwrite_directory",
+            }
+            for category, key in ini_keys.items():
+                parser["Settings"][key] = str(chosen[category])
+
+            backup = self._backup_instance_ini(record, config)
             fd, temporary = tempfile.mkstemp(prefix=".wyrd-mo2-", suffix=".ini", dir=str(config.parent))
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as stream:
@@ -312,20 +396,25 @@ class Mo2LibraryDialog(QDialog):
                 except OSError:
                     pass
                 raise
+
             record.setdefault("storage_policy", {})
-            record["storage_policy"]["mods"] = "shared" if shared["mods"] else "instance-local"
-            record["storage_policy"]["downloads"] = "shared" if shared["downloads"] else "instance-local"
+            for category in categories:
+                if category in shared:
+                    record["storage_policy"][category] = "shared" if shared[category] else "instance-local"
+                elif category == "overwrite":
+                    record["storage_policy"][category] = "instance-local"
+                else:
+                    record["storage_policy"].setdefault(category, "instance-local")
             record.setdefault("storage_paths", {})
-            for category in ("mods", "downloads"):
-                path = chosen[category] if shared[category] else str(base / category)
+            for category, path in chosen.items():
                 record["storage_paths"][category] = {
-                    "path": path, "status": "available" if Path(path).is_dir() else "missing"
+                    "path": str(path), "status": "available",
                 }
             self.service.replace_instance(record)
             self._refresh_registered()
             QMessageBox.information(
                 self, "Storage settings saved",
-                "The selected instance's MO2 path settings were updated. No files were moved."
+                f"All six MO2 storage paths were updated. No data was moved.\nINI backup: {backup}"
             )
         except Exception as error:
             QMessageBox.warning(self, "Storage settings", str(error))
