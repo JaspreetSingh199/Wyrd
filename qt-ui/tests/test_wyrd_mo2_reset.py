@@ -102,6 +102,40 @@ class WyrdMO2ResetTests(unittest.TestCase):
             self.assertTrue(prefix.is_dir())
             self.assertTrue(sentinel.exists())
 
+    def test_symlinked_global_instance_is_refused_before_deletion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            _steam, prefix, install, instance, game, _custom, sentinel = self._managed_layout(home)
+            self._registry(home, install, instance)
+            outside = home / "outside-instance"
+            outside.mkdir()
+            (outside / "ModOrganizer.ini").write_text("[General]\n", encoding="utf-8")
+            instance.rmdir()
+            instance.symlink_to(outside, target_is_directory=True)
+            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "install": str(install), "prefix": str(prefix),
+            }):
+                result = reset_wyrd_mo2(home, game)
+            self.assertFalse(result["ok"])
+            self.assertTrue(install.exists())
+            self.assertTrue(sentinel.exists())
+            self.assertTrue((outside / "ModOrganizer.ini").exists())
+
+    def test_malformed_registry_refuses_reset_before_deletion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            _steam, prefix, install, _instance, game, _custom, sentinel = self._managed_layout(home)
+            registry = managed_paths(home)["config"] / "mo2-registry.json"
+            registry.parent.mkdir(parents=True, exist_ok=True)
+            registry.write_text("{not-json", encoding="utf-8")
+            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+                "installed": True, "install": str(install), "prefix": str(prefix),
+            }):
+                result = reset_wyrd_mo2(home, game)
+            self.assertFalse(result["ok"])
+            self.assertTrue(install.exists())
+            self.assertTrue(sentinel.exists())
+
     def test_unverified_install_is_never_removed(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
