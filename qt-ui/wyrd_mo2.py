@@ -1537,6 +1537,67 @@ def classify_launch_diagnostics(content: str) -> list[dict]:
     return findings
 
 
+def detect_game_processes(ancestor_pid: int, expected_binary: Path | str,
+                          proc_root: Path = Path("/proc")) -> dict:
+    """Find the configured executable inside a Proton/MO2 launch process tree.
+
+    Matching is constrained to descendants of the exact launch wrapper and to
+    the basename of the executable Wyrd verified from the MO2 instance config.
+    This avoids claiming unrelated processes as the launched game.
+    """
+    expected_name = Path(str(expected_binary).replace("\\", "/")).name.casefold()
+    if not expected_name:
+        return {"ok": False, "processes": [], "message": "No expected executable was supplied."}
+    found = []
+    try:
+        entries = list(Path(proc_root).iterdir())
+    except OSError as error:
+        return {"ok": False, "processes": [], "message": f"Could not inspect process table: {error}"}
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        if pid == ancestor_pid or not _is_descendant_process(pid, ancestor_pid, proc_root):
+            continue
+        try:
+            argv_bytes = (entry / "cmdline").read_bytes()
+        except OSError:
+            argv_bytes = b""
+        argv = [part.decode("utf-8", errors="replace")
+                for part in argv_bytes.split(bytes([0])) if part]
+        try:
+            comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            comm = ""
+        try:
+            exe_path = os.readlink(entry / "exe")
+        except OSError:
+            exe_path = ""
+        names = {
+            Path(value.replace("\\", "/").strip('"')).name.casefold()
+            for value in argv if value.strip()
+        }
+        names.add(Path(exe_path.replace("\\", "/")).name.casefold())
+        names.add(comm.casefold())
+        if expected_name not in names:
+            continue
+        identity = _proc_identity(pid, proc_root)
+        found.append({
+            "pid": pid, "binary": expected_name,
+            "start_time": identity.get("start_time"),
+            "ppid": identity.get("ppid"),
+            "attributed_to_launch": True,
+        })
+    found.sort(key=lambda item: item["pid"])
+    return {
+        "ok": True, "processes": found,
+        "message": (
+            f"Matched {len(found)} descendant process(es) for {expected_name}."
+            if found else f"No descendant process matching {expected_name} was found yet."
+        ),
+    }
+
+
 def detect_skyrim_processes(prefix_root: Path | None = None,
                            proc_root: Path = Path("/proc")) -> dict:
     """Read /proc for Skyrim/SKSE and attribute processes to Wyrd when possible."""
