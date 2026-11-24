@@ -395,14 +395,14 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     }
 
 
-def reset_wyrd_mo2(home: Path | None = None) -> dict:
+def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> dict:
     """Remove verified Wyrd MO2 files while preserving Steam's Skyrim prefix."""
     import json
     import shutil
     from wyrd_mo2_registry import empty_registry, load_registry, save_registry
 
     home = (home or Path.home()).expanduser()
-    game = _game_path_for_wyrd_install(home)
+    game = Path(game_path).expanduser() if game_path is not None else _game_path_for_wyrd_install(home)
     state = inspect_skyrim_prefix_mo2_installation(game, home)
     if not state.get("installed"):
         return {"ok": False, "message": state.get("message", "No verified Wyrd MO2 installation found."), "removed": []}
