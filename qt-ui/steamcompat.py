@@ -51,8 +51,9 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
         raise RuntimeError("Skyrim compatdata prefix is outside the detected Steam root.")
     proton_prefix = prefix / "pfx"
     wine_drive = proton_prefix / "drive_c"
+    modding_root = wine_drive / "Modding"
     if (proton_prefix.is_symlink() or wine_drive.is_symlink()
-            or (prefix / "pfx/drive_c/Modding").is_symlink()):
+            or modding_root.is_symlink()):
         raise RuntimeError("Refusing to install MO2 through a symlinked Proton prefix path.")
     if not wine_drive.is_dir():
         raise RuntimeError("Skyrim's Proton prefix is not initialized. Launch Skyrim through Steam once first.")
