@@ -47,8 +47,8 @@ class WyrdMO2Tests(unittest.TestCase):
             prefix = Path(tmp) / "managed-prefix"
             proc.mkdir()
             for pid, argv, env, comm in [
-                ("100", ["SkyrimSE.exe"], [], "SkyrimSE.exe"),
-                ("101", ["skse64_loader.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}", "WINEDLLOVERRIDES=xaudio2_7=n,b", "PULSE_LATENCY_MSEC=90"], "skse64_loader.exe"),
+                ("100", ["SkyrimSE.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}"], "SkyrimSE.exe"),
+                ("101", ["skse64_loader.exe"], [f"STEAM_COMPAT_DATA_PATH={prefix}", "WYRD_LAUNCHED=1", "WINEDLLOVERRIDES=xaudio2_7=n,b", "PULSE_LATENCY_MSEC=90"], "skse64_loader.exe"),
                 ("102", ["python"], [], "python"),
             ]:
                 entry = proc / pid
@@ -64,6 +64,8 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual([item["pid"] for item in result["processes"]], [100, 101])
             self.assertEqual([item["pid"] for item in result["wyrd_processes"]], [101])
             self.assertFalse(result["processes"][0]["attributed_to_wyrd"])
+            self.assertTrue(result["processes"][0]["prefix_attributed"])
+            self.assertFalse(result["processes"][1]["prefix_attributed"] is False)
             self.assertEqual(
                 result["processes"][1]["audio_runtime_environment"],
                 {"WINEDLLOVERRIDES": "xaudio2_7=n,b", "PULSE_LATENCY_MSEC": "90"},
