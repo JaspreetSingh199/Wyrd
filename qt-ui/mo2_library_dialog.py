@@ -314,8 +314,19 @@ class Mo2LibraryDialog(QDialog):
             "Existing installation ownership is unchanged."
         )
         paths = record.get("storage_paths", {})
+        # Display all six resolved storage roots even for registry entries created
+        # before storage metadata existed; fall back to the MO2 instance defaults.
+        base_path = Path(paths.get("base", {}).get("path") or record.get("instance_path", "")).expanduser()
+        defaults = {
+            "base": base_path,
+            "mods": base_path / "mods",
+            "downloads": base_path / "downloads",
+            "cache": base_path / "webcache",
+            "profiles": base_path / "profiles",
+            "overwrite": base_path / "overwrite",
+        }
         for category, field in self.storage_fields.items():
-            field.setText(str(paths.get(category, {}).get("path", "Not recorded")))
+            field.setText(str(paths.get(category, {}).get("path") or defaults[category]))
         policies = record.get("storage_policy", {})
         self.share_mods_check.setChecked(policies.get("mods") == "shared")
         self.share_downloads_check.setChecked(policies.get("downloads") == "shared")
@@ -327,10 +338,14 @@ class Mo2LibraryDialog(QDialog):
             and prefix_value and Path(prefix_value).is_dir()
         )
         self._launch_existing_button.setEnabled(ready)
-        self.apply_storage_button.setEnabled(bool(record.get("config")))
-        self.restore_storage_button.setEnabled(bool(record.get("config_backups")))
+        writable = bool(record.get("config")) and installation.get("owner") == "wyrd"
+        self.apply_storage_button.setEnabled(writable)
+        self.restore_storage_button.setEnabled(writable and bool(record.get("config_backups")))
         for button in self.storage_browse_buttons.values():
-            button.setEnabled(bool(record.get("config")))
+            button.setEnabled(writable)
+        self.create_storage_check.setEnabled(writable)
+        self.share_mods_check.setEnabled(writable)
+        self.share_downloads_check.setEnabled(writable)
         self._edit_associations_button.setEnabled(True)
 
     def rename_selected_instance(self) -> None:
@@ -738,6 +753,7 @@ Continue?",
                     category: ("shared" if category in shared and shared[category] else "instance-local")
                     for category in categories
                 }
+                # Overwrite and Profiles are never eligible for shared storage.
                 updated["storage_paths"] = dict(record.get("storage_paths", {}))
                 for category, path in chosen.items():
                     updated["storage_paths"][category] = {"path": str(path), "status": "available"}
