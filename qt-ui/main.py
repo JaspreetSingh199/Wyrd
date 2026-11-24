@@ -570,6 +570,10 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
+        # Keep both MO2 panels synchronized with detected Skyrim and the
+        # selected Proton runtime. The default prefix is Skyrim's existing
+        # Steam compatdata directory; this does not create or reset a prefix.
+        self.manage_mo2_library()
         # Registered instances own their own game/runtime selections and can
         # launch even when Skyrim detection is empty.
         self._restore_registered_instance()
