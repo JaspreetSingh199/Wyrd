@@ -64,14 +64,24 @@ class Mo2LibraryDialog(QDialog):
 
         self.game_name_edit = QLineEdit("Skyrim Special Edition")
         self.game_id_edit = QLineEdit("steam-489830")
+        self.game_appid_edit = QLineEdit("489830")
         self.game_path_edit = QLineEdit(str(game_path))
-        self.game_path_edit.setReadOnly(True)
+        game_row = QHBoxLayout()
+        game_row.addWidget(self.game_path_edit, 1)
+        browse_game = QPushButton("Browse…")
+        browse_game.clicked.connect(self._browse_game)
+        game_row.addWidget(browse_game)
         self.proton_edit = QLineEdit(str(proton_path or ""))
-        self.proton_edit.setReadOnly(True)
-        form.addRow("Game:", self.game_name_edit)
+        runtime_row = QHBoxLayout()
+        runtime_row.addWidget(self.proton_edit, 1)
+        browse_runtime = QPushButton("Browse Proton…")
+        browse_runtime.clicked.connect(self._browse_runtime)
+        runtime_row.addWidget(browse_runtime)
+        form.addRow("Game name:", self.game_name_edit)
         form.addRow("Game association ID:", self.game_id_edit)
-        form.addRow("Game directory:", self.game_path_edit)
-        form.addRow("Selected Proton runtime:", self.proton_edit)
+        form.addRow("Optional Steam AppID:", self.game_appid_edit)
+        form.addRow("Game directory:", game_row)
+        form.addRow("Proton runtime:", runtime_row)
         root.addLayout(form)
 
         actions = QHBoxLayout()
@@ -407,6 +417,20 @@ class Mo2LibraryDialog(QDialog):
             self.launch_requested = True
             self.accept()
 
+    def _browse_game(self) -> None:
+        selected = QFileDialog.getExistingDirectory(
+            self, "Select game installation directory", self.game_path_edit.text()
+        )
+        if selected:
+            self.game_path_edit.setText(selected)
+
+    def _browse_runtime(self) -> None:
+        selected = QFileDialog.getExistingDirectory(
+            self, "Select Proton runtime directory", self.proton_edit.text()
+        )
+        if selected:
+            self.proton_edit.setText(selected)
+
     def _browse_prefix(self) -> None:
         selected = QFileDialog.getExistingDirectory(
             self, "Select initialized Proton prefix", self.prefix_edit.text()
@@ -522,8 +546,12 @@ class Mo2LibraryDialog(QDialog):
                 "The selected Proton prefix is missing or not initialized."
             )
             return
-        if not game_id or not game_name or not game_path:
-            QMessageBox.warning(self, "Register MO2 instance", "Game name, association ID, and game directory are required.")
+        if not game_id or not game_name or not game_path or not Path(game_path).expanduser().is_dir():
+            QMessageBox.warning(self, "Register MO2 instance", "Game name, association ID, and an existing game directory are required.")
+            return
+        proton_path = self.proton_edit.text().strip()
+        if not proton_path or Path(proton_path).is_symlink() or not (Path(proton_path) / "proton").is_file():
+            QMessageBox.warning(self, "Register MO2 instance", "Select a valid Proton runtime before registering.")
             return
         answer = QMessageBox.question(
             self, "Register MO2 instance",
@@ -536,9 +564,18 @@ class Mo2LibraryDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
 
+        app_id = self.game_appid_edit.text().strip()
+        if app_id and not app_id.isdigit():
+            QMessageBox.warning(self, "Register MO2 instance", "Steam AppID must contain digits only, or be blank for a non-Steam game.")
+            return
+        steam_root = ""
+        if app_id:
+            game_dir = Path(game_path).expanduser().resolve()
+            if game_dir.parent.name.casefold() == "common" and game_dir.parent.parent.name.casefold() == "steamapps":
+                steam_root = str(game_dir.parent.parent.parent)
         game = {
-            "id": game_id, "name": game_name, "app_id": "489830",
-            "path": game_path, "steam_root": str(Path(game_path).parents[2]),
+            "id": game_id, "name": game_name, "app_id": app_id,
+            "path": game_path, "steam_root": steam_root,
             "prefix_path": str(selected_prefix.resolve(strict=True)),
         }
         runtime = None
