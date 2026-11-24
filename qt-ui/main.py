@@ -502,6 +502,9 @@ class MainWindow(QMainWindow):
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
         self.mo2_library_button.setEnabled(True)
+        # Registered instances own their own game/runtime selections and can
+        # launch even when Skyrim detection is empty.
+        self._restore_registered_instance()
 
     def _restore_registered_instance(self) -> dict | None:
         """Resolve the saved primary instance from Wyrd's local registry."""
@@ -515,6 +518,8 @@ class MainWindow(QMainWindow):
                        if item.get("id") == self.selected_mo2_instance_id), None)
         if record is None:
             self.active_instance_label.setText("Active MO2 instance: none selected")
+            if hasattr(self, "launch_game_button"):
+                self.launch_game_button.setEnabled(False)
             return None
         games = {item["id"]: item for item in registry["games"]}
         game = games.get(record.get("game_id"), {})
@@ -522,6 +527,9 @@ class MainWindow(QMainWindow):
         self.active_instance_label.setText(
             f"Active MO2 instance: {label} · {game.get('name', 'unknown game')}"
         )
+        if hasattr(self, "launch_game_button"):
+            busy = bool(self.worker and self.worker.isRunning())
+            self.launch_game_button.setEnabled(not busy)
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
@@ -532,6 +540,7 @@ class MainWindow(QMainWindow):
         settings["selected_mo2_instance_id"] = self.selected_mo2_instance_id
         self._saved_settings = settings
         self._restore_registered_instance()
+        self.launch_game_button.setEnabled(not (self.worker and self.worker.isRunning()))
         # Preserve the normal Proton/game/audio preferences while saving the
         # additional selection key using the same atomic settings-file pattern.
         import json, os, tempfile
