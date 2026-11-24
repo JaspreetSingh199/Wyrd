@@ -265,6 +265,14 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     if not state.get("installed") or state.get("managed"):
         return {"ok": False, "message": state.get("message", "External MO2 installation is unavailable.")}
     prefix, install = Path(state["prefix"]), Path(state["install"])
+    executable = Path(state["executable"])
+    if (prefix.is_symlink() or install.is_symlink() or executable.is_symlink()
+            or not executable.is_file() or not install.is_dir()):
+        return {"ok": False, "message": "External MO2 paths changed or became unsafe after discovery; launch was refused."}
+    try:
+        executable.resolve(strict=True).relative_to(install.resolve(strict=True))
+    except (OSError, ValueError, RuntimeError):
+        return {"ok": False, "message": "External MO2 executable resolves outside its installation directory; launch was refused."}
     inventory = inspect_mo2_instances(prefix, install, require_managed=False)
     if not inventory.get("ok"):
         return {"ok": False, "message": inventory.get("message", "Could not inspect external MO2 instances.")}
@@ -295,7 +303,7 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
         env["WINEDLLOVERRIDES"] = ";".join(overrides)
     try:
         process = subprocess.Popen(
-            [str(proton / "proton"), "run", str(Path(state["executable"])),
+            [str(proton / "proton"), "run", str(executable),
              "--instance", instance_name],
             cwd=str(install), env=env, start_new_session=True,
         )
