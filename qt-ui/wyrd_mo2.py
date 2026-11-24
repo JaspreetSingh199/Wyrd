@@ -1207,7 +1207,8 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
                           proton_path: Path | None = None,
                           game_path: Path | None = None,
                           prefix_root: Path | None = None,
-                          install_root: Path | None = None) -> dict:
+                          install_root: Path | None = None,
+                          require_managed: bool = True) -> dict:
     """Start an MO2 configured-executable handoff with explicit runtime paths.
 
     Supplying prefix_root/install_root selects the already-initialized Steam
@@ -1259,7 +1260,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not validation.get("ok"):
         return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
 
-    prefix_check = inspect_mo2_instances(prefix, install, require_managed=not explicit_prefix)
+    prefix_check = inspect_mo2_instances(prefix, install, require_managed=require_managed if explicit_prefix else True)
     instance_match = next(
         (item for item in prefix_check.get("skyrim_instances", []) if item["name"] == instance),
         None,
@@ -1268,7 +1269,7 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         return {"ok": False, "message": "The selected Skyrim instance is no longer present in the selected MO2 prefix."}
     target_state = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance, install_root=install,
-        require_managed=not explicit_prefix,
+        require_managed=require_managed if explicit_prefix else True,
     )
     expected_path = None
     if expected_binary is not None:
