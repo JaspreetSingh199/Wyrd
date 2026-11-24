@@ -881,6 +881,8 @@ class MainWindow(QMainWindow):
             return {"ok": False, "message": "A registered launch path is symlinked; launch refused."}
         if not executable.is_file() or not instance_path.is_dir() or not config.is_file() or not game_path.is_dir():
             return {"ok": False, "message": "Registered MO2 executable, instance, INI or game directory is missing."}
+        if record.get("instance_type") == "portable" and instance_path.resolve() != executable.parent.resolve():
+            return {"ok": False, "message": "Portable MO2 instance must be the registered installation root."}
         if not (prefix / "pfx/drive_c/users").is_dir():
             return {"ok": False, "message": "The associated Proton prefix is not initialized."}
         validation = inspect_proton_build(proton)
