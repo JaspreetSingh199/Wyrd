@@ -515,7 +515,14 @@ class MainWindow(QMainWindow):
         dialog.exec()
         if dialog.registered:
             self._log("MO2 installation/instance metadata registered in Wyrd's local registry.")
-            self.refresh_all()
+        if dialog.launch_requested and dialog.selected_instance_record:
+            result = self._launch_registered_instance(dialog.selected_instance_record)
+            self._log(result.get("message", "Registered launch did not start."))
+            if result.get("ok"):
+                self.progress_label.setText("Selected registered MO2 instance started.")
+                QMessageBox.information(self, "MO2 launch", result["message"])
+            else:
+                QMessageBox.warning(self, "MO2 launch refused", result.get("message", "Could not launch selected instance."))
         if dialog.launch_requested and dialog.selected_instance_record:
             result = self._launch_registered_instance(dialog.selected_instance_record)
             self._log(result.get("message", "Registered launch did not start."))
