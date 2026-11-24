@@ -527,14 +527,26 @@ class MainWindow(QMainWindow):
                 self.launch_game_button.setEnabled(legacy_ready and not busy)
             return None
         games = {item["id"]: item for item in registry["games"]}
+        installations = {item["id"]: item for item in registry["installations"]}
+        runtimes = {item["id"]: item for item in registry["runtimes"]}
         game = games.get(record.get("game_id"), {})
+        installation = installations.get(record.get("installation_id"), {})
+        runtime = runtimes.get(record.get("runtime_id"), {})
         label = Path(record.get("instance_path", "")).name
+        prefix_value = record.get("prefix_path") or installation.get("prefix_path")
+        ready = bool(
+            installation.get("executable") and Path(installation["executable"]).is_file()
+            and game.get("path") and Path(game["path"]).is_dir()
+            and runtime.get("path") and Path(runtime["path"]).is_dir()
+            and prefix_value and Path(prefix_value).is_dir()
+        )
         self.active_instance_label.setText(
-            f"Active MO2 instance: {label} · {game.get('name', 'unknown game')}"
+            f"Active MO2 instance: {label} · {game.get('name', 'unknown game')} · "
+            + ("Ready" if ready else "Association incomplete — edit game / Proton settings")
         )
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
-            self.launch_game_button.setEnabled(not busy)
+            self.launch_game_button.setEnabled(ready and not busy)
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
