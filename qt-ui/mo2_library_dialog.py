@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -163,13 +164,26 @@ class Mo2LibraryDialog(QDialog):
         proposals = result.get("proposals", [])
         if not proposals:
             lines.append("No readable MO2 instances were found in the selected roots.")
+        try:
+            registered = self.service.load().get("instances", [])
+            registered_paths = {
+                os.path.normcase(os.path.realpath(record.get("instance_path", "")))
+                for record in registered
+            }
+        except Exception as error:
+            registered_paths = set()
+            lines.append(f"Could not compare the Wyrd registry: {error}")
         self.details.setPlainText("\n".join(lines))
         for proposal in proposals:
+            identity = os.path.normcase(os.path.realpath(proposal.get("instance_path", "")))
+            if identity in registered_paths:
+                proposal["registration_status"] = "registered"
             kind = proposal.get("instance_type", "unknown")
             game = proposal.get("game_name") or "Game not identified"
             owner = proposal.get("owner", "unknown")
+            status = "REGISTERED" if proposal.get("registration_status") == "registered" else "DISCOVERED"
             item = QListWidgetItem(
-                f"{proposal.get('id')}  ·  {kind}  ·  {game}  ·  {owner}"
+                f"{status}  ·  {kind}  ·  {game}  ·  {owner}"
             )
             item.setData(Qt.ItemDataRole.UserRole, proposal)
             self.instances.addItem(item)
@@ -198,13 +212,13 @@ class Mo2LibraryDialog(QDialog):
             )
         lines.append("Default policy on registration: all storage remains instance-local.")
         self.details.setPlainText("\n".join(lines))
-        self.register_button.setEnabled(True)
+        self.register_button.setEnabled(proposal.get("registration_status") != "registered")
 
     def register_selected(self) -> None:
         item = self.instances.currentItem()
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
         installation = self.discovery.get("installation")
-        if not proposal or not installation:
+        if not proposal or not installation or proposal.get("registration_status") == "registered":
             return
         game_id = self.game_id_edit.text().strip()
         game_name = self.game_name_edit.text().strip()
