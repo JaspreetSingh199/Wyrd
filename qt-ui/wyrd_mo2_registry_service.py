@@ -144,8 +144,17 @@ class RegistryService:
                     raise RegistryError(f"{collection} association requires an ID")
                 existing = next((item for item in current[collection] if item.get("id") == identifier), None)
                 if existing is not None and existing != record:
-                    raise RegistryError(f"{collection} ID already exists with different metadata")
-                if existing is None:
+                    if collection == "games":
+                        stable_identity = (
+                            existing.get("path") == record.get("path")
+                            and str(existing.get("app_id") or "") == str(record.get("app_id") or "")
+                        )
+                    else:
+                        stable_identity = existing.get("path") == record.get("path")
+                    if not stable_identity:
+                        raise RegistryError(f"{collection} ID already exists with a different game/runtime path")
+                    current[collection][current[collection].index(existing)] = record
+                elif existing is None:
                     current[collection].append(record)
             updated = dict(instance)
             updated["game_id"] = game["id"]
