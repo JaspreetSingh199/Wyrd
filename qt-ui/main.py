@@ -517,8 +517,16 @@ class MainWindow(QMainWindow):
             ("x3daudio", "X3DAudio 1.7 (32-bit)"), ("x3daudio_x64", "X3DAudio 1.7 (64-bit)"),
             ("xapofx", "XAPOFX 1.5 (32-bit)"), ("xapofx_x64", "XAPOFX 1.5 (64-bit)"),
         ]
-        lines = [f"{label}: {components.get(key, {}).get('state', 'unknown')}" for key, label in labels]
-        lines += ["FAudio / FFmpeg support: UNKNOWN", "Dialogue audio: NOT VERIFIED (test an NPC conversation in Skyrim)"]
+        lines = [
+            "LEGACY Wyrd-prefix inventory — NOT the Skyrim Steam-prefix runtime.",
+            f"Inspected prefix: {report.get('prefix', 'unknown')}",
+        ]
+        lines += [f"{label}: {components.get(key, {}).get('state', 'unknown')}" for key, label in labels]
+        lines += [
+            "FAudio / FFmpeg support: UNKNOWN",
+            "Skyrim Steam-prefix audio: NOT INSPECTED",
+            "Dialogue audio: NOT VERIFIED (test an NPC conversation in Skyrim)",
+        ]
         self.audio_detail.setText("\n".join(lines))
 
     def check_audio_libraries(self) -> None:
@@ -614,6 +622,21 @@ class MainWindow(QMainWindow):
         self._log(message)
 
     def _on_install_completed(self, result: dict) -> None:
+        if result.get("ok"):
+            # The worker result is not the final trust boundary: re-open the
+            # installed target and validate both ModOrganizer.exe and the
+            # Wyrd ownership marker before reporting success to the user.
+            game_dir = self.game_state.get("game_dir")
+            verified = (
+                inspect_skyrim_prefix_mo2_installation(Path(game_dir))
+                if game_dir else {"installed": False, "message": "Skyrim game path is unavailable."}
+            )
+            if not verified.get("installed"):
+                result = {
+                    "ok": False,
+                    "message": "MO2 installer returned success, but post-install ownership/executable verification failed: "
+                               + verified.get("message", "installation could not be verified."),
+                }
         if result.get("ok"):
             self.progress.setValue(100)
             self.progress_label.setText("MO2 installed and verified.")
