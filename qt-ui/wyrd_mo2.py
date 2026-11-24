@@ -1361,7 +1361,8 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
                           game_path: Path | None = None,
                           prefix_root: Path | None = None,
                           install_root: Path | None = None,
-                          require_managed: bool = True) -> dict:
+                          require_managed: bool = True,
+                          steam_root_path: Path | None = None) -> dict:
     """Start an MO2 configured-executable handoff with explicit runtime paths.
 
     Supplying prefix_root/install_root selects the already-initialized Steam
@@ -1392,7 +1393,17 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
         if install.is_symlink() or not install.is_dir() or not (install / "ModOrganizer.exe").is_file():
             return {"ok": False, "message": "The selected MO2 install directory is missing or unsafe."}
         state_ok = True
-        steam_root = prefix.parents[2]
+        if steam_root_path is not None:
+            steam_root = Path(steam_root_path).expanduser()
+        elif prefix.parent.name == "compatdata" and prefix.parent.parent.name == "steamapps":
+            steam_root = prefix.parents[2]
+        else:
+            try:
+                steam_root = _steam_root_for_game(game, home)
+            except RuntimeError:
+                return {"ok": False, "message": "The Steam client root for this registered Skyrim game could not be resolved."}
+        if not steam_root.is_dir():
+            return {"ok": False, "message": "The associated Steam client root is missing or unsafe."}
     else:
         state = inspect_wyrd_installation(home)
         if not state.get("installed") or not state.get("prefix_ready"):
