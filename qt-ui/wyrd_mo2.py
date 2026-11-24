@@ -131,12 +131,32 @@ def discover_proton_builds(home: Path | None = None,
         if item.get("ok"):
             found[item["path"]] = item
     def sort_key(item: dict):
-        name = item["name"].lower()
-        # Put Experimental first, then common Proton builds, then GE/custom tools.
-        priority = 0 if "experimental" in name else 1 if name.startswith("proton") else 2
+        name = item["name"].strip().lower()
         import re
+
+        # Prefer Valve's own Proton releases, then GE-Proton, then other
+        # compatibility-tool builds (CachyOS, SLR forks, TKG, etc.).
+        is_ge = "ge-proton" in name or "proton-ge" in name or name.startswith("ge ")
+        official_match = re.match(
+            r"^proton(?:\s+\d+(?:\.\d+)*.*|\s*-\s*(?:experimental|hotfix))$",
+            name,
+        )
+        if official_match:
+            priority = 0
+            # Prefer a stable numbered Valve release, then Experimental, then Hotfix.
+            if "experimental" in name:
+                subpriority = 1
+            elif "hotfix" in name:
+                subpriority = 2
+            else:
+                subpriority = 0
+        elif is_ge:
+            priority, subpriority = 1, 0
+        else:
+            priority, subpriority = 2, 0
+
         version = tuple(int(part) for part in re.findall(r"\d+", name)[-3:])
-        return (priority, tuple(-v for v in version), name)
+        return (priority, subpriority, tuple(-v for v in version), name)
     return sorted(found.values(), key=sort_key)
 
 
