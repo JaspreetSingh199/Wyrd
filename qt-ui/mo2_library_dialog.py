@@ -389,6 +389,12 @@ class Mo2LibraryDialog(QDialog):
                 chosen[category] = path.resolve(strict=True)
 
             instance_root = Path(record["instance_path"]).resolve(strict=True)
+            for index, category in enumerate(categories):
+                for previous in categories[:index]:
+                    if chosen[category] == chosen[previous]:
+                        raise ValueError(
+                            f"{category.title()} and {previous.title()} cannot use the same directory."
+                        )
             shared = {
                 "mods": self.share_mods_check.isChecked(),
                 "downloads": self.share_downloads_check.isChecked(),
@@ -492,8 +498,9 @@ class Mo2LibraryDialog(QDialog):
         if not record:
             return
         try:
-            _registry, _installations, games, runtimes = self._registry_maps()
+            _registry, installations, games, runtimes = self._registry_maps()
             current_game = games[record["game_id"]]
+            installation = installations[record["installation_id"]]
             current_runtime = runtimes.get(record.get("runtime_id"), {})
             game_name, accepted = QInputDialog.getText(
                 self, "Edit game association", "Game name:", text=current_game.get("name", "")
@@ -511,14 +518,38 @@ class Mo2LibraryDialog(QDialog):
             )
             if not accepted:
                 return
+            if app_id.strip() and not app_id.strip().isdigit():
+                raise ValueError("Steam AppID must contain digits only, or be blank for a non-Steam game.")
+            if not Path(game_path).expanduser().is_dir():
+                raise ValueError("Selected game directory is no longer available.")
             prefix_path = QFileDialog.getExistingDirectory(
                 self, "Select initialized Proton prefix", str(record.get("prefix_path") or "")
             )
             if not prefix_path:
                 return
             prefix = Path(prefix_path).expanduser()
-            if prefix.is_symlink() or not (prefix / "pfx/drive_c/users").is_dir():
+            if (
+                prefix.is_symlink()
+                or (prefix / "pfx").is_symlink()
+                or (prefix / "pfx/drive_c").is_symlink()
+                or (prefix / "pfx/drive_c/users").is_symlink()
+                or not (prefix / "pfx/drive_c/users").is_dir()
+            ):
                 raise ValueError("Selected prefix is not initialized or contains a symlink.")
+            from wyrd_mo2 import inspect_mo2_instances
+            install_root = Path(installation.get("executable", "")).expanduser().parent
+            inventory = inspect_mo2_instances(prefix, install_root, require_managed=False)
+            expected_instance = Path(record.get("instance_path", "")).expanduser().resolve(strict=True)
+            available = {
+                Path(item.get("path", "")).expanduser().resolve(strict=True)
+                for item in inventory.get("instances", [])
+                if item.get("path")
+            } if inventory.get("ok") else set()
+            if expected_instance not in available:
+                raise ValueError(
+                    "The selected Proton prefix does not contain this MO2 instance. "
+                    "Choose the prefix already associated with the instance."
+                )
             runtime_path = QFileDialog.getExistingDirectory(
                 self, "Select Proton runtime", current_runtime.get("path", "")
             )
@@ -531,10 +562,17 @@ class Mo2LibraryDialog(QDialog):
                 (game_path + "|" + app_id.strip()).encode()
             ).hexdigest()[:16]
             runtime_id = "proton-" + hashlib.sha256(str(runtime.resolve()).encode()).hexdigest()[:16]
+            game_directory = Path(game_path).expanduser().resolve(strict=True)
+            steam_root = ""
+            if (
+                app_id.strip()
+                and game_directory.parent.name.casefold() == "common"
+                and game_directory.parent.parent.name.casefold() == "steamapps"
+            ):
+                steam_root = str(game_directory.parent.parent.parent)
             game = {
-                "id": game_id, "name": game_name.strip(), "path": game_path,
-                "app_id": app_id.strip(),
-                "steam_root": str(Path(game_path).parents[2]) if app_id.strip() else "",
+                "id": game_id, "name": game_name.strip(), "path": str(game_directory),
+                "app_id": app_id.strip(), "steam_root": steam_root,
                 "prefix_path": str(prefix.resolve(strict=True)),
             }
             runtime_record = {
