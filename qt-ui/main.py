@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         self.install_button.setEnabled(
             ready
             and not (self.worker and self.worker.isRunning())
-            and not (self.mo2_state.get("installed") and self.mo2_state.get("prefix_ready"))
+            and not self.mo2_state.get("installed")
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
 
