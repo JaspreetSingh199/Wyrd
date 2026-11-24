@@ -1537,17 +1537,27 @@ def classify_launch_diagnostics(content: str) -> list[dict]:
     return findings
 
 
-def detect_game_processes(ancestor_pid: int, expected_binary: Path | str,
-                          proc_root: Path = Path("/proc")) -> dict:
-    """Find the configured executable inside a Proton/MO2 launch process tree.
+def detect_game_processes(
+    ancestor_pid: int, expected_binary: Path | str,
+    prefix_root: Path | str | None = None,
+    proc_root: Path = Path("/proc"),
+) -> dict:
+    """Find the configured game executable under a Wyrd-launched Proton context.
 
-    Matching is constrained to descendants of the exact launch wrapper and to
-    the basename of the executable Wyrd verified from the MO2 instance config.
-    This avoids claiming unrelated processes as the launched game.
+    A process is attributed when it is either a descendant of the exact launch
+    wrapper, or it has inherited WYRD_LAUNCHED=1 and the exact registered
+    STEAM_COMPAT_DATA_PATH. In both cases its command/executable basename must
+    match the executable that Wyrd verified from the MO2 instance.
     """
     expected_name = Path(str(expected_binary).replace("\\", "/")).name.casefold()
     if not expected_name:
         return {"ok": False, "processes": [], "message": "No expected executable was supplied."}
+    expected_prefix = None
+    if prefix_root is not None:
+        try:
+            expected_prefix = str(Path(prefix_root).expanduser().resolve(strict=True))
+        except (OSError, RuntimeError):
+            return {"ok": False, "processes": [], "message": "Registered Proton prefix is unavailable for process attribution."}
     found = []
     try:
         entries = list(Path(proc_root).iterdir())
@@ -1557,14 +1567,17 @@ def detect_game_processes(ancestor_pid: int, expected_binary: Path | str,
         if not entry.name.isdigit():
             continue
         pid = int(entry.name)
-        if pid == ancestor_pid or not _is_descendant_process(pid, ancestor_pid, proc_root):
+        if pid == ancestor_pid:
             continue
+        descendant = _is_descendant_process(pid, ancestor_pid, proc_root)
         try:
             argv_bytes = (entry / "cmdline").read_bytes()
         except OSError:
             argv_bytes = b""
-        argv = [part.decode("utf-8", errors="replace")
-                for part in argv_bytes.split(bytes([0])) if part]
+        argv = [
+            part.decode("utf-8", errors="replace")
+            for part in argv_bytes.split(bytes([0])) if part
+        ]
         try:
             comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip()
         except OSError:
@@ -1581,19 +1594,40 @@ def detect_game_processes(ancestor_pid: int, expected_binary: Path | str,
         names.add(comm.casefold())
         if expected_name not in names:
             continue
+
+        inherited_launch_marker = False
+        if expected_prefix is not None:
+            try:
+                env_data = (entry / "environ").read_bytes()
+            except OSError:
+                env_data = b""
+            variables = {}
+            for item in env_data.split(bytes([0])):
+                if b"=" not in item:
+                    continue
+                key, value = item.split(b"=", 1)
+                variables[key.decode("utf-8", errors="replace")] = value.decode("utf-8", errors="replace")
+            inherited_launch_marker = (
+                variables.get("WYRD_LAUNCHED") == "1"
+                and variables.get("STEAM_COMPAT_DATA_PATH")
+                and os.path.normcase(os.path.realpath(variables["STEAM_COMPAT_DATA_PATH"]))
+                    == os.path.normcase(expected_prefix)
+            )
+        if not descendant and not inherited_launch_marker:
+            continue
         identity = _proc_identity(pid, proc_root)
         found.append({
             "pid": pid, "binary": expected_name,
             "start_time": identity.get("start_time"),
             "ppid": identity.get("ppid"),
-            "attributed_to_launch": True,
+            "attributed_to_launch": "descendant" if descendant else "inherited-prefix-marker",
         })
     found.sort(key=lambda item: item["pid"])
     return {
         "ok": True, "processes": found,
         "message": (
-            f"Matched {len(found)} descendant process(es) for {expected_name}."
-            if found else f"No descendant process matching {expected_name} was found yet."
+            f"Matched {len(found)} process(es) for {expected_name}."
+            if found else f"No process matching {expected_name} was attributed to this Wyrd launch yet."
         ),
     }
 
