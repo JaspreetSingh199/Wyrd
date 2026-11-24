@@ -218,8 +218,13 @@ def inspect_external_skyrim_prefix_mo2_installation(game_path: Path, home: Path 
             return {"installed": False, "managed": False, "prefix": str(prefix),
                     "install": str(install), "message": "An ownership marker exists but cannot be verified; external adoption was refused."}
         if not executable.is_file() or executable.is_symlink():
+            # An existing directory still occupies the installer target. Report
+            # the path so the UI can block installation without adopting it.
+            occupied = install.exists()
             return {"installed": False, "managed": False, "prefix": str(prefix),
-                    "install": str(install), "message": "No external MO2 executable was found at the conventional Skyrim-prefix location."}
+                    "install": str(install) if occupied else None,
+                    "message": ("An existing MO2 target directory is present but its executable is missing; it was left untouched."
+                                if occupied else "No external MO2 executable was found at the conventional Skyrim-prefix location.")}
         return {
             "installed": True, "managed": False, "executable": str(executable),
             "prefix": str(prefix), "install": str(install), "steam_root": str(steam_root),
