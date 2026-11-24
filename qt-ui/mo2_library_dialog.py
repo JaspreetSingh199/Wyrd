@@ -441,10 +441,7 @@ class Mo2AdvancedSettings(QWidget):
                 updated.pop("display_name", None)
             self.selected_instance_record = updated
             self._refresh_registered()
-            self.details.setPlainText(
-                "Wyrd display name updated. MO2's instance directory, INI, profiles, mods, "
-                "downloads and game files were not changed."
-            )
+            QMessageBox.information(self, "Name updated", "The name shown in Wyrd was updated. MO2 files were not changed.")
         except Exception as error:
             QMessageBox.warning(self, "Rename MO2 instance", str(error))
 
@@ -470,9 +467,6 @@ class Mo2AdvancedSettings(QWidget):
             self.selected_instance_record = None
             self.selection_changed = True
             self._refresh_registered()
-            self.details.setPlainText(
-                "Instance reference removed from Wyrd. No MO2 or game files were changed."
-            )
             callback = getattr(self, "on_registry_changed", None)
             if callable(callback):
                 callback(None, True)
@@ -511,9 +505,7 @@ class Mo2AdvancedSettings(QWidget):
             self.selected_instance_record = None
             self.selection_changed = True
             self._refresh_registered()
-            self.details.setPlainText(
-                "Unused installation reference removed from Wyrd. No files were deleted."
-            )
+            self._refresh_registered()
         except Exception as error:
             QMessageBox.warning(self, "Unregister MO2 installation", str(error))
 
