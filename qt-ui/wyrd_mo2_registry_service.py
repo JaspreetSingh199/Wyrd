@@ -74,6 +74,7 @@ class RegistryService:
             "id": self._id("installation", executable),
             "executable": str(executable.resolve()),
             "owner": owner,
+            "prefix_path": str(prefix.resolve(strict=True)),
         }
         proposals = []
         for item in inventory.get("instances", []):
@@ -153,6 +154,7 @@ class RegistryService:
 
         installation_record = dict(installation)
         game_record = dict(game)
+        game_record.setdefault("prefix_path", installation_record.get("prefix_path"))
         runtime_record = dict(runtime) if runtime is not None else None
         instance = {
             "id": proposal["id"], "installation_id": installation_record["id"],
@@ -161,6 +163,7 @@ class RegistryService:
             "runtime_id": runtime_record["id"] if runtime_record else None,
             "storage_policy": dict(proposal["default_storage_policy"]),
             "config": proposal["config"],
+            "prefix_path": installation_record.get("prefix_path"),
             "storage_paths": dict(proposal.get("storage", {})),
             "game_name": proposal.get("game_name", ""),
             "is_skyrim_se": bool(proposal.get("is_skyrim_se")),
