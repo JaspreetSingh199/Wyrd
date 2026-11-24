@@ -367,7 +367,13 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main._is_descendant_process", side_effect=lambda pid, ancestor: True
         ):
             window._poll_launch_status()
-        self.assertEqual(window.launch_session.detected_processes, scan["processes"])
+        self.assertEqual(
+            [{key: item.get(key) for key in ("pid", "binary", "start_time")}
+             for item in window.launch_session.detected_processes],
+            scan["processes"],
+        )
+        self.assertTrue(all(item.get("_launch_source") == "descendant"
+                            for item in window.launch_session.detected_processes))
         self.assertEqual(window.launch_session.process_identities, {700: 111, 701: 222})
         self.assertEqual(window.launch_session.state, "detected")
         window.close()
@@ -432,6 +438,8 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.launch_session.wrapper_pid = 500
         window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
+        window.launch_session.app_id = "489830"
+        window._launch_monitor.start()
         ordinary_steam_process = {
             "pid": 700, "binary": "skyrimse.exe",
             "prefix_attributed": True, "attributed_to_wyrd": False,
