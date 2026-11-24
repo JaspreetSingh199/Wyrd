@@ -764,6 +764,11 @@ class MainWindow(QMainWindow):
             return {"ok": False, "message": "Registered game directory is missing or symlinked."}
         if prefix.is_symlink() or not (prefix / "pfx/drive_c/users").is_dir():
             return {"ok": False, "message": "Associated Proton prefix is missing or unsafe."}
+        if (executable.resolve(strict=True) == instance_path.resolve(strict=True)
+                or instance_path.resolve(strict=True) in executable.resolve(strict=True).parents):
+            # Portable instances may be rooted at the install folder itself.
+            if record.get("instance_type") != "portable":
+                return {"ok": False, "message": "Global instance path is unexpectedly nested under the MO2 installation."}
         validation = inspect_proton_build(proton)
         if not validation.get("ok"):
             return {"ok": False, "message": validation.get("message", "The associated Proton runtime is unavailable.")}
@@ -771,6 +776,14 @@ class MainWindow(QMainWindow):
         try:
             executable.resolve(strict=True).relative_to(executable.parent.resolve(strict=True))
             config.resolve(strict=True).relative_to(instance_path.resolve(strict=True))
+            ini_text = config.read_text(encoding="utf-8-sig")
+            import configparser
+            parser = configparser.ConfigParser(interpolation=None)
+            parser.read_string(ini_text)
+            general = parser["General"] if parser.has_section("General") else {}
+            configured_name = general.get("gameName", "").strip()
+            if configured_name and game.get("name") and configured_name.casefold() not in game["name"].casefold():
+                return {"ok": False, "message": "Selected MO2 instance is associated with a different game than the registry record."}
         except (OSError, ValueError, RuntimeError):
             return {"ok": False, "message": "Registered executable or INI escaped its installation/instance boundary."}
 
