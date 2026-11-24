@@ -497,15 +497,14 @@ class MainWindow(QMainWindow):
         """Open the MO2 library; existing registry entries work without current Skyrim detection."""
         saved_game = self.game_state.get("game_dir")
         prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
-        if prefix is None:
-            prefix = Path("")
+        prefix_text = str(prefix) if prefix is not None else ""
         install_path = self.mo2_state.get("install") if saved_game else None
         if not install_path and saved_game and self.mo2_state.get("executable"):
             install_path = str(Path(self.mo2_state["executable"]).parent)
-        if not install_path:
-            install_path = str(prefix / "pfx/drive_c/Modding/MO2") if str(prefix) else ""
+        if not install_path and prefix is not None:
+            install_path = str(prefix / "pfx/drive_c/Modding/MO2")
         dialog = Mo2LibraryDialog(
-            self, prefix_path=prefix, install_path=install_path or "",
+            self, prefix_path=prefix_text, install_path=install_path or "",
             game_path=saved_game or "", proton_path=self.proton_combo.currentData() or "",
         )
         dialog.exec()
