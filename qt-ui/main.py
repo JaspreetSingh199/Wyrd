@@ -417,6 +417,9 @@ class MainWindow(QMainWindow):
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
+        self.mo2_target_occupied = bool(
+            self.mo2_state.get("installed") or self.mo2_state.get("install")
+        )
         if self.mo2_state.get("installed"):
             self.instance_state = inspect_any_skyrim_prefix_mo2_instances(
                 Path(self.game_state["game_dir"])
@@ -465,7 +468,7 @@ class MainWindow(QMainWindow):
         self.install_button.setEnabled(
             ready
             and not (self.worker and self.worker.isRunning())
-            and not self.mo2_state.get("installed")
+            and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
 
