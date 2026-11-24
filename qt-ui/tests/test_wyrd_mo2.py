@@ -652,7 +652,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "[customExecutables]\n"
                 "size=1\n"
                 "1\\\\title=SKSE\n"
-                f"1\\\\binary=Z:{win_game}\\skse64_loader.exe\n",
+                f"1\\\\binary=Z:{win_game}\\\\skse64_loader.exe\n",
                 encoding="utf-8",
             )
             log_path = root / "logs/skyrim-launch.log"
