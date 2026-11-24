@@ -67,7 +67,7 @@ class Mo2LibraryDialog(QDialog):
             "not adopt ownership, rewrite ModOrganizer.ini, move files, or change profiles."
         )
         intro.setWordWrap(True)
-        intro.setText("Discover MO2 instances for Skyrim. Discovery is read-only; registering an instance stores Wyrd metadata only and never changes MO2 files or ownership.")
+        intro.setText("Find your MO2 instances, then add one to Wyrd. This does not change your MO2 files.")
         setup_layout.addWidget(intro)
 
         form = QFormLayout()
@@ -116,7 +116,7 @@ class Mo2LibraryDialog(QDialog):
         form.addRow("Optional Steam AppID:", self.game_appid_edit)
         form.addRow("Game directory:", game_row)
         form.addRow("Proton runtime:", runtime_row)
-        advanced_layout.addWidget(QLabel("Discovery locations and game association"))
+        advanced_layout.addWidget(QLabel("Paths and game settings"))
         advanced_layout.addLayout(form)
 
         actions = QHBoxLayout()
@@ -124,54 +124,54 @@ class Mo2LibraryDialog(QDialog):
         self.discover_button.clicked.connect(self.discover)
         actions.addWidget(self.discover_button)
         actions.addStretch(1)
-        self.discover_button.setText("Discover MO2 instances")
+        self.discover_button.setText("Find MO2 instances")
         setup_layout.addLayout(actions)
 
-        advanced_layout.addWidget(QLabel("Registered installations"))
+        advanced_layout.addWidget(QLabel("MO2 installations"))
         self.installation_filter = QComboBox()
         self.installation_filter.addItem("All installations", None)
         self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
         advanced_layout.addWidget(self.installation_filter)
-        self.installation_summary = QLabel("Select an installation to inspect its registry references.")
+        self.installation_summary = QLabel("Choose an installation.")
         self.installation_summary.setWordWrap(True)
         advanced_layout.addWidget(self.installation_summary)
-        advanced_layout.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
+        advanced_layout.addWidget(QLabel("Instances saved in Wyrd"))
         self.registered_instances = QListWidget()
         self.registered_instances.setMinimumHeight(100)
         self.registered_instances.setMaximumHeight(150)
         self.registered_instances.currentRowChanged.connect(self._select_registered)
         advanced_layout.addWidget(self.registered_instances, 1)
-        self._edit_associations_button = QPushButton("Edit game / Proton association")
+        self._edit_associations_button = QPushButton("Change game or Proton")
         self._edit_associations_button.setEnabled(False)
         self._edit_associations_button.clicked.connect(self.edit_associations)
         advanced_layout.addWidget(self._edit_associations_button)
-        self.rename_instance_button = QPushButton("Rename Wyrd display name…")
+        self.rename_instance_button = QPushButton("Rename in Wyrd…")
         self.rename_instance_button.setEnabled(False)
         self.rename_instance_button.clicked.connect(self.rename_selected_instance)
         advanced_layout.addWidget(self.rename_instance_button)
-        self._launch_existing_button = QPushButton("Launch selected registered instance")
+        self._launch_existing_button = QPushButton("Use selected instance")
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
         advanced_layout.addWidget(self._launch_existing_button)
         management_actions = QHBoxLayout()
-        self.unregister_instance_button = QPushButton("Unregister selected instance")
+        self.unregister_instance_button = QPushButton("Remove instance from Wyrd")
         self.unregister_instance_button.setEnabled(False)
         self.unregister_instance_button.clicked.connect(self.unregister_selected_instance)
-        self.unregister_installation_button = QPushButton("Unregister unused installation")
+        self.unregister_installation_button = QPushButton("Remove unused installation from Wyrd")
         self.unregister_installation_button.setEnabled(False)
         self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
         management_actions.addWidget(self.unregister_instance_button)
         management_actions.addWidget(self.unregister_installation_button)
         advanced_layout.addLayout(management_actions)
 
-        setup_layout.addWidget(QLabel("Discovered instances"))
+        setup_layout.addWidget(QLabel("Found instances"))
         self.instances = QListWidget()
         self.instances.setMinimumHeight(90)
         self.instances.setMaximumHeight(140)
         self.instances.currentRowChanged.connect(self._show_selected)
         setup_layout.addWidget(self.instances, 1)
 
-        setup_layout.addWidget(QLabel("Discovery details"))
+        setup_layout.addWidget(QLabel("Details"))
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
         self.details.setMinimumHeight(72)
@@ -179,7 +179,7 @@ class Mo2LibraryDialog(QDialog):
         self.details.setPlaceholderText("Choose Discover MO2 instances to inspect the selected installation.")
         setup_layout.addWidget(self.details)
 
-        storage_box = QGroupBox("Selected instance storage")
+        storage_box = QGroupBox("Storage locations")
         storage_form = QFormLayout(storage_box)
         self.storage_fields = {}
         self.storage_browse_buttons = {}
@@ -199,17 +199,17 @@ class Mo2LibraryDialog(QDialog):
             storage_form.addRow(label, row)
         advanced_layout.addWidget(storage_box)
 
-        self.share_mods_check = QCheckBox("Explicitly share Mods directory with other registered instances")
-        self.share_downloads_check = QCheckBox("Explicitly share Downloads directory with other registered instances")
+        self.share_mods_check = QCheckBox("Share Mods folder")
+        self.share_downloads_check = QCheckBox("Share Downloads folder")
         advanced_layout.addWidget(self.share_mods_check)
         advanced_layout.addWidget(self.share_downloads_check)
         self.create_storage_check = QCheckBox(
-            "Create missing empty storage folders (never move or copy existing data)"
+            "Create missing folders (existing files are never moved or copied)"
         )
         advanced_layout.addWidget(self.create_storage_check)
         storage_actions = QHBoxLayout()
-        self.apply_storage_button = QPushButton("Apply storage settings")
-        self.restore_storage_button = QPushButton("Restore INI backup…")
+        self.apply_storage_button = QPushButton("Save storage settings")
+        self.restore_storage_button = QPushButton("Restore settings backup…")
         self.apply_storage_button.setEnabled(False)
         self.restore_storage_button.setEnabled(False)
         self.apply_storage_button.clicked.connect(self.apply_storage)
@@ -219,10 +219,10 @@ class Mo2LibraryDialog(QDialog):
         advanced_layout.addLayout(storage_actions)
 
         footer = QHBoxLayout()
-        self.register_button = QPushButton("Register selected instance")
+        self.register_button = QPushButton("Add selected instance")
         self.register_button.setEnabled(False)
         self.register_button.clicked.connect(self.register_selected)
-        close = QPushButton("Close")
+        close = QPushButton("Done")
         close.clicked.connect(self.accept)
         setup_layout.addWidget(self.register_button)
         setup_layout.addStretch(1)
@@ -289,13 +289,13 @@ class Mo2LibraryDialog(QDialog):
             self.installation_summary.setText(
                 f"Installations: {len(registry['installations'])} · "
                 f"Registered instances: {len(registry['instances'])}. "
-                "Choose one installation to inspect its references."
+                "Choose an installation to see its instances."
             )
             self.unregister_installation_button.setEnabled(False)
         self.unregister_instance_button.setEnabled(False)
 
         if not registry["instances"]:
-            self.registered_instances.addItem("No MO2 instances registered yet.")
+            self.registered_instances.addItem("No instances added to Wyrd yet.")
             return
         visible_count = 0
         for record in registry["instances"]:
@@ -314,7 +314,7 @@ class Mo2LibraryDialog(QDialog):
             if record.get("id") == self.preferred_instance_id:
                 self.registered_instances.setCurrentItem(item)
         if not visible_count:
-            self.registered_instances.addItem("No instances belong to this MO2 installation.")
+            self.registered_instances.addItem("No instances found for this installation.")
 
     def _select_registered(self, row: int) -> None:
         item = self.registered_instances.item(row) if row >= 0 else None
@@ -970,7 +970,7 @@ class Mo2LibraryDialog(QDialog):
         self.register_button.setEnabled(False)
         self.details.clear()
         if not self.game_path_edit.text():
-            QMessageBox.warning(self, "MO2 discovery", "Select/detect Skyrim Special Edition in Wyrd first.")
+            QMessageBox.warning(self, "MO2 discovery", "Wyrd needs to detect Skyrim first.")
             return
         self.discover_button.setEnabled(False)
         try:
@@ -1122,9 +1122,9 @@ class Mo2LibraryDialog(QDialog):
             return
         answer = QMessageBox.question(
             self, "Register MO2 instance",
-            "Register this instance in Wyrd's local registry? This records its paths and "
-            "game/runtime association only. It does not modify MO2, its profiles, mods, "
-            "downloads, saves, or Proton prefix.",
+            "Add this instance to Wyrd? Wyrd saves its paths and "
+            "game and Proton settings only. MO2 files, profiles, mods, "
+            "downloads, saves and Proton prefix stay unchanged.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -1175,4 +1175,4 @@ class Mo2LibraryDialog(QDialog):
                 break
         self.register_button.setEnabled(False)
         self.details.appendPlainText("\n\nRegistered successfully in Wyrd's local MO2 registry.")
-        QMessageBox.information(self, "MO2 instance registered", "Wyrd metadata was saved. No MO2 files or game data were changed.")
+        QMessageBox.information(self, "MO2 instance registered", "Added to Wyrd. No MO2 or game files were changed.")
