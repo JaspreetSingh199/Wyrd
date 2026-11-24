@@ -96,6 +96,9 @@ class Mo2LibraryDialog(QDialog):
         self.installation_filter.addItem("All installations", None)
         self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
         root.addWidget(self.installation_filter)
+        self.installation_summary = QLabel("Select an installation to inspect its registry references.")
+        self.installation_summary.setWordWrap(True)
+        root.addWidget(self.installation_summary)
         root.addWidget(QLabel("Registered MO2 instances — select to manage or launch"))
         self.registered_instances = QListWidget()
         self.registered_instances.currentRowChanged.connect(self._select_registered)
@@ -108,6 +111,16 @@ class Mo2LibraryDialog(QDialog):
         self._launch_existing_button.setEnabled(False)
         self._launch_existing_button.clicked.connect(self.launch_selected)
         root.addWidget(self._launch_existing_button)
+        management_actions = QHBoxLayout()
+        self.unregister_instance_button = QPushButton("Unregister selected instance")
+        self.unregister_instance_button.setEnabled(False)
+        self.unregister_instance_button.clicked.connect(self.unregister_selected_instance)
+        self.unregister_installation_button = QPushButton("Unregister unused installation")
+        self.unregister_installation_button.setEnabled(False)
+        self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
+        management_actions.addWidget(self.unregister_instance_button)
+        management_actions.addWidget(self.unregister_installation_button)
+        root.addLayout(management_actions)
 
         root.addWidget(QLabel("Discovered instances"))
         self.instances = QListWidget()
@@ -203,6 +216,25 @@ class Mo2LibraryDialog(QDialog):
         self.installation_filter.setCurrentIndex(max(0, selected_index))
         self.installation_filter.blockSignals(False)
         active_filter = self.installation_filter.currentData()
+        selected_installation = installations.get(active_filter) if active_filter else None
+        if selected_installation:
+            references = sum(1 for item in registry["instances"]
+                             if item.get("installation_id") == active_filter)
+            self.installation_summary.setText(
+                f"Selected installation: {selected_installation.get('executable')}\\n"
+                f"Ownership: {selected_installation.get('owner', 'unknown')} · "
+                f"Registered instances: {references}\\n"
+                "Unregistering removes only Wyrd's reference; it never deletes MO2 files."
+            )
+            self.unregister_installation_button.setEnabled(references == 0)
+        else:
+            self.installation_summary.setText(
+                f"Installations: {len(registry['installations'])} · "
+                f"Registered instances: {len(registry['instances'])}. "
+                "Choose one installation to inspect its references."
+            )
+            self.unregister_installation_button.setEnabled(False)
+        self.unregister_instance_button.setEnabled(False)
 
         if not registry["instances"]:
             self.registered_instances.addItem("No MO2 instances registered yet.")
@@ -233,8 +265,10 @@ class Mo2LibraryDialog(QDialog):
             self._launch_existing_button.setEnabled(False)
             self._edit_associations_button.setEnabled(False)
             self.apply_storage_button.setEnabled(False)
+            self.unregister_instance_button.setEnabled(False)
             return
         self.selected_instance_record = record
+        self.unregister_instance_button.setEnabled(True)
         try:
             registry, installations, games, runtimes = self._registry_maps()
             installation = installations[record["installation_id"]]
@@ -266,6 +300,69 @@ class Mo2LibraryDialog(QDialog):
         for button in self.storage_browse_buttons.values():
             button.setEnabled(bool(record.get("config")))
         self._edit_associations_button.setEnabled(True)
+
+    def unregister_selected_instance(self) -> None:
+        """Forget a selected instance in Wyrd without changing its files."""
+        record = self.selected_instance_record
+        if not record:
+            return
+        answer = QMessageBox.question(
+            self, "Unregister MO2 instance",
+            "Remove this instance from Wyrd's registry?\\n\\n"
+            "The MO2 instance, profiles, mods, downloads, saves, Proton prefix and installation "
+            "will remain exactly where they are. This action only removes Wyrd metadata.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.service.unregister_instance(record["id"])
+            if self.preferred_instance_id == record["id"]:
+                self.preferred_instance_id = ""
+            self.selected_instance_record = None
+            self._refresh_registered()
+            self.details.setPlainText(
+                "Instance reference removed from Wyrd. No MO2 or game files were changed."
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Unregister MO2 instance", str(error))
+
+    def unregister_selected_installation(self) -> None:
+        """Forget an unused installation reference, never its on-disk files."""
+        installation_id = self.installation_filter.currentData()
+        if not installation_id:
+            return
+        try:
+            registry, installations, _games, _runtimes = self._registry_maps()
+            installation = installations.get(installation_id)
+            if not installation:
+                raise ValueError("Selected installation is no longer registered.")
+            references = [item for item in registry["instances"]
+                          if item.get("installation_id") == installation_id]
+            if references:
+                raise ValueError(
+                    f"This installation still has {len(references)} registered instance(s). "
+                    "Unregister those instance references first."
+                )
+            answer = QMessageBox.question(
+                self, "Unregister MO2 installation",
+                f"Remove this unused installation reference from Wyrd?\\n\\n"
+                f"{installation.get('executable')}\\n\\n"
+                "The MO2 executable, installation directory, Proton prefix and all data remain untouched.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.service.unregister_installation(installation_id)
+            self.preferred_instance_id = ""
+            self._refresh_registered()
+            self.details.setPlainText(
+                "Unused installation reference removed from Wyrd. No files were deleted."
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Unregister MO2 installation", str(error))
 
     def _choose_storage_path(self, category: str) -> None:
         current = self.storage_fields[category].text()
@@ -745,8 +842,29 @@ class Mo2LibraryDialog(QDialog):
             )
             return
         if game_id == "steam-489830" and app_id != "489830":
-            identity = hashlib.sha256((str(Path(game_path).expanduser()) + "|" + app_id).encode()).hexdigest()[:16]
-            game_id = f"steam-{app_id}" if app_id else f"game-{identity}"
+            identity = hashlib.sha256(
+                (str(Path(game_path).expanduser().resolve()) + "|" + app_id).encode()
+            ).hexdigest()[:16]
+            game_id = f"steam-{app_id}-{identity}" if app_id else f"game-{identity}"
+        # The same Steam AppID may be installed in multiple Steam libraries.
+        # Keep the legacy Skyrim ID for its first canonical registration, but
+        # disambiguate a second physical copy by its resolved game path.
+        if app_id:
+            try:
+                existing_games = self.service.load().get("games", [])
+                resolved_game = str(Path(game_path).expanduser().resolve(strict=True))
+                collision = next((
+                    game for game in existing_games
+                    if game.get("id") == game_id
+                    and str(game.get("path", "")) != resolved_game
+                ), None)
+                if collision:
+                    identity = hashlib.sha256(
+                        (resolved_game + "|" + app_id).encode()
+                    ).hexdigest()[:16]
+                    game_id = f"steam-{app_id}-{identity}"
+            except (OSError, RuntimeError):
+                pass
         selected_prefix = Path(self.prefix_edit.text()).expanduser()
         discovered_install = self.discovery.get("installation", {})
         discovered_prefix = Path(discovered_install.get("prefix_path", "")).expanduser()
