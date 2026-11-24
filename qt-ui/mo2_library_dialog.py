@@ -48,7 +48,7 @@ class Mo2LibraryDialog(QDialog):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(8)
         scroll.setWidget(content)
-        content_layout.addWidget(scroll, 1)
+        root.addWidget(scroll, 1)
 
         intro = QLabel(
             "Discover MO2 installations and instances in a known Proton prefix. "
