@@ -1044,6 +1044,71 @@ class MainWindow(QMainWindow):
         )
 
     def start_skyrim(self) -> None:
+        """Launch the active registered Skyrim instance, falling back to legacy discovery."""
+        registered = self._restore_registered_instance()
+        selected_record = None
+        if registered:
+            from wyrd_mo2_registry_service import RegistryService
+            registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+            games = {item["id"]: item for item in registry["games"]}
+            installations = {item["id"]: item for item in registry["installations"]}
+            runtimes = {item["id"]: item for item in registry["runtimes"]}
+            game = games.get(registered.get("game_id"), {})
+            if str(game.get("app_id") or "") == "489830":
+                selected_record = registered
+
+        if selected_record:
+            registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
+            games = {item["id"]: item for item in registry["games"]}
+            installations = {item["id"]: item for item in registry["installations"]}
+            runtimes = {item["id"]: item for item in registry["runtimes"]}
+            game = games[selected_record["game_id"]]
+            installation = installations[selected_record["installation_id"]]
+            runtime = runtimes.get(selected_record.get("runtime_id"), {})
+            game_path = Path(game.get("path", "")).expanduser()
+            prefix = Path(selected_record.get("prefix_path") or game.get("prefix_path") or "").expanduser()
+            install_root = Path(installation.get("executable", "")).expanduser().parent
+            proton = Path(runtime.get("path", "")).expanduser()
+            instance_path = Path(selected_record.get("instance_path", "")).expanduser()
+            if installation.get("owner") not in ("wyrd", "external"):
+                QMessageBox.warning(self, "MO2 launch unavailable", "Registered installation ownership is not verified.")
+                return
+            for path, label in ((game_path, "game"), (prefix, "Proton prefix"),
+                                (install_root, "MO2 installation"), (proton, "Proton runtime"),
+                                (instance_path, "MO2 instance")):
+                if not str(path) or path.is_symlink() or not path.is_dir():
+                    QMessageBox.warning(self, "MO2 launch unavailable", f"Registered {label} path is unavailable or unsafe: {path}")
+                    return
+            if not (install_root / "ModOrganizer.exe").is_file() or not (proton / "proton").is_file():
+                QMessageBox.warning(self, "MO2 launch unavailable", "Registered MO2 executable or Proton launcher is missing.")
+                return
+            inventory = inspect_mo2_instances(
+                prefix, install_root, require_managed=(installation.get("owner") == "wyrd" and
+                    prefix.name != "489830")
+            )
+            if not inventory.get("ok"):
+                # Steam AppID prefixes are not Wyrd-owned; inspect them explicitly.
+                inventory = inspect_mo2_instances(prefix, install_root, require_managed=False)
+            if not inventory.get("ok"):
+                QMessageBox.warning(self, "MO2 launch unavailable", inventory.get("message", "Could not inspect registered MO2 prefix."))
+                return
+            instance_name = instance_path.name
+            found = next((item for item in inventory.get("instances", [])
+                          if Path(item.get("path", "")).resolve() == instance_path.resolve()), None)
+            if not found:
+                QMessageBox.warning(self, "MO2 launch unavailable", "Registered instance no longer exists in the associated prefix.")
+                return
+            target_state = inspect_skyrim_launch_targets(
+                prefix, game_path, instance_name=instance_name, install_root=install_root,
+                require_managed=False,
+            )
+            self._launch_registered_skyrim_target(
+                selected_record, game, installation, runtime, target_state,
+                game_path, prefix, install_root, proton,
+            )
+            return
+
+        # Legacy path remains unchanged for installations not yet in the registry.
         instances = self.instance_state.get("skyrim_instances", [])
         if not instances:
             QMessageBox.warning(
@@ -1070,6 +1135,31 @@ class MainWindow(QMainWindow):
             instance_name=instance_name, install_root=Path(mo2_state["install"]),
             require_managed=bool(mo2_state.get("managed", True)),
         )
+        self._launch_skyrim_target_from_inventory(
+            instance_name, target_state, game_path, Path(mo2_state["prefix"]),
+            Path(mo2_state["install"]), Path(self.proton_combo.currentData()),
+            bool(mo2_state.get("managed", True)),
+        )
+
+    def _launch_registered_skyrim_target(
+        self, record: dict, game: dict, installation: dict, runtime: dict,
+        target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
+    ) -> None:
+        if not target_state.get("ok") or not target_state.get("targets"):
+            QMessageBox.warning(
+                self, "Skyrim launch unavailable",
+                target_state.get("message", "No configured Skyrim/SKSE executable was found."),
+            )
+            return
+        instance_name = Path(record["instance_path"]).name
+        self._launch_skyrim_target_from_inventory(
+            instance_name, target_state, game_path, prefix, install_root, proton, False,
+        )
+
+    def _launch_skyrim_target_from_inventory(
+        self, instance_name: str, target_state: dict, game_path: Path,
+        prefix: Path, install_root: Path, proton: Path, require_managed: bool,
+    ) -> None:
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
@@ -1078,8 +1168,6 @@ class MainWindow(QMainWindow):
             self._log(target_state.get("message", "No valid targets found."))
             return
         targets = target_state["targets"]
-        # Include the binary basename when titles collide; keep the original
-        # MO2 title separately because that is what its CLI expects.
         title_counts = {}
         for target in targets:
             title_counts[target["title"]] = title_counts.get(target["title"], 0) + 1
@@ -1098,22 +1186,18 @@ class MainWindow(QMainWindow):
         selected = selected_target["title"]
         answer = QMessageBox.question(
             self, "Confirm Skyrim launch",
-            f"MO2 will launch '{selected}' in instance '{instance_name}' "
-            "using its virtual filesystem. Wyrd will not edit the instance configuration.\\n\\nContinue?",
+            f"MO2 will launch '{selected}' in instance '{instance_name}' using its virtual filesystem. Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         audio_mode = "xaudio2_compat" if self.xaudio_override_checkbox.isChecked() else "default"
-        self._log("Skyrim audio launch mode: " + audio_mode)
         result = launch_skyrim_via_mo2(
             selected, instance_name, expected_binary=selected_target["binary"],
-            audio_mode=audio_mode,
-            proton_path=Path(self.proton_combo.currentData()),
-            game_path=game_path, prefix_root=Path(mo2_state["prefix"]),
-            install_root=Path(mo2_state["install"]),
-            require_managed=bool(mo2_state.get("managed", True)),
+            audio_mode=audio_mode, proton_path=proton, game_path=game_path,
+            prefix_root=prefix, install_root=install_root,
+            require_managed=require_managed,
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
