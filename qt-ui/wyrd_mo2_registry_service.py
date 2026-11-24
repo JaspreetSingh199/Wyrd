@@ -255,7 +255,7 @@ class RegistryService:
             "runtime_id": runtime_record["id"] if runtime_record else None,
             "storage_policy": dict(proposal["default_storage_policy"]),
             "config": proposal["config"],
-            "prefix_path": installation_record.get("prefix_path"),
+            "prefix_path": game_record.get("prefix_path") or proposal.get("prefix_path") or installation_record.get("prefix_path"),
             "storage_paths": dict(proposal.get("storage", {})),
             "game_name": proposal.get("game_name", ""),
             "is_skyrim_se": bool(proposal.get("is_skyrim_se")),
