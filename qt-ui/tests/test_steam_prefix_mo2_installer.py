@@ -7,7 +7,10 @@ from unittest.mock import patch
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from steamcompat import (install_mo2_into_skyrim_prefix, steam_compat_prefix,\n                          inspect_skyrim_prefix_mo2_installation)
+from steamcompat import (
+    install_mo2_into_skyrim_prefix, steam_compat_prefix,
+    inspect_skyrim_prefix_mo2_installation,
+)
 
 
 def fake_proton(path: Path) -> Path:
