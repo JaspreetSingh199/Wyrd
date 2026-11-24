@@ -95,7 +95,6 @@ class Mo2LibraryDialog(QDialog):
         self.registered_instances = QListWidget()
         self.registered_instances.currentRowChanged.connect(self._select_registered)
         root.addWidget(self.registered_instances, 1)
-        self._refresh_registered()
         self._edit_associations_button = QPushButton("Edit game / Proton association")
         self._edit_associations_button.setEnabled(False)
         self._edit_associations_button.clicked.connect(self.edit_associations)
@@ -161,6 +160,7 @@ class Mo2LibraryDialog(QDialog):
         footer.addStretch(1)
         footer.addWidget(close)
         root.addLayout(footer)
+        self._refresh_registered()
 
     def _registry_maps(self):
         registry = self.service.load()
@@ -682,6 +682,12 @@ class Mo2LibraryDialog(QDialog):
             return
 
         self.registered = True
+        self.preferred_instance_id = proposal.get("id", "")
+        registry = self.service.load()
+        self.selected_instance_record = next(
+            (record for record in registry["instances"] if record.get("id") == self.preferred_instance_id),
+            None,
+        )
         self._refresh_registered()
         for row in range(self.instances.count()):
             candidate = self.instances.item(row)
