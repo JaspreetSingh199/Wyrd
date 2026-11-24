@@ -1536,7 +1536,10 @@ class MainWindow(QMainWindow):
                 launch_token=self.launch_session.launch_token,
                 ancestor_start_time=self.launch_session.wrapper_start_time,
             )
-            session_processes = process_scan.get("processes", []) if process_scan.get("ok") and wrapper_identity_matches else []
+            # The scanner independently verifies either the original wrapper
+            # identity (for descendants) or this launch's unique environment token
+            # and prefix (for reparented game processes).
+            session_processes = process_scan.get("processes", []) if process_scan.get("ok") else []
         else:
             process_scan = {"ok": False, "processes": [], "message": "No configured target binary is available for process attribution."}
             session_processes = []
