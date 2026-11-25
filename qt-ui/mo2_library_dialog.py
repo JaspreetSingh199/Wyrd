@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QInputDialog, QVBoxLayout, QWidget, QStackedWidget,
 )
 
-from wyrd_mo2 import _runtime_environment, managed_paths
+from wyrd_mo2 import _runtime_environment, managed_paths, _steam_root_for_game
 from skyrim_detection import find_steam_roots
 from wyrd_mo2_registry_service import RegistryService
 
@@ -394,87 +394,23 @@ class Mo2LibraryDialog(QWidget):
             )
             return
 
-        steam_roots = find_steam_roots(Path.home())
         resolved_game = game_path.resolve(strict=True)
-        steam_root = next(
-            (root for root in steam_roots
-             if not root.is_symlink()
-             and resolved_game == root.resolve(strict=True)
-             or not root.is_symlink() and root.resolve(strict=True) in resolved_game.parents),
-            None,
-        )
-        if steam_root is None:
-            QMessageBox.warning(
-                self, "Cannot create MO2 instance",
-                "Wyrd could not identify the Steam installation for this game. Refresh Steam detection first.",
-            )
+        try:
+            steam_root = _steam_root_for_game(resolved_game, Path.home())
+            mapping = configure_steam_library_drive(prefix, resolved_game, steam_root)
+        except Exception as error:
+            QMessageBox.warning(self, "Could not prepare MO2 game discovery", str(error))
             return
-
-        # MO2's Bethesda game plugin reads the installed game directory from
-        # the Windows registry. Steam's stale S: mapping can otherwise win over
-        # the real Linux installation. Update only Skyrim SE's Installed Path
-        # value in this selected Proton prefix, after explicit user approval.
-        game_windows_path = "Z:" + str(resolved_game).replace("/", "\\")
-        answer = QMessageBox.question(
-            self, "Prepare Skyrim path for MO2",
-            "Wyrd can point Skyrim Special Edition's Bethesda registry entry in this "
-            "Proton prefix at the detected Linux game folder:\n\n"
-            f"{game_windows_path}\n\n"
-            "This changes only the 'Installed Path' registry value for Skyrim Special Edition "
-            "inside the selected Proton prefix. It does not change Steam library files, game "
-            "files, saves, or other registry entries. Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not mapping.get("ok"):
+            QMessageBox.warning(
+                self, "Could not prepare MO2 game discovery",
+                "Wyrd could not verify or repair MO2's S: Steam-library mapping. "
+                "MO2 was not launched.\\n\\n" + mapping.get("message", "Unknown mapping error."),
+            )
             return
 
         env = _runtime_environment(proton.resolve(strict=True), steam_root.resolve(strict=True), prefix.resolve(strict=True))
         proton_wrapper = str((proton / "proton").resolve(strict=True))
-        registry_key = r"HKLM\Software\WOW6432Node\Bethesda Softworks\Skyrim Special Edition"
-        registry_command = [
-            proton_wrapper, "run", "reg.exe", "add", registry_key,
-            "/v", "Install path", "/t", "REG_SZ", "/d", game_windows_path, "/f",
-        ]
-        try:
-            registry_result = subprocess.run(
-                registry_command, cwd=str(proton), env=env,
-                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=45,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            QMessageBox.warning(self, "Could not prepare Skyrim path", str(error))
-            return
-        if registry_result.returncode != 0:
-            detail = (registry_result.stderr or registry_result.stdout or "").strip()
-            QMessageBox.warning(
-                self, "Could not prepare Skyrim path",
-                "Proton could not update the Skyrim registry entry. MO2 was not launched.\\n\\n" + detail,
-            )
-            return
-
-        verify_command = [
-            proton_wrapper, "run", "reg.exe", "query", registry_key,
-            "/v", "Install path",
-        ]
-        try:
-            verified = subprocess.run(
-                verify_command, cwd=str(proton), env=env,
-                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=45,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            QMessageBox.warning(self, "Could not verify Skyrim path", str(error))
-            return
-        observed = (verified.stdout or "").replace("/", "\\\\").casefold()
-        expected = game_windows_path.replace("/", "\\\\").casefold()
-        if verified.returncode != 0 or expected not in observed:
-            detail = (verified.stderr or verified.stdout or "Registry value did not match the detected game directory.").strip()
-            QMessageBox.warning(
-                self, "Could not verify Skyrim path",
-                "The Skyrim registry path could not be verified. MO2 was not launched.\\n\\n" + detail,
-            )
-            return
 
         command = [proton_wrapper, "run", str(executable.resolve(strict=True)), "--pick"]
         try:
@@ -499,7 +435,8 @@ class Mo2LibraryDialog(QWidget):
 
         self.setup_status.setText(
             f"Opened MO2 instance picker with {proton.name}. "
-            "Create the instance in MO2, close the manager, then choose Connect existing instance to add it to Wyrd."
+            f"{mapping['message']} {mapping['windows_game_path']} resolves to {mapping['resolved_game_path']}. "
+            "Create the instance in MO2, close the manager, then refresh Wyrd's environment scan."
         )
 
     def discover(self):
