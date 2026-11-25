@@ -77,29 +77,6 @@ class Mo2LibraryDialog(QWidget):
         environment_entry_actions.addStretch(1)
         layout.addLayout(environment_entry_actions)
 
-        self.connected_instances = QListWidget()
-        self.connected_instances.setMinimumHeight(90)
-        self.connected_instances.setMaximumHeight(190)
-        self.connected_instances.currentRowChanged.connect(self._select_connected)
-        self.connected_instances.hide()
-        layout.addWidget(self.connected_instances)
-
-        environment_actions = QHBoxLayout()
-        self.open_environment_folder_button = QPushButton("Open folder")
-        self.open_environment_folder_button.clicked.connect(self.open_selected_environment_folder)
-        self.open_environment_folder_button.setEnabled(False)
-        self.rename_environment_button = QPushButton("Rename")
-        self.rename_environment_button.clicked.connect(self.rename_selected_environment)
-        self.rename_environment_button.setEnabled(False)
-        self.disconnect_environment_button = QPushButton("Disconnect")
-        self.disconnect_environment_button.clicked.connect(self.disconnect_selected_environment)
-        self.disconnect_environment_button.setEnabled(False)
-        environment_actions.addWidget(self.open_environment_folder_button)
-        environment_actions.addWidget(self.rename_environment_button)
-        environment_actions.addWidget(self.disconnect_environment_button)
-        environment_actions.addStretch(1)
-        layout.addLayout(environment_actions)
-
         self.instances = QListWidget()
         self.instances.setMinimumHeight(55)
         self.instances.setMaximumHeight(120)
@@ -108,13 +85,7 @@ class Mo2LibraryDialog(QWidget):
         self.instances.hide()
         layout.addWidget(self.instances)
 
-        self.register_button = QPushButton("Add to Wyrd")
-        self.register_button.clicked.connect(self.register_selected)
-        self.register_button.setEnabled(False)
-        self.register_button.hide()
-        layout.addWidget(self.register_button, 0, Qt.AlignmentFlag.AlignLeft)
-
-        self._refresh_connected()
+        # Discovered MO2 instances are used directly; no Wyrd registration step is needed.
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
         self.prefix_path = str(prefix_path or "")
@@ -444,8 +415,6 @@ class Mo2LibraryDialog(QWidget):
     def discover(self):
         self.instances.clear()
         self.instances.hide()
-        self.register_button.hide()
-        self.register_button.setEnabled(False)
         if not self.game_path or not self.prefix_path or not self.install_path:
             self.setup_status.setText("Wyrd needs to detect Skyrim and its Proton prefix before searching.")
             return
@@ -459,14 +428,6 @@ class Mo2LibraryDialog(QWidget):
         self.discovery = result
         if not result.get("ok"):
             self.setup_status.setText(result.get("message", "Could not find MO2 instances."))
-            return
-        try:
-            registered_paths = {
-                os.path.normcase(os.path.realpath(item.get("instance_path", "")))
-                for item in self.service.load().get("instances", [])
-            }
-        except Exception as error:
-            self.setup_status.setText(f"Could not check saved instances: {error}")
             return
         proposals = result.get("proposals", [])
         self._proposal_registration_state = {}
@@ -484,102 +445,20 @@ class Mo2LibraryDialog(QWidget):
         if proposals:
             self.instances.show()
             self.instances.setCurrentRow(0)
-            self.setup_status.setText(f"Found {len(proposals)} MO2 instance(s). Select one to add it to Wyrd.")
+            self.setup_status.setText(f"Found {len(proposals)} MO2 instance(s). Wyrd uses this scan directly; no registration is needed.")
         else:
             self.setup_status.setText("MO2 was found, but no instances were found in its usual folders.")
 
     def _show_selected(self, row: int):
         item = self.instances.item(row) if row >= 0 else None
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
-        already_registered = (
-            isinstance(proposal, dict)
-            and self._proposal_registration_state.get(id(proposal), False)
-        )
-        is_fresh = (
-            isinstance(proposal, dict)
-            and proposal.get("registration_status") == "discovered-not-registered"
-            and not already_registered
-        )
-        self.register_button.setVisible(bool(is_fresh))
-        self.register_button.setEnabled(bool(is_fresh))
-
-    def register_selected(self):
-        item = self.instances.currentItem()
-        proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
-        installation = self.discovery.get("installation")
-        if (
-            not isinstance(proposal, dict)
-            or not installation
-            or proposal.get("registration_status") != "discovered-not-registered"
-            or self._proposal_registration_state.get(id(proposal), False)
-        ):
-            return
-        game_path = Path(self.game_path).expanduser()
-        prefix = Path(self.prefix_path).expanduser()
-        install = Path(self.install_path).expanduser()
-        runtime = Path(self.proton_path).expanduser()
-        game_id, game_name, app_id = "steam-489830", "Skyrim Special Edition", "489830"
-        if not game_path.is_dir():
-            self.setup_status.setText("Skyrim's game folder could not be found. Refresh detection and try again.")
-            return
-        if prefix.is_symlink() or not (prefix / "pfx/drive_c/users").is_dir():
-            self.setup_status.setText("The Skyrim Proton prefix is missing or unsafe.")
-            return
-        if runtime.is_symlink() or not (runtime / "proton").is_file():
-            self.setup_status.setText("Choose a valid Proton runtime in Environment before adding this instance.")
-            return
-        discovered_install = self.discovery.get("installation", {})
-        discovered_prefix = Path(discovered_install.get("prefix_path", "")).expanduser()
-        discovered_root = Path(discovered_install.get("executable", "")).expanduser().parent
-        try:
-            if prefix.resolve(strict=True) != discovered_prefix.resolve(strict=True) or install.resolve(strict=True) != discovered_root.resolve(strict=True):
-                self.setup_status.setText("The detected MO2 location changed. Search again before adding it.")
-                return
-        except (OSError, RuntimeError):
-            self.setup_status.setText("The detected MO2 location is no longer available. Search again.")
-            return
-        try:
-            current_games = self.service.load().get("games", [])
-            resolved_game = str(game_path.resolve(strict=True))
-            collision = next((x for x in current_games if x.get("id") == game_id and str(x.get("path", "")) != resolved_game), None)
-            if collision:
-                identity = hashlib.sha256((resolved_game + "|" + app_id).encode()).hexdigest()[:16]
-                game_id = f"steam-{app_id}-{identity}"
-        except (OSError, RuntimeError):
-            pass
-        answer = QMessageBox.question(
-            self, "Add MO2 to Wyrd",
-            "Add this instance to Wyrd? This saves its location and game settings only. MO2 files, profiles, mods, downloads, saves and the Proton prefix stay unchanged.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        game = {
-            "id": game_id, "name": game_name, "app_id": app_id,
-            "path": str(game_path.resolve(strict=True)),
-            "steam_root": str(game_path.resolve(strict=True).parent.parent.parent)
-                if game_path.resolve(strict=True).parent.name.casefold() == "common"
-                and game_path.resolve(strict=True).parent.parent.name.casefold() == "steamapps" else "",
-            "prefix_path": str(prefix.resolve(strict=True)),
-        }
-        runtime_id = "proton-" + hashlib.sha256(str(runtime.resolve(strict=True)).encode()).hexdigest()[:16]
-        runtime_record = {"id": runtime_id, "name": runtime.name, "path": str(runtime.resolve(strict=True))}
-        try:
-            self.service.register(installation, proposal, game, runtime_record)
-        except Exception as error:
-            QMessageBox.warning(self, "Could not add MO2", str(error))
-            return
-        self.registered = True
-        self.preferred_instance_id = proposal.get("id", "")
-        registry = self.service.load()
-        self.selected_instance_record = next((x for x in registry["instances"] if x.get("id") == self.preferred_instance_id), None)
-        self.selection_changed = True
-        if callable(self.on_registry_changed):
-            self.on_registry_changed(self.selected_instance_record, True)
-        self.setup_status.setText("MO2 is connected to Wyrd. Use Launch Modded Skyrim on the Environment page to start your game through MO2.")
-        self.register_button.hide()
-        self._refresh_connected()
+        self.selected_instance_record = dict(proposal) if isinstance(proposal, dict) else None
+        if self.selected_instance_record:
+            self.setup_status.setText(
+                f"Discovered: {self.selected_instance_record.get('game_name') or 'Skyrim Special Edition'} · "
+                f"{self.selected_instance_record.get('instance_type', 'instance')}. "
+                "No Wyrd registration is required."
+            )
 
 
 
