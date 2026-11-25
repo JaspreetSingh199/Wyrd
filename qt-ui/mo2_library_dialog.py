@@ -790,12 +790,32 @@ class Mo2AdvancedSettings(QWidget):
         selected_filter=self.installation_filter.currentData() if self.installation_filter.count() else None
         self.registered_instances.clear(); self.selected_instance_record=None
         try:
-            registry, installations, games, _runtimes=self._registry_maps()
+            registry, installations, games, runtimes=self._registry_maps()
         except Exception as error:
             self.registered_instances.addItem(f"Registry unavailable: {error}"); return
+
+        # The registry is historical metadata, not proof that an instance still
+        # exists. Apply the same read-only filesystem validation as the main
+        # Environment picker so stale Portable entries never appear here.
+        valid_records = [
+            item for item in registry.get("instances", [])
+            if Mo2LibraryDialog._registered_environment_exists(
+                item, installations, games, runtimes
+            )
+        ]
+        valid_installation_ids = {item.get("installation_id") for item in valid_records}
+        valid_installations = [
+            item for item in registry.get("installations", [])
+            if item.get("id") in valid_installation_ids
+            or (
+                item.get("executable")
+                and Path(item["executable"]).expanduser().is_file()
+                and not Path(item["executable"]).expanduser().is_symlink()
+            )
+        ]
         self.installation_filter.blockSignals(True); self.installation_filter.clear()
         self.installation_filter.addItem("All installations",None)
-        for installation in sorted(registry["installations"],key=lambda item: Path(item.get("executable","")).parent.name.casefold()):
+        for installation in sorted(valid_installations,key=lambda item: Path(item.get("executable","")).parent.name.casefold()):
             executable=Path(installation.get("executable",""))
             self.installation_filter.addItem(f"{executable.parent.name or 'MO2'} · {installation.get('owner','unknown')} · {installation.get('executable','')}",installation.get("id"))
         selected_index=self.installation_filter.findData(selected_filter)
@@ -803,14 +823,14 @@ class Mo2AdvancedSettings(QWidget):
         active_filter=self.installation_filter.currentData()
         selected_installation=installations.get(active_filter) if active_filter else None
         if selected_installation:
-            references=sum(1 for item in registry["instances"] if item.get("installation_id")==active_filter)
+            references=sum(1 for item in valid_records if item.get("installation_id")==active_filter)
             self.installation_summary.setText(f"{selected_installation.get('executable')}\nOwner: {selected_installation.get('owner','unknown')} · Instances: {references}\nRemoving a reference never deletes files.")
             self.unregister_installation_button.setEnabled(references==0)
         else:
-            self.installation_summary.setText(f"{len(registry['installations'])} installation(s) · {len(registry['instances'])} instance(s)")
+            self.installation_summary.setText(f"{len(valid_installations)} installation(s) · {len(valid_records)} verified instance(s)")
             self.unregister_installation_button.setEnabled(False)
         active=self.installation_filter.currentData()
-        for record in registry["instances"]:
+        for record in valid_records:
             if active and record.get("installation_id")!=active: continue
             game=games.get(record.get("game_id"),{})
             row=QListWidgetItem(f"{record.get('display_name') or game.get('name','MO2')} · {record.get('instance_type','instance')}")
