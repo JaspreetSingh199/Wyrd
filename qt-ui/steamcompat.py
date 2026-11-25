@@ -560,7 +560,7 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
     if (
         metadata.get("managed_by") != "Wyrd"
         or metadata.get("game_app_id") != APP_ID
-        or metadata.get("installation_mode") != "skyrim-steam-prefix"
+        or metadata.get("installation_mode") not in {"skyrim-steam-prefix", "official-windows-installer"}
         or Path(metadata.get("install", "")).expanduser() != install
         or not executable.is_file()
     ):
