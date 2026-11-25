@@ -1,4 +1,4 @@
-name: Wyrd tests and release bundle
+name: Wyrd tests and release bundle (including MO2 environments)
 
 on:
   push:
