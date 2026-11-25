@@ -632,16 +632,12 @@ class Mo2AdvancedSettings(QWidget):
         root.addWidget(heading)
         root.addWidget(intro)
 
-        content = QHBoxLayout()
-        content.setSpacing(12)
-        self.category_list = QListWidget()
-        self.category_list.setObjectName("mo2AdvancedCategories")
-        self.category_list.setFixedWidth(190)
-        self.category_list.setSpacing(3)
+        self.category_selector = QComboBox()
+        self.category_selector.setObjectName("mo2AdvancedCategories")
+        self.category_selector.setMinimumHeight(36)
         self.category_pages = QStackedWidget()
-        content.addWidget(self.category_list)
-        content.addWidget(self.category_pages, 1)
-        root.addLayout(content, 1)
+        root.addWidget(self.category_selector)
+        root.addWidget(self.category_pages, 1)
 
         def add_category(title, page, description):
             page_layout = QVBoxLayout(page)
@@ -654,7 +650,7 @@ class Mo2AdvancedSettings(QWidget):
             help_text.setWordWrap(True)
             page_layout.addWidget(label)
             page_layout.addWidget(help_text)
-            self.category_list.addItem(title)
+            self.category_selector.addItem(title)
             self.category_pages.addWidget(page)
             return page_layout
 
@@ -763,8 +759,8 @@ class Mo2AdvancedSettings(QWidget):
         storage_layout.addLayout(storage_actions)
         storage_layout.addStretch(1)
 
-        self.category_list.currentRowChanged.connect(self.category_pages.setCurrentIndex)
-        self.category_list.setCurrentRow(0)
+        self.category_selector.currentIndexChanged.connect(self.category_pages.setCurrentIndex)
+        self.category_selector.setCurrentIndex(0)
         self._refresh_registered()
 
 
