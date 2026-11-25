@@ -117,13 +117,69 @@ class Mo2LibraryDialog(QWidget):
             {x["id"]: x for x in registry["runtimes"]},
         )
 
+    @staticmethod
+    def _registered_environment_exists(connected, installations, games, runtimes):
+        """Fast, read-only filesystem precheck; stale registry entries stay hidden."""
+        def existing_dir(value):
+            if not value:
+                return False
+            path = Path(value).expanduser()
+            return not path.is_symlink() and path.is_dir()
+
+        def existing_file(value):
+            if not value:
+                return False
+            path = Path(value).expanduser()
+            return not path.is_symlink() and path.is_file()
+
+        installation = installations.get(connected.get("installation_id"), {})
+        game = games.get(connected.get("game_id"), {})
+        runtime = runtimes.get(connected.get("runtime_id"), {})
+        instance_path = connected.get("instance_path")
+        config_path = connected.get("config")
+        executable = installation.get("executable")
+        prefix_path = (
+            connected.get("prefix_path")
+            or installation.get("prefix_path")
+            or game.get("prefix_path")
+        )
+        runtime_path = runtime.get("path")
+        game_path = game.get("path")
+
+        if not existing_file(executable):
+            return False
+        if not existing_dir(prefix_path):
+            return False
+        prefix = Path(prefix_path).expanduser()
+        if not existing_dir(str(prefix / "pfx/drive_c")):
+            return False
+        if not existing_dir(instance_path) or not existing_file(config_path):
+            return False
+        if not existing_dir(runtime_path):
+            return False
+        if game_path and not existing_dir(game_path):
+            return False
+        return True
+
     def _refresh_connected(self):
         try:
-            registry, _installations, games, runtimes = self._registry_maps()
+            registry, installations, games, runtimes = self._registry_maps()
         except Exception as error:
+            self.connected_records = []
+            self.connected_instances.clear()
+            self.connected_instances.hide()
+            self.selected_instance_record = None
             self.setup_status.setText(f"Could not load MO2 connections: {error}")
             return
-        self.connected_records = registry["instances"]
+
+        # The Wyrd registry is a record of prior connections, not proof that
+        # those files still exist. Re-check the actual installation, prefix,
+        # instance/config and runtime before displaying an environment.
+        all_records = registry.get("instances", [])
+        self.connected_records = [
+            item for item in all_records
+            if self._registered_environment_exists(item, installations, games, runtimes)
+        ]
         record = next(
             (item for item in self.connected_records if item.get("id") == self.preferred_instance_id),
             None,
@@ -135,7 +191,7 @@ class Mo2LibraryDialog(QWidget):
             runtime = runtimes.get(connected.get("runtime_id"), {})
             instance_name = Path(connected.get("instance_path", "")).name or "MO2"
             display_name = connected.get("display_name") or instance_name
-            runtime_name = runtime.get("name") or "Proton runtime not set"
+            runtime_name = runtime.get("name") or "Proton runtime"
             active = connected.get("id") == self.preferred_instance_id
             label = (
                 f"{'● ' if active else ''}{display_name} · "
@@ -149,6 +205,7 @@ class Mo2LibraryDialog(QWidget):
         self.open_environment_folder_button.setEnabled(False)
         self.rename_environment_button.setEnabled(False)
         self.disconnect_environment_button.setEnabled(False)
+
         if record:
             game = games.get(record.get("game_id"), {})
             self.selected_instance_record = dict(record)
@@ -164,10 +221,7 @@ class Mo2LibraryDialog(QWidget):
                     self.connected_instances.setCurrentRow(row_index)
                     self.connected_instances.blockSignals(False)
                     instance_path = Path(record.get("instance_path", "")).expanduser()
-                    folder_available = (
-                        not instance_path.is_symlink()
-                        and instance_path.is_dir()
-                    )
+                    folder_available = not instance_path.is_symlink() and instance_path.is_dir()
                     self.open_environment_folder_button.setEnabled(folder_available)
                     self.rename_environment_button.setEnabled(True)
                     self.disconnect_environment_button.setEnabled(True)
@@ -175,13 +229,20 @@ class Mo2LibraryDialog(QWidget):
         elif self.connected_records:
             self.selected_instance_record = None
             self.setup_status.setText(
-                f"{len(self.connected_records)} environment(s) connected. Choose one below."
+                f"{len(self.connected_records)} verified environment(s) connected. Choose one below."
             )
         else:
             self.selected_instance_record = None
-            self.setup_status.setText(
-                "No environments connected yet. Add an existing MO2 instance to get started."
-            )
+            stale_count = len(all_records)
+            if stale_count:
+                self.setup_status.setText(
+                    "No existing MO2 installation or instance files were found at the registered locations. "
+                    "Nothing is shown; reconnect an instance after restoring or installing MO2."
+                )
+            else:
+                self.setup_status.setText(
+                    "No MO2 environments found. Create a new instance or connect an existing one."
+                )
 
     def _select_connected(self, row: int):
         item = self.connected_instances.item(row) if row >= 0 else None
