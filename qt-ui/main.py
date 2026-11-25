@@ -1166,45 +1166,6 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget.discover_button.setFocus()
         self.mo2_library_widget.discover()
 
-    def start_mo2_in_skyrim_prefix(self) -> None:
-        """Launch MO2 in Skyrim's Steam compatdata prefix (experimental)."""
-        answer = QMessageBox.warning(
-            self, "Experimental: MO2 in Skyrim Prefix",
-            "This launches Wyrd's MO2 installation using Skyrim's existing Steam Proton compatdata prefix. "
-            "It does not reset or intentionally modify that prefix, but MO2/Proton may write normal runtime "
-            "configuration files into it. This is separate from Standalone MO2.\n\nProceed?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        inventory = inspect_skyrim_prefix_mo2_instances()
-        if not inventory.get("ok"):
-            self._log(inventory.get("message", "Could not inspect Skyrim-prefix MO2 instances."))
-            QMessageBox.warning(self, "Steam-prefix MO2", inventory.get("message", "Could not inspect MO2 instances."))
-            return
-        candidates = inventory.get("skyrim_instances", [])
-        if not candidates:
-            message = inventory.get("message", "No Skyrim MO2 instance exists in Skyrim's Proton prefix.")
-            self._log(message)
-            QMessageBox.warning(self, "Steam-prefix MO2", message)
-            return
-        names = [item["name"] for item in candidates]
-        instance_name, accepted = QInputDialog.getItem(
-            self, "MO2 instance in Skyrim prefix", "Select the Skyrim MO2 instance:",
-            names, 0, False,
-        )
-        if not accepted or not instance_name:
-            return
-        result = launch_mo2_in_skyrim_prefix(instance_name=instance_name)
-        self._log(result.get("message", "Steam-prefix MO2 launch failed."))
-        if result.get("ok"):
-            self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
-            QMessageBox.information(self, "Steam-prefix MO2", result["message"])
-        else:
-            QMessageBox.warning(self, "Steam-prefix MO2 launch failed", result.get("message", "Could not launch MO2."))
-
-
     def copy_instance_to_skyrim_prefix(self) -> None:
         """Offer a non-destructive copy of an existing Wyrd Skyrim instance."""
         state = inspect_wyrd_installation()
