@@ -227,10 +227,9 @@ class MainWindow(QMainWindow):
         self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
+        self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         # Startup restoration is asynchronous: keep persistence suppressed until
         # refresh_all has populated the runtime list and restored the saved choice.
-        self._restoring_selection = True
-        self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         self._restoring_selection = True
         self.startup_checks_complete = False
 
