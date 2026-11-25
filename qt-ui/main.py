@@ -142,6 +142,20 @@ def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
     return steam_compat_prefix(path.parents[2])
 
 
+def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
+    """Add a compact, accessible information control beside an advanced action."""
+    info = QPushButton("i")
+    info.setObjectName("infoButton")
+    info.setFixedSize(24, 24)
+    info.setToolTip("What does this do?")
+    info.setAccessibleName(f"Information about {title}")
+    info.clicked.connect(
+        lambda _checked=False: QMessageBox.information(parent, title, explanation)
+    )
+    layout.addWidget(info)
+    return info
+
+
 def panel(title: str, description: str) -> QFrame:
     frame = QFrame()
     frame.setObjectName("panel")
@@ -433,6 +447,7 @@ class MainWindow(QMainWindow):
         self.test_proton_button.setObjectName("secondaryAction")
         self.test_proton_button.clicked.connect(self.test_selected_proton)
         proton_diagnostics_row.addWidget(self.test_proton_button)
+        add_info_button(proton_diagnostics_row, self, "Test selected Proton", "Runs a local, read-only preflight of the selected Proton runtime. It checks that the runtime folder, executable launcher and payload are present. It does not launch Skyrim, modify the prefix, or prove that a game will work.")
         proton_diagnostics_row.addStretch(1)
         proton_diagnostics_panel.layout().addLayout(proton_diagnostics_row)
         diagnostics_grid.addWidget(proton_diagnostics_panel, 0, 0)
@@ -450,6 +465,7 @@ class MainWindow(QMainWindow):
         self.audio_check_button = QPushButton("Inspect audio libraries")
         self.audio_check_button.clicked.connect(self.check_audio_libraries)
         audio_actions.addWidget(self.audio_check_button)
+        add_info_button(audio_actions, self, "Inspect audio libraries", "Checks the Skyrim Proton prefix for relevant audio libraries and reports what Wyrd can detect. This is diagnostic only; it does not install or replace audio files. The XAudio2 checkbox separately controls the launch-time compatibility override.")
         self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
         self.xaudio_override_checkbox.setChecked(bool(self._saved_settings.get("xaudio2_compat", False)))
         self.xaudio_override_checkbox.toggled.connect(self._save_audio_option)
@@ -464,7 +480,9 @@ class MainWindow(QMainWindow):
         )
         diagnostic_row = QHBoxLayout()
         diagnostic_row.addWidget(self.diagnostics_button)
+        add_info_button(diagnostic_row, self, "View launch log", "Opens the recent Skyrim/MO2 launch log. Use it when a launch fails or when you need the detailed Proton and MO2 output.")
         diagnostic_row.addWidget(self.launch_status_button)
+        add_info_button(diagnostic_row, self, "Check launch status", "Scans for Skyrim/SKSE processes and checks the launch handoff Wyrd is tracking. It can report a running process, an exited process, or an inconclusive result; it does not start or stop the game.")
         diagnostic_row.addStretch(1)
         diagnostics_panel.layout().addLayout(diagnostic_row)
         diagnostics_grid.addWidget(diagnostics_panel, 1, 0, 1, 2)
@@ -498,12 +516,14 @@ class MainWindow(QMainWindow):
         )
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         maintenance_row.addWidget(self.reset_mo2_button)
+        add_info_button(maintenance_row, self, "Remove MO2", "Removes only a verified Wyrd-managed MO2 installation and its registered instances after confirmation. It does not remove Skyrim, Skyrim saves, Steam files, or the Skyrim Steam compatdata prefix. External/unmanaged MO2 installations are not deleted.")
         self.reset_settings_button = QPushButton("Reset Wyrd Settings")
         self.reset_settings_button.setToolTip(
             "Resets Wyrd preferences. Existing MO2 registrations and the active environment are preserved; first-launch setup appears on the next application launch."
         )
         self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
         maintenance_row.addWidget(self.reset_settings_button)
+        add_info_button(maintenance_row, self, "Reset Wyrd Settings", "Resets Wyrd preferences. It preserves existing MO2 registrations and the active environment. It does not launch the first-time setup immediately; setup is offered on the next application launch.")
         maintenance_row.addStretch(1)
         recovery_panel.layout().addLayout(maintenance_row)
         maintenance_layout.addWidget(recovery_panel)
