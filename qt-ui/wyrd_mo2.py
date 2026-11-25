@@ -1090,30 +1090,30 @@ def inspect_mo2_storage(prefix_root: Path, install_root: Path | None = None,
         "message": f"Inspected storage settings for {len(storage_inventory)} MO2 instance(s). No data was changed.",
     }
 
-def _resolve_windows_path(value: str, prefix_root: Path, game_path: Path) -> Path | None:
-    """Resolve Wine DOS paths conservatively beneath the supplied known root."""
+def _resolve_windows_path(value: str, prefix_root: Path,
+                          game_path: Path | None = None) -> Path | None:
+    """Resolve Wine DOS paths beneath their known drive mappings."""
     raw = value.strip().strip('"')
     if not raw:
         return None
-    normalized = raw.replace("/", "\\")
+    normalized = raw.replace("/", "\\\\")
     drive = normalized[:2].casefold()
     if drive == "z:":
-        relative = normalized[2:].lstrip("\\")
-        candidate = Path("/") / relative.replace("\\", "/")
-        allowed_root = game_path
+        relative = normalized[2:].lstrip("\\\\")
+        candidate = Path("/") / relative.replace("\\\\", "/")
+        allowed_root = Path("/")
     elif drive == "c:":
-        relative = normalized[2:].lstrip("\\")
+        relative = normalized[2:].lstrip("\\\\")
         allowed_root = prefix_root / "pfx/drive_c"
-        candidate = allowed_root / relative.replace("\\", "/")
+        candidate = allowed_root / relative.replace("\\\\", "/")
     else:
         return None
     try:
         resolved = candidate.resolve(strict=True)
         resolved.relative_to(allowed_root.resolve(strict=True))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return None
     return resolved
-
 
 
 def copy_mo2_instance_to_prefix(source_instance: Path, destination_prefix: Path,
