@@ -235,14 +235,22 @@ class MainWindow(QMainWindow):
         runtime_row = QHBoxLayout()
         self.proton_combo = QComboBox()
         self.proton_combo.setMinimumWidth(320)
+        self.proton_combo.setMinimumHeight(38)
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.refresh_all)
         self.proton_combo.currentIndexChanged.connect(self._save_selection)
         runtime_row.addWidget(self.proton_combo, 1)
         runtime_row.addWidget(self.refresh_button)
         runtime_layout.addLayout(runtime_row)
+        runtime_actions = QHBoxLayout()
+        self.test_proton_button = QPushButton("Test selected Proton")
+        self.test_proton_button.clicked.connect(self.test_selected_proton)
+        runtime_actions.addWidget(self.test_proton_button)
+        runtime_actions.addStretch(1)
+        runtime_layout.addLayout(runtime_actions)
         self.runtime_status = QLabel("Looking for Proton…")
         self.runtime_status.setObjectName("muted")
+        self.runtime_status.setWordWrap(True)
         runtime_layout.addWidget(self.runtime_status)
         setup_layout.addWidget(runtime_panel)
 
@@ -411,50 +419,76 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(250, self._run_first_launch_setup)
 
     def _run_first_launch_setup(self) -> None:
-        """Offer a one-time, non-destructive setup using detected Skyrim paths."""
+        """Offer first-run environment setup and let the user choose Proton."""
         if self._saved_settings.get("first_run_completed"):
             return
         mark_first_run_completed()
         self._saved_settings["first_run_completed"] = True
 
         game_ready = bool(self.game_state.get("found"))
-        # On first launch, ignore any stale saved community runtime choice and
-        # use the highest-ranked discovered Proton. Manual choices remain valid
-        # after onboarding has been completed.
-        if game_ready and self.proton_combo.count():
-            self.proton_combo.blockSignals(True)
-            self.proton_combo.setCurrentIndex(0)
-            self.proton_combo.blockSignals(False)
-        proton_ready = bool(self.proton_combo.currentData())
-        if game_ready and proton_ready:
-            answer = QMessageBox.question(
-                self,
-                "Welcome to Wyrd",
-                "Wyrd found Skyrim Special Edition and a compatible Proton runtime. "
-                "Set up Wyrd using these detected settings?\n\n"
-                "This saves your game and Proton choices and points MO2 to Skyrim's "
-                "existing Steam compatdata folder. It will not install anything, "
-                "reset the prefix, or change game files.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
-            if answer == QMessageBox.StandardButton.Yes:
-                self._save_selection(self.proton_combo.currentIndex())
-                self.manage_mo2_library()
-                self.progress_label.setText("Wyrd environment configured.")
-                self._log("First-launch setup: saved detected Skyrim and Proton settings.")
-        else:
+        if not game_ready:
             QMessageBox.information(
                 self, "Welcome to Wyrd",
-                "Wyrd could not detect both Skyrim Special Edition and a compatible "
-                "Proton runtime yet. Install or locate them, then choose Refresh."
+                "Wyrd could not find Skyrim Special Edition yet. Install or locate it "
+                "through Steam, then use Refresh to try again."
             )
+            return
+        if not self.proton_builds:
+            QMessageBox.information(
+                self, "Welcome to Wyrd",
+                "Wyrd found Skyrim, but no compatible Proton runtime. Install one "
+                "through Steam or ProtonUp-Qt, then use Refresh."
+            )
+            return
+
+        # Use the ranked list as a sensible default, but always let the user
+        # choose. Never silently force a community or official runtime.
+        choices = [
+            f'{item["name"]} ({item["architecture"]})'
+            for item in self.proton_builds
+        ]
+        saved_path = self._saved_settings.get("proton")
+        default_index = next(
+            (i for i, item in enumerate(self.proton_builds)
+             if str(Path(item["path"]).expanduser()) == str(Path(saved_path).expanduser())),
+            0,
+        )
+        chosen, accepted = QInputDialog.getItem(
+            self, "Choose Proton for Wyrd",
+            "Which compatibility runtime should Wyrd use for Skyrim and MO2?",
+            choices, default_index, False,
+        )
+        if not accepted or not chosen:
+            self.progress_label.setText("Setup paused. Choose a Proton runtime when ready.")
+            return
+        selected_index = choices.index(chosen)
+        self.proton_combo.setCurrentIndex(selected_index)
+        self._save_selection(selected_index)
+
+        answer = QMessageBox.question(
+            self, "Welcome to Wyrd",
+            "Use the selected Skyrim and Proton settings?\n\n"
+            "Wyrd will use Skyrim's existing Steam compatdata folder. "
+            "It will not reset the prefix or change game files.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            self.progress_label.setText("Environment setup skipped. You can configure it later.")
+            return
+
+        self.manage_mo2_library()
+        self.progress_label.setText("Wyrd environment configured.")
+        self._log(
+            "First-launch setup: selected Proton "
+            + str(self.proton_combo.currentText())
+            + " for Skyrim."
+        )
 
         if self.mo2_state.get("installed"):
             answer = QMessageBox.question(
                 self, "Mod Organizer 2",
-                "MO2 is already installed in Skyrim's Proton prefix. "
-                "Would you like to launch it now?",
+                "MO2 is already installed in Skyrim's Proton prefix. Would you like to launch it now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
             )
@@ -462,14 +496,11 @@ class MainWindow(QMainWindow):
                 self.start_mo2()
             return
 
-        if not game_ready or not proton_ready:
-            return
         answer = QMessageBox.question(
             self, "Set up Mod Organizer 2?",
             "Would you like Wyrd to download and install the official Mod Organizer 2 "
             "into Skyrim's existing Steam compatdata prefix now?\n\n"
-            "You can skip this and launch unmodded Skyrim instead. You can install MO2 "
-            "later from Environment.",
+            "You can skip this and launch unmodded Skyrim instead. MO2 can be installed later.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
@@ -477,6 +508,38 @@ class MainWindow(QMainWindow):
             self.install_mo2(confirm=False)
         else:
             self.progress_label.setText("MO2 setup skipped. You can launch unmodded Skyrim.")
+
+    def test_selected_proton(self) -> None:
+        """Perform a non-destructive preflight of the selected Proton runtime."""
+        raw_path = self.proton_combo.currentData()
+        if not raw_path:
+            QMessageBox.warning(self, "Test Proton", "Choose a Proton runtime first.")
+            return
+        runtime = Path(str(raw_path)).expanduser()
+        executable = runtime / "proton"
+        problems = []
+        if runtime.is_symlink() or not runtime.is_dir():
+            problems.append("The runtime folder is missing or is a symlink.")
+        if executable.is_symlink() or not executable.is_file():
+            problems.append("The Proton launcher is missing or unsafe.")
+        elif not os.access(executable, os.X_OK):
+            problems.append("The Proton launcher is not executable.")
+        if not (runtime / "files").is_dir() and not (runtime / "dist").is_dir():
+            problems.append("The runtime payload folder (files or dist) is missing.")
+        if problems:
+            message = "Proton check failed:\n\n" + "\n".join(f"• {item}" for item in problems)
+            self.runtime_status.setText("Selected Proton needs attention.")
+            self._log("Proton preflight failed: " + "; ".join(problems))
+            QMessageBox.warning(self, "Proton check failed", message)
+            return
+        message = (
+            f"{self.proton_combo.currentText()} passed the local runtime check.\n\n"
+            "Wyrd found an executable Proton launcher and its runtime payload. "
+            "This check does not launch a game or prove that the runtime works in-game."
+        )
+        self.runtime_status.setText("Selected Proton passed the local runtime check.")
+        self._log("Proton preflight passed: " + str(runtime))
+        QMessageBox.information(self, "Proton check passed", message)
 
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
