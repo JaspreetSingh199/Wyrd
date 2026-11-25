@@ -293,8 +293,8 @@ def _initialize_prefix(proton: Path, steam_root: Path, prefix_root: Path,
     escaped = normalized.replace("\\", "\\\\")
     registry = (
         "Windows Registry Editor Version 5.00\n\n"
-        "[HKEY_LOCAL_MACHINE\\Software\\Bethesda Softworks\\Skyrim Special Edition]\n"
-        f'"Installed Path"="{escaped}"\n'
+        "[HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\\\Bethesda Softworks\\Skyrim Special Edition]\n"
+        f'"Install path"="{escaped}"\n'
     )
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".reg", delete=False) as handle:
         handle.write(registry)
