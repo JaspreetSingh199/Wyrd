@@ -60,8 +60,8 @@ def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root
         if manifest.is_symlink() or not manifest.is_file():
             raise RuntimeError("The detected Steam library has no safe Skyrim AppID manifest.")
         manifest_text = manifest.read_text(encoding="utf-8", errors="replace")
-        app_id_match = re.search(r'"appid"\\s+"([^"]+)"', manifest_text)
-        install_dir_match = re.search(r'"installdir"\\s+"([^"]+)"', manifest_text)
+        app_id_match = re.search(r'"appid"\s+"([^"]+)"', manifest_text)
+        install_dir_match = re.search(r'"installdir"\s+"([^"]+)"', manifest_text)
         if (not app_id_match or app_id_match.group(1) != APP_ID
                 or not install_dir_match or install_dir_match.group(1) != resolved_game.name):
             raise RuntimeError("The Steam AppID manifest does not identify the detected Skyrim directory.")
@@ -100,7 +100,7 @@ def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root
         return {
             "ok": True, "changed": changed, "drive": "S:",
             "library_root": str(library_root),
-            "windows_game_path": "S:\\\\steamapps\\\\common\\\\ " + resolved_game.name,
+            "windows_game_path": r"S:\steamapps\common\\" + resolved_game.name,
             "resolved_game_path": str(verified_game),
             "message": ("Corrected" if changed else "Verified") + " MO2 S: Steam-library mapping.",
         }
