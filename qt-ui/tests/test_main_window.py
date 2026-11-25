@@ -736,6 +736,11 @@ if __name__ == "__main__":
         }
         with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \
              patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \
+             patch("main._steam_root_for_game", return_value=Path("/steam")), \
+             patch("main.configure_steam_library_drive", return_value={
+                 "ok": True, "windows_game_path": r"S:\\steamapps\\common\\Skyrim Special Edition",
+                 "resolved_game_path": "/games/Skyrim Special Edition",
+             }), \
              patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory):
             window = self._window()
         self.assertFalse(window.install_button.isEnabled())
