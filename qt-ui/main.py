@@ -1324,8 +1324,8 @@ class MainWindow(QMainWindow):
             registered_instances = registry.get("instances", [])
             registered_installations = registry.get("installations", [])
             lines.append("")
-            lines.append(f"Wyrd-registered MO2 installations: {len(registered_installations)}")
-            lines.append(f"Wyrd-registered environments: {len(registered_instances)}")
+            lines.append(f"Legacy Wyrd installation records (not used for discovery/launch): {len(registered_installations)}")
+            lines.append(f"Legacy Wyrd environment records (not used for discovery/launch): {len(registered_instances)}")
             for item in registered_instances:
                 lines.append(
                     f"  • {item.get('display_name') or item.get('instance_name') or item.get('id')} "
