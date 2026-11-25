@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 import steamcompat
-from wyrd_mo2 import inspect_mo2_instances, copy_mo2_instance_to_prefix
+from wyrd_mo2 import inspect_mo2_instances, copy_mo2_instance_to_prefix, _steam_root_for_game
 
 
 def test_prefix_path_is_skyrim_appid():
@@ -328,6 +328,22 @@ def _make_steam_discovery_fixture(tmp_path):
     dosdevices = prefix / "pfx/dosdevices"
     dosdevices.mkdir()
     return steam, library, game, prefix, dosdevices
+
+
+def test_steam_root_resolver_finds_owner_of_secondary_library(tmp_path):
+    home = tmp_path / "home"
+    steam = home / ".steam/steam"
+    library = tmp_path / "Secondary Library"
+    game = library / "steamapps/common/Skyrim Special Edition"
+    game.mkdir(parents=True)
+    (steam / "steamapps").mkdir(parents=True)
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "' + str(steam) + '" } '
+        '"1" { "path" "' + str(library) + '" } }',
+        encoding="utf-8",
+    )
+
+    assert _steam_root_for_game(game, home) == steam.resolve()
 
 
 def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
