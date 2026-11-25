@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
-    launch_mo2, managed_paths,
+    managed_paths,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
@@ -456,8 +456,12 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(root)
         self._restore_registered_instance()
-        self.refresh_all()
         self._restoring_selection = False
+        # Let Qt paint the startup checklist before any filesystem/Steam scans
+        # begin. refresh_all updates each row as its read-only check completes.
+        self.precheck_status.setText("Preparing startup checks…")
+        self.precheck_progress.setFormat("Waiting…")
+        QTimer.singleShot(150, self.refresh_all)
         self._restore_saved_selection()
         self._save_selection(self.proton_combo.currentIndex())
         # Show onboarding only after initial detection and path population finish.
@@ -629,18 +633,39 @@ class MainWindow(QMainWindow):
                 "(read from /proc; may not reflect later runtime changes)"
             )
 
+    def _reset_precheck(self) -> None:
+        """Put the visible startup checklist into its pending state."""
+        labels = (
+            "Skyrim installation",
+            "Compatible Proton runtime",
+            "Skyrim Steam prefix and MO2 installation",
+            "MO2 instances",
+            "Active Wyrd environment",
+        )
+        self.precheck_progress.setRange(0, len(self.precheck_rows))
+        self.precheck_progress.setValue(0)
+        self.precheck_progress.setFormat("Checking…")
+        for checkbox, label in zip(self.precheck_rows, labels):
+            checkbox.setChecked(False)
+            checkbox.setText(f"{label} — PENDING")
+        self.precheck_status.setText("Checking Skyrim, Proton, MO2 and registered environments…")
+        QCoreApplication.processEvents()
+
     def _update_precheck(self, index: int, label: str, passed: bool | None, detail: str) -> None:
         """Update the visible startup checklist as each read-only check completes."""
         if index < 0 or index >= len(self.precheck_rows):
             return
         row = self.precheck_rows[index]
         row.setChecked(bool(passed))
-        row.setText(f"{label} — {'OK' if passed else 'NOT FOUND' if passed is False else 'SKIPPED'}")
+        state = "OK" if passed else "NOT FOUND" if passed is False else "SKIPPED"
+        row.setText(f"{label} — {state}")
         self.precheck_progress.setValue(index + 1)
+        self.precheck_progress.setFormat(f"{index + 1}/{len(self.precheck_rows)} checks")
         self.precheck_status.setText(detail)
         QCoreApplication.processEvents()
 
     def refresh_all(self) -> None:
+        self._reset_precheck()
         selected = self.proton_combo.currentData()
         self.game_state = detect_skyrim()
         saved_game = self._saved_settings.get("game_path")
@@ -792,10 +817,11 @@ class MainWindow(QMainWindow):
             "A registered environment is selected." if active
             else "No active environment selected yet. Connect or create an MO2 instance.",
         )
+        self.precheck_progress.setFormat("Checks complete")
         self.precheck_status.setText(
             "Startup checks complete. " +
             ("An active environment is ready for launch." if active
-             else "Install MO2 or connect an existing instance to continue.")
+             else "Some setup is still needed. Review the unchecked items above.")
         )
 
     def _restore_registered_instance(self) -> dict | None:
