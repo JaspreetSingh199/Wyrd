@@ -28,7 +28,7 @@ from wyrd_mo2 import (
     inspect_audio_compatibility, reset_wyrd_settings,
 )
 from steamcompat import (
-    install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
+    install_mo2_into_skyrim_prefix, configure_steam_library_drive, inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
     steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
@@ -836,6 +836,28 @@ class MainWindow(QMainWindow):
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
+        self.mo2_discovery_state = None
+        if self.mo2_state.get("installed") and self.game_state.get("found"):
+            try:
+                game_path = Path(self.game_state["game_dir"]).expanduser()
+                steam_root = _steam_root_for_game(game_path, Path.home())
+                self.mo2_discovery_state = configure_steam_library_drive(
+                    Path(self.mo2_state["prefix"]), game_path, steam_root
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                self.mo2_discovery_state = {"ok": False, "message": str(error)}
+            if self.mo2_discovery_state.get("ok"):
+                self._log(
+                    "MO2 Steam discovery: "
+                    + self.mo2_discovery_state["windows_game_path"]
+                    + " resolves to "
+                    + self.mo2_discovery_state["resolved_game_path"]
+                )
+            else:
+                self._log(
+                    "MO2 Steam discovery verification failed closed: "
+                    + self.mo2_discovery_state.get("message", "unknown mapping error")
+                )
         self._update_precheck(
             2, "Skyrim prefix and MO2 installation",
             bool(self.mo2_state.get("installed")),
@@ -920,18 +942,17 @@ class MainWindow(QMainWindow):
         self.manage_mo2_library()
         # A modded launch stays disabled until every startup check has completed.
         self.startup_checks_complete = True
-        # Registered instances own their own game/runtime selections and can
-        # launch even when Skyrim detection is empty, provided their own paths passed validation.
-        active = self._restore_registered_instance()
+        # Live MO2 inventory is authoritative; Wyrd registration is not required.
+        self._update_active_instance_from_scan()
+        active_ready = self.launch_game_button.isEnabled()
         self._update_precheck(
-            4, "Active Wyrd environment", bool(active and self.launch_game_button.isEnabled()),
-            "A registered environment is selected." if active
-            else "No active environment selected yet. Connect or create an MO2 instance.",
+            4, "Detected MO2 environment", active_ready,
+            self.active_instance_label.text(),
         )
         self.precheck_progress.setFormat("")
         self.precheck_status.setText(
             "Startup checks complete. " +
-            ("An active environment is ready for launch." if active
+            ("A detected MO2 instance is ready for launch." if active_ready
              else "Some setup is still needed. Review the unchecked items above.")
         )
 
