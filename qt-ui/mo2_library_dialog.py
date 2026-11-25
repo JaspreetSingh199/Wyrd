@@ -337,8 +337,50 @@ class Mo2LibraryDialog(QWidget):
             )
             return
 
+        # MO2's Bethesda game plugin reads the installed game directory from
+        # the Windows registry. Steam's stale S: mapping can otherwise win over
+        # the real Linux installation. Update only Skyrim SE's Installed Path
+        # value in this selected Proton prefix, after explicit user approval.
+        game_windows_path = "Z:" + str(resolved_game).replace("/", "\\\\")
+        answer = QMessageBox.question(
+            self, "Prepare Skyrim path for MO2",
+            "Wyrd can point Skyrim Special Edition's Bethesda registry entry in this "
+            "Proton prefix at the detected Linux game folder:\\n\\n"
+            f"{game_windows_path}\\n\\n"
+            "This changes only the 'Installed Path' registry value for Skyrim Special Edition "
+            "inside the selected Proton prefix. It does not change Steam library files, game "
+            "files, saves, or other registry entries. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
         env = _runtime_environment(proton.resolve(strict=True), steam_root.resolve(strict=True), prefix.resolve(strict=True))
-        command = [str((proton / "proton").resolve(strict=True)), "run", str(executable.resolve(strict=True)), "--pick"]
+        proton_wrapper = str((proton / "proton").resolve(strict=True))
+        registry_command = [
+            proton_wrapper, "run", "reg.exe", "add",
+            r"HKLM\\Software\\Bethesda Softworks\\Skyrim Special Edition",
+            "/v", "Installed Path", "/t", "REG_SZ", "/d", game_windows_path, "/f",
+        ]
+        try:
+            registry_result = subprocess.run(
+                registry_command, cwd=str(proton), env=env,
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=45,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            QMessageBox.warning(self, "Could not prepare Skyrim path", str(error))
+            return
+        if registry_result.returncode != 0:
+            detail = (registry_result.stderr or registry_result.stdout or "").strip()
+            QMessageBox.warning(
+                self, "Could not prepare Skyrim path",
+                "Proton could not update the Skyrim registry entry. MO2 was not launched.\\n\\n" + detail,
+            )
+            return
+
+        command = [proton_wrapper, "run", str(executable.resolve(strict=True)), "--pick"]
         try:
             logs = managed_paths()["root"] / "logs"
             logs.mkdir(parents=True, exist_ok=True)
