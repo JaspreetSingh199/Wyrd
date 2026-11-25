@@ -1083,7 +1083,6 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget.update_context(**context)
         self.mo2_advanced_widget.update_context(**context)
         self.mo2_advanced_widget._refresh_registered()
-        self.mo2_library_widget._refresh_connected()
 
     def _on_mo2_registry_changed(self, record: dict | None, changed: bool = False) -> None:
         if record:
@@ -1093,7 +1092,6 @@ class MainWindow(QMainWindow):
         self.mo2_advanced_widget.preferred_instance_id = self.selected_mo2_instance_id
         self.mo2_advanced_widget._refresh_registered()
         self.mo2_library_widget.preferred_instance_id = self.selected_mo2_instance_id
-        self.mo2_library_widget._refresh_connected()
         self._restore_registered_instance()
 
     def _restore_saved_selection(self) -> None:
