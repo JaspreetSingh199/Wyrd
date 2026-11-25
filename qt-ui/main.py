@@ -148,75 +148,6 @@ def panel(title: str, description: str) -> QFrame:
     return frame
 
 
-class MO2RequirementsInstallWorker(QThread):
-    """Install MO2's Windows prerequisites into Skyrim's existing Steam prefix."""
-    progress = Signal(str)
-    completed = Signal(dict)
-
-    def __init__(self, proton_path: str, game_path: str):
-        super().__init__()
-        self.proton_path = Path(proton_path).expanduser()
-        self.game_path = Path(game_path).expanduser()
-
-    def run(self) -> None:
-        try:
-            protontricks = shutil.which("protontricks")
-            if not protontricks:
-                raise RuntimeError(
-                    "protontricks was not found. Install it using your Linux distribution "
-                    "or Flatpak, then retry. No prefix was modified."
-                )
-            state = inspect_skyrim_prefix_mo2_installation(self.game_path)
-            if not state.get("installed"):
-                raise RuntimeError("Install and verify MO2 first. " + state.get("message", ""))
-            prefix = Path(state["prefix"]).expanduser()
-            steam_root = Path(state["steam_root"]).expanduser()
-            if prefix.is_symlink() or not (prefix / "pfx/drive_c").is_dir():
-                raise RuntimeError("Skyrim's existing Proton prefix is missing or unsafe.")
-            if not self.proton_path.is_dir() or not (self.proton_path / "proton").is_file():
-                raise RuntimeError(f"Selected Proton runtime is unavailable: {self.proton_path}")
-            env = os.environ.copy()
-            env["STEAM_COMPAT_DATA_PATH"] = str(prefix)
-            env["STEAM_DIR"] = str(steam_root)
-            env["PROTON_VERSION"] = self.proton_path.name
-
-            def run_verb(args: list[str], label: str) -> str:
-                self.progress.emit(label)
-                result = subprocess.run(
-                    [protontricks, "489830", *args],
-                    cwd=str(steam_root), env=env, stdin=subprocess.DEVNULL,
-                    capture_output=True, text=True, timeout=1800, check=False,
-                )
-                output = "\\n".join(
-                    part.strip() for part in (result.stdout, result.stderr) if part.strip()
-                )
-                if result.returncode:
-                    raise RuntimeError(f"{label} failed (exit {result.returncode}).\\n{output[-12000:]}")
-                return output
-
-            installed = run_verb(["list-installed"], "Checking installed MO2 prerequisites").lower()
-            details = []
-            if "vcrun2022" in installed:
-                details.append("Microsoft Visual C++ 2015–2022 runtime: already installed")
-            else:
-                run_verb(["-q", "vcrun2022"], "Installing Microsoft Visual C++ 2015–2022 x64 (14.40+)")
-                details.append("Microsoft Visual C++ 2015–2022 runtime: installed")
-            if "dotnet48" in installed:
-                details.append(".NET Framework 4.8: already installed")
-            else:
-                run_verb(["-q", "dotnet48"], "Installing .NET Framework 4.8 for FOMOD/OMOD")
-                details.append(".NET Framework 4.8: installed")
-            final = run_verb(["list-installed"], "Verifying MO2 prerequisites").lower()
-            missing = [name for name in ("vcrun2022", "dotnet48") if name not in final]
-            if missing:
-                raise RuntimeError("Protontricks did not confirm: " + ", ".join(missing) + "\\n" + final[-8000:])
-            self.completed.emit({"ok": True, "prefix": str(prefix), "details": details})
-        except subprocess.TimeoutExpired as error:
-            self.completed.emit({"ok": False, "message": f"Protontricks timed out: {error}"})
-        except Exception as error:
-            self.completed.emit({"ok": False, "message": str(error)})
-
-
 class SteamPrefixInstallWorker(QThread):
     progress = Signal(int, str)
     completed = Signal(dict)
@@ -503,22 +434,6 @@ class MainWindow(QMainWindow):
             "RECOVERY & MAINTENANCE",
             "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
         )
-        requirements_row = QHBoxLayout()
-        self.install_mo2_requirements_button = QPushButton("Install MO2 Requirements")
-        self.install_mo2_requirements_button.setToolTip(
-            "Install Microsoft Visual C++ 2015–2022 (14.40+) and .NET Framework 4.8 "
-            "inside Skyrim's existing AppID 489830 Proton prefix."
-        )
-        self.install_mo2_requirements_button.clicked.connect(self.install_mo2_requirements)
-        self.mo2_requirements_status = QLabel(
-            "Available after MO2 is installed. Uses Skyrim's existing Steam prefix."
-        )
-        self.mo2_requirements_status.setObjectName("muted")
-        self.mo2_requirements_status.setWordWrap(True)
-        requirements_row.addWidget(self.install_mo2_requirements_button)
-        requirements_row.addWidget(self.mo2_requirements_status, 1)
-        recovery_panel.layout().addLayout(requirements_row)
-
         maintenance_row = QHBoxLayout()
         self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
         self.reset_mo2_button.setToolTip(
@@ -1249,69 +1164,6 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         self._restore_registered_instance()
 
-    def install_mo2_requirements(self, *, automatic: bool = False) -> None:
-        """Install MO2's Windows prerequisites into Skyrim's existing Proton prefix."""
-        worker = getattr(self, "mo2_requirements_worker", None)
-        if worker is not None and worker.isRunning():
-            return
-        if not self.game_state.get("found"):
-            message = "Skyrim Special Edition was not detected."
-            self.mo2_requirements_status.setText(message)
-            if not automatic:
-                QMessageBox.warning(self, "MO2 requirements", message)
-            return
-        proton_path = self.proton_combo.currentData()
-        if not proton_path:
-            message = "Select a compatible Proton runtime first."
-            self.mo2_requirements_status.setText(message)
-            if not automatic:
-                QMessageBox.warning(self, "MO2 requirements", message)
-            return
-        state = inspect_skyrim_prefix_mo2_installation(Path(self.game_state["game_dir"]))
-        if not state.get("installed"):
-            message = "Install and verify MO2 first. " + state.get("message", "")
-            self.mo2_requirements_status.setText("Waiting for MO2 installation.")
-            if not automatic:
-                QMessageBox.information(self, "Install MO2 first", message)
-            return
-        if not shutil.which("protontricks"):
-            message = "Protontricks is required. Install it through your Linux distribution or Flatpak, then retry."
-            self.mo2_requirements_status.setText("Protontricks is missing.")
-            self._log(message)
-            if not automatic:
-                QMessageBox.warning(self, "Protontricks required", message)
-            return
-        self.mo2_requirements_worker = MO2RequirementsInstallWorker(
-            str(proton_path), self.game_state["game_dir"]
-        )
-        self.mo2_requirements_worker.progress.connect(self._on_mo2_requirements_progress)
-        self.mo2_requirements_worker.completed.connect(self._on_mo2_requirements_completed)
-        self.install_mo2_requirements_button.setEnabled(False)
-        self.mo2_requirements_status.setText("Preparing MO2 prerequisites…")
-        self._log("Installing MO2's Windows prerequisites in Skyrim AppID 489830 prefix.")
-        self.mo2_requirements_worker.start()
-
-    def _on_mo2_requirements_progress(self, message: str) -> None:
-        self.mo2_requirements_status.setText(message)
-        self._log(message)
-
-    def _on_mo2_requirements_completed(self, result: dict) -> None:
-        self.install_mo2_requirements_button.setEnabled(True)
-        if result.get("ok"):
-            details = "\\n".join(result.get("details", []))
-            self.mo2_requirements_status.setText("MO2 requirements installed and verified.")
-            self._log("MO2 Visual C++ and .NET prerequisites verified in Skyrim's prefix.")
-            QMessageBox.information(
-                self, "MO2 requirements ready",
-                "Both MO2 prerequisites are present in Skyrim's existing Proton prefix."
-                + ("\\n\\n" + details if details else ""),
-            )
-        else:
-            message = result.get("message", "Unknown Protontricks error.")
-            self.mo2_requirements_status.setText("Installation failed. See Setup Log.")
-            self._log("MO2 requirements failed: " + message)
-            QMessageBox.warning(self, "MO2 requirements failed", message)
-
     def check_mo2_installation(self) -> None:
         """Show a read-only inventory of Skyrim prefix, MO2 files and instances."""
         lines = []
@@ -1460,10 +1312,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, "MO2 installed",
                 result.get("message", "MO2 is ready.")
-                + "\n\nWyrd will now install MO2's Visual C++ and .NET prerequisites "
-                "into the same Skyrim Proton prefix.",
+                + "\n\nContinue by creating or connecting an MO2 instance.",
             )
-            self.install_mo2_requirements(automatic=True)
         else:
             self.progress_label.setText("Setup stopped. Review the log for details.")
             self._log("MO2 setup failed: " + result.get("message", "Unknown error"))
