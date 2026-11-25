@@ -28,18 +28,37 @@ def steam_compat_prefix(steam_root: Path) -> Path:
     return Path(steam_root).expanduser() / "steamapps/compatdata" / APP_ID
 
 
+def _reject_symlinked_path_components(path: Path, label: str) -> Path:
+    """Return an absolute lexical path after rejecting symlinks in every component.
+
+    Do this before resolve(): resolving first would erase evidence that an
+    ancestor in the caller-supplied path traversed a symlink.
+    """
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        raise RuntimeError(f"The {label} path must be absolute.")
+    if ".." in candidate.parts:
+        raise RuntimeError(f"The {label} path contains a parent-directory component.")
+    current = Path(candidate.anchor)
+    for part in candidate.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            raise RuntimeError(
+                f"The {label} path contains a symlinked component: {current}"
+            )
+    return candidate
+
+
 def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root: Path) -> dict:
     """Make S: inside Skyrim's AppID prefix resolve to the detected game library.
 
     Only the S: dosdevices symlink is changed. The game, Steam manifests,
     saves, and other prefix entries are never modified.
     """
-    prefix = Path(prefix_root).expanduser()
-    game = Path(game_path).expanduser()
-    steam = Path(steam_root).expanduser()
     try:
-        if any(path.is_symlink() for path in (prefix, steam, game)):
-            raise RuntimeError("The selected Steam prefix, client root, or game path is symlinked; S: mapping was not changed.")
+        prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
+        game = _reject_symlinked_path_components(Path(game_path), "Skyrim game")
+        steam = _reject_symlinked_path_components(Path(steam_root), "Steam client root")
         resolved_prefix = prefix.resolve(strict=True)
         resolved_steam = steam.resolve(strict=True)
         expected_prefix = steam_compat_prefix(resolved_steam).resolve(strict=True)
