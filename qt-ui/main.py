@@ -269,13 +269,6 @@ class MainWindow(QMainWindow):
         runtime_row.addWidget(self.proton_combo, 1)
         runtime_row.addWidget(self.refresh_button)
         runtime_layout.addLayout(runtime_row)
-        runtime_actions = QHBoxLayout()
-        self.test_proton_button = QPushButton("Test selected Proton")
-        self.test_proton_button.setObjectName("secondaryAction")
-        self.test_proton_button.clicked.connect(self.test_selected_proton)
-        runtime_actions.addWidget(self.test_proton_button)
-        runtime_actions.addStretch(1)
-        runtime_layout.addLayout(runtime_actions)
         self.runtime_status = QLabel("Looking for Proton…")
         self.runtime_status.setObjectName("muted")
         self.runtime_status.setWordWrap(True)
@@ -374,6 +367,19 @@ class MainWindow(QMainWindow):
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
 
+        proton_diagnostics_panel = panel(
+            "PROTON DIAGNOSTICS",
+            "Run a local, non-destructive check of the selected Proton runtime. This does not launch Skyrim or prove in-game compatibility."
+        )
+        proton_diagnostics_row = QHBoxLayout()
+        self.test_proton_button = QPushButton("Test selected Proton")
+        self.test_proton_button.setObjectName("secondaryAction")
+        self.test_proton_button.clicked.connect(self.test_selected_proton)
+        proton_diagnostics_row.addWidget(self.test_proton_button)
+        proton_diagnostics_row.addStretch(1)
+        proton_diagnostics_panel.layout().addLayout(proton_diagnostics_row)
+        advanced_layout.addWidget(proton_diagnostics_panel)
+
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
             "Advanced diagnostics only. A library inventory cannot prove in-game audio; verify dialogue and music in Skyrim.",
@@ -443,7 +449,7 @@ class MainWindow(QMainWindow):
         maintenance_row.addWidget(self.reset_mo2_button)
         self.reset_settings_button = QPushButton("Reset Wyrd Settings")
         self.reset_settings_button.setToolTip(
-            "Clears Wyrd's saved preferences and lets you run first-launch setup again. Does not reset or remove MO2."
+            "Resets Wyrd preferences. Existing MO2 registrations and the active environment are preserved; first-launch setup appears on the next application launch."
         )
         self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
         maintenance_row.addWidget(self.reset_settings_button)
@@ -1085,7 +1091,8 @@ class MainWindow(QMainWindow):
             self, "Reset Wyrd Settings",
             "Reset Wyrd's preferences to their defaults?\n\n"
             "This does NOT uninstall Wyrd or remove MO2, its registrations, Skyrim, "
-            "Steam compatdata, game files or saves. First-launch setup will appear next time you start Wyrd.",
+            "Steam compatdata, game files or saves. Existing MO2 registrations and the active environment are preserved. "
+            "First-launch setup will appear next time you start Wyrd.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
