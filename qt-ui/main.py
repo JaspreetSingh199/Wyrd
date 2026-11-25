@@ -435,9 +435,9 @@ class MainWindow(QMainWindow):
             "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
         )
         maintenance_row = QHBoxLayout()
-        self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
+        self.reset_mo2_button = QPushButton("Remove MO2")
         self.reset_mo2_button.setToolTip(
-            "Resets only a verified Wyrd-managed installation. External MO2 installations are never reset."
+            "Removes a verified Wyrd-managed MO2 installation and its registered instances. Skyrim and its Steam prefix are preserved."
         )
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         maintenance_row.addWidget(self.reset_mo2_button)
@@ -1134,14 +1134,14 @@ class MainWindow(QMainWindow):
         )
         if not state.get("installed") or not state.get("managed", True):
             QMessageBox.information(
-                self, "Nothing to reset",
+                self, "MO2 cannot be be removed",
                 "Wyrd could not verify a Wyrd-managed MO2 installation. External or unverified installations will not be removed.",
             )
             return
         install = state.get("install", "Wyrd-managed MO2 directory")
         answer = QMessageBox.warning(
-            self, "Reset Wyrd-managed MO2?",
-            "This permanently removes Wyrd's verified MO2 installation and registered global instances. "
+            self, "Remove Wyrd-managed MO2?",
+            "This permanently removes Wyrd's verified MO2 installation and its registered instances. "
             "Instance-local modding data is removed with those instances. Custom storage outside the instance folders is preserved.\n\n"
             "It will also clear Wyrd's registry entries and active instance selection for this installation.\n\n"
             "NEVER DELETED: Skyrim's Steam compatdata/489830 prefix, Skyrim/game files, saves, external MO2 installations, "
@@ -1153,14 +1153,14 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         result = reset_wyrd_mo2(game_path=Path(self.game_state["game_dir"]))
-        self._log(result.get("message", "MO2 reset attempted."))
+        self._log(result.get("message", "MO2 removal attempted."))
         if result.get("ok"):
             self.selected_mo2_instance_id = ""
             self._saved_settings.pop("selected_mo2_instance_id", None)
-            self.progress_label.setText("Wyrd-managed MO2 reset complete.")
-            QMessageBox.information(self, "MO2 reset complete", result["message"])
+            self.progress_label.setText("Wyrd-managed MO2 removed.")
+            QMessageBox.information(self, "MO2 removed", result["message"])
         else:
-            QMessageBox.warning(self, "MO2 reset incomplete", result.get("message", "Reset failed safely."))
+            QMessageBox.warning(self, "MO2 removal incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
         self._restore_registered_instance()
 
