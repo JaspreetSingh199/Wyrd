@@ -343,6 +343,21 @@ def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
     assert Path(result["resolved_game_path"]) == game.resolve()
 
 
+def test_s_drive_mapping_is_idempotent_when_library_is_already_mapped(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    link = dosdevices / "s:"
+    link.symlink_to(library, target_is_directory=True)
+    original_target = link.resolve()
+
+    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
+
+    assert result["ok"], result
+    assert result["changed"] is False
+    assert link.is_symlink()
+    assert link.resolve() == original_target == library.resolve()
+    assert result["windows_game_path"] == r"S:\steamapps\common\Skyrim Special Edition"
+
+
 def test_s_drive_mapping_refuses_non_symlink_entry(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
     (dosdevices / "s:").write_text("leave me alone", encoding="utf-8")
