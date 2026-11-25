@@ -41,7 +41,7 @@ class Mo2LibraryDialog(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
-        self.intro = QLabel("Connect an existing MO2 instance. Your files will not be changed.")
+        self.intro = QLabel("Your Skyrim environments. Each one keeps its own MO2 instance and mod setup.")
         self.intro.setWordWrap(True)
         layout.addWidget(self.intro)
         self.setup_status = QLabel()
@@ -49,12 +49,13 @@ class Mo2LibraryDialog(QWidget):
         self.setup_status.setWordWrap(True)
         layout.addWidget(self.setup_status)
 
-        self.discover_button = QPushButton("Find existing MO2")
+        self.discover_button = QPushButton("+ Add environment")
         self.discover_button.clicked.connect(self.discover)
         layout.addWidget(self.discover_button, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.connected_instances = QListWidget()
-        self.connected_instances.setMaximumHeight(90)
+        self.connected_instances.setMinimumHeight(90)
+        self.connected_instances.setMaximumHeight(190)
         self.connected_instances.currentRowChanged.connect(self._select_connected)
         self.connected_instances.hide()
         layout.addWidget(self.connected_instances)
@@ -104,11 +105,11 @@ class Mo2LibraryDialog(QWidget):
         elif self.connected_records:
             self.setup_status.setText(f"{len(self.connected_records)} MO2 instance(s) connected. Choose one below.")
         if self.connected_records:
-            if len(self.connected_records) > 1:
+            if self.connected_records:
                 self.connected_instances.clear()
                 for item in self.connected_records:
                     game = games.get(item.get("game_id"), {})
-                    label = f"{item.get('display_name') or game.get('name', 'MO2')} · {item.get('instance_type', 'instance')}"
+                    label = f"{item.get('display_name') or Path(item.get('instance_path', '')).name or game.get('name', 'MO2')}  ·  {item.get('instance_type', 'instance').title()}"
                     if item.get("id") == self.preferred_instance_id:
                         label += " · Active"
                     row = QListWidgetItem(label)
@@ -127,7 +128,7 @@ class Mo2LibraryDialog(QWidget):
             else:
                 self.connected_instances.hide()
         else:
-            self.setup_status.setText("Not connected")
+            self.setup_status.setText("No environments connected yet. Add an existing MO2 instance to get started.")
             self.connected_instances.hide()
 
     def _select_connected(self, row: int):
