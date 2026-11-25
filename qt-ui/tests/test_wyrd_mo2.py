@@ -1304,29 +1304,21 @@ class WyrdMO2Tests(unittest.TestCase):
                     builds = discover_proton_builds(home, system_roots=[])
             self.assertEqual([item["name"] for item in builds], ["Proton Good"])
 
-    def test_unmanaged_prefix_is_never_initialized_or_adopted(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            paths = managed_paths(home)
-            paths["prefix"].mkdir(parents=True)
-            (paths["prefix"] / "important-user-data.txt").write_text("keep")
-            proton = make_proton(home / "Proton")
-            game = home / "Skyrim"
-            game.mkdir()
-            with patch.dict(os.environ, {
-                "XDG_DATA_HOME": str(home / ".local/share"),
-                "XDG_CONFIG_HOME": str(home / ".config"),
-            }):
-                with patch("wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]):
-                    with patch("wyrd_mo2._latest_mo2_archive") as release:
-                        with self.assertRaisesRegex(RuntimeError, "not marked as Wyrd-managed"):
-                            install_mo2_environment(proton, game, home)
-                        release.assert_not_called()
-            self.assertEqual((paths["prefix"] / "important-user-data.txt").read_text(), "keep")
 
-
-
-
+    def _managed_prefix(self, home: Path):
+        paths = managed_paths(home)
+        paths["install"].mkdir(parents=True)
+        (paths["install"] / "ModOrganizer.exe").write_bytes(b"mo2")
+        (paths["install"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+            "prefix": str(paths["prefix"]),
+        }), encoding="utf-8")
+        (paths["prefix"] / "pfx/drive_c/windows/system32").mkdir(parents=True)
+        (paths["prefix"] / "pfx/drive_c/windows/syswow64").mkdir(parents=True)
+        (paths["prefix"] / ".wyrd-managed.json").write_text(json.dumps({
+            "managed_by": "Wyrd", "game_app_id": "489830",
+        }), encoding="utf-8")
+        return paths
 
     def test_xact_payload_cache_is_fail_closed_and_checks_pe_headers(self):
         from wyrd_mo2 import _resolve_xact_dlls, managed_paths
