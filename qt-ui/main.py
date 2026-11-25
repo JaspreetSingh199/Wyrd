@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QInputDialog, QDialog,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QInputDialog, QDialog,
     QWidget, QTabWidget, QScrollArea,
 )
 
@@ -25,7 +25,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
-    inspect_audio_compatibility, reset_mo2_compatdata, reset_wyrd_settings,
+    inspect_audio_compatibility, reset_wyrd_settings,
 )
 from steamcompat import (
     install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
@@ -1054,40 +1054,6 @@ class MainWindow(QMainWindow):
             self.audio_detail.setText(f"Audio inspection failed: {error}")
         finally:
             self.audio_check_button.setEnabled(True)
-
-    def reset_mo2_prefix(self) -> None:
-        """Reset only Wyrd-owned MO2 compatdata after two explicit confirmations."""
-        prefix = managed_paths()["prefix"]
-        if not prefix.exists() or prefix.is_symlink():
-            QMessageBox.warning(self, "Reset MO2 compatdata", "The managed MO2 prefix is absent or unsafe to reset.")
-            return
-        first = QMessageBox.warning(
-            self, "Nuke MO2 Compatdata",
-            "This permanently deletes Wyrd's MO2 Proton compatdata (prefix), including its Wine settings and installed Windows components.\n\n"
-            "It does NOT delete Wyrd's MO2 installation files, Skyrim, Steam compatdata, mods stored outside the prefix, or your game files. "
-            "MO2 may need to be configured again after reset.\n\nProceed?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if first != QMessageBox.StandardButton.Yes:
-            return
-        second = QMessageBox.question(
-            self, "Final confirmation — delete MO2 prefix",
-            f"Delete this Wyrd-managed prefix now?\n\n{prefix}\n\nThis cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if second != QMessageBox.StandardButton.Yes:
-            return
-        result = reset_mo2_compatdata(confirmed=True)
-        self._log(result.get("message", "MO2 compatdata reset attempted."))
-        if result.get("ok"):
-            self.progress_label.setText("MO2 compatdata removed. Use Repair MO2 runtime to recreate it.")
-            QMessageBox.information(self, "MO2 compatdata reset", result["message"])
-        else:
-            QMessageBox.warning(self, "MO2 compatdata reset failed", result.get("message", "Reset failed."))
-        self.refresh_all()
-
 
     def reset_wyrd_preferences(self) -> None:
         """Restore defaults now and leave first-run onboarding for the next app launch."""
