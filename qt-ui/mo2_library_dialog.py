@@ -431,10 +431,10 @@ class Mo2LibraryDialog(QWidget):
 
         env = _runtime_environment(proton.resolve(strict=True), steam_root.resolve(strict=True), prefix.resolve(strict=True))
         proton_wrapper = str((proton / "proton").resolve(strict=True))
+        registry_key = r"HKLM\Software\WOW6432Node\Bethesda Softworks\Skyrim Special Edition"
         registry_command = [
-            proton_wrapper, "run", "reg.exe", "add",
-            r"HKLM\Software\Bethesda Softworks\Skyrim Special Edition",
-            "/v", "Installed Path", "/t", "REG_SZ", "/d", game_windows_path, "/f",
+            proton_wrapper, "run", "reg.exe", "add", registry_key,
+            "/v", "Install path", "/t", "REG_SZ", "/d", game_windows_path, "/f",
         ]
         try:
             registry_result = subprocess.run(
@@ -450,6 +450,29 @@ class Mo2LibraryDialog(QWidget):
             QMessageBox.warning(
                 self, "Could not prepare Skyrim path",
                 "Proton could not update the Skyrim registry entry. MO2 was not launched.\\n\\n" + detail,
+            )
+            return
+
+        verify_command = [
+            proton_wrapper, "run", "reg.exe", "query", registry_key,
+            "/v", "Install path",
+        ]
+        try:
+            verified = subprocess.run(
+                verify_command, cwd=str(proton), env=env,
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=45,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            QMessageBox.warning(self, "Could not verify Skyrim path", str(error))
+            return
+        observed = (verified.stdout or "").replace("/", "\\\\").casefold()
+        expected = game_windows_path.replace("/", "\\\\").casefold()
+        if verified.returncode != 0 or expected not in observed:
+            detail = (verified.stderr or verified.stdout or "Registry value did not match the detected game directory.").strip()
+            QMessageBox.warning(
+                self, "Could not verify Skyrim path",
+                "The Skyrim registry path could not be verified. MO2 was not launched.\\n\\n" + detail,
             )
             return
 
