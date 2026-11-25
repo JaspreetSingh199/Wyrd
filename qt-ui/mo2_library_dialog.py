@@ -232,7 +232,7 @@ class Mo2LibraryDialog(QWidget):
             self.selection_changed = was_active
             self._refresh_connected()
             if callable(self.on_registry_changed) and (self.selected_instance_record or was_active):
-                self.on_registry_changed(self.selected_instance_record, False)
+                self.on_registry_changed(self.selected_instance_record, was_active and self.selected_instance_record is None)
             self.setup_status.setText(
                 "Environment disconnected. Wyrd registration metadata was removed; all files were left untouched."
             )
