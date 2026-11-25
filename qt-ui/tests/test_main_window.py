@@ -594,7 +594,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "message": "Verified Wyrd-managed MO2 installation.",
         })
         self.assertFalse(window.install_button.isEnabled())
-        self.assertTrue(window.use_existing_mo2_button.isHidden())
+        self.assertTrue(window.use_existing_mo2_button.isVisible())
         window.close()
 
     def test_install_completion_rejects_failed_post_install_verification(self):
