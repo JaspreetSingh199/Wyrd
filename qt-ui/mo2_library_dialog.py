@@ -220,7 +220,8 @@ class Mo2AdvancedSettings(QWidget):
         )
         self.detected_instances = QListWidget()
         self.detected_instances.setMinimumHeight(120)
-        self.detected_instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.detected_instances.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.detected_instances.currentRowChanged.connect(self._select_detected_instance)
         instances_layout.addWidget(self.detected_instances, 1)
         self.detected_instances_summary = QLabel("Instances are scanned automatically.")
         self.detected_instances_summary.setObjectName("muted")
@@ -236,6 +237,13 @@ class Mo2AdvancedSettings(QWidget):
             storage_page,
             "Configure this instance's storage locations. Shared-folder controls are hidden in V1; existing settings are preserved."
         )
+        self.storage_compatibility_note = QLabel(
+            "Storage editing is available only for previously managed instances with verified Wyrd metadata. "
+            "Unregistered MO2 instances remain fully discoverable and launchable without registration."
+        )
+        self.storage_compatibility_note.setObjectName("muted")
+        self.storage_compatibility_note.setWordWrap(True)
+        storage_layout.addWidget(self.storage_compatibility_note)
         storage_box=QGroupBox("Storage folders")
         storage_form=QFormLayout(storage_box)
         self.storage_fields={}; self.storage_browse_buttons={}
@@ -296,6 +304,39 @@ class Mo2AdvancedSettings(QWidget):
             {x["id"]: x for x in registry["runtimes"]},
         )
 
+    def _select_detected_instance(self, row: int) -> None:
+        item = self.detected_instances.item(row) if row >= 0 else None
+        instance = item.data(Qt.ItemDataRole.UserRole) if item else None
+        self.selected_instance_record = None
+        if isinstance(instance, dict):
+            instance_path = os.path.normcase(os.path.realpath(instance.get("path", "")))
+            try:
+                legacy_records = self.service.load().get("instances", [])
+            except Exception:
+                legacy_records = []
+            self.selected_instance_record = next(
+                (record for record in legacy_records
+                 if os.path.normcase(os.path.realpath(record.get("instance_path", ""))) == instance_path),
+                None,
+            )
+        managed = False
+        if self.selected_instance_record:
+            try:
+                installations = {item["id"]: item for item in self.service.load().get("installations", [])}
+                managed = installations.get(self.selected_instance_record.get("installation_id"), {}).get("owner") == "wyrd"
+            except Exception:
+                managed = False
+        self.storage_compatibility_note.setText(
+            "Storage editing is available for this previously managed instance."
+            if managed else
+            "This instance is discovered directly from MO2. Its storage settings remain untouched; "
+            "Wyrd registration is not required for discovery or launch."
+        )
+        for button in self.storage_browse_buttons.values():
+            button.setEnabled(managed)
+        self.apply_storage_button.setEnabled(managed)
+        self.restore_storage_button.setEnabled(managed)
+
     def _refresh_registered(self, _index: int = -1) -> None:
         """Compatibility hook: refresh the live MO2 inventory, not registrations."""
         self._refresh_detected_instances()
@@ -319,8 +360,11 @@ class Mo2AdvancedSettings(QWidget):
         for instance in instances:
             name = instance.get("name", "Unnamed MO2 instance")
             profile = instance.get("selected_profile") or "No profile selected"
-            widget.addItem(f"{name} · {profile}")
+            row = QListWidgetItem(f"{name} · {profile}")
+            row.setData(Qt.ItemDataRole.UserRole, instance)
+            widget.addItem(row)
         if instances:
+            widget.setCurrentRow(0)
             summary.setText(
                 f"Automatically discovered {len(instances)} Skyrim Special Edition instance(s). "
                 "The scan reads MO2 directly; it does not create Wyrd registration records."
