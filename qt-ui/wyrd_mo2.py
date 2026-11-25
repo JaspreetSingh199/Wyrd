@@ -762,6 +762,32 @@ def read_settings(home: Path | None = None) -> dict:
         result["selected_mo2_instance_id"] = selected_instance.strip()
     return result
 
+def reset_wyrd_settings(home: Path | None = None) -> dict:
+    """Clear only Wyrd's GUI preferences; preserve MO2, registry, game and Steam data."""
+    paths = managed_paths(home)
+    config = paths["config"]
+    settings = paths["settings"]
+    if config.is_symlink() or settings.is_symlink():
+        return {"ok": False, "message": "Wyrd settings path is symlinked; nothing was changed."}
+    try:
+        config_resolved = config.resolve(strict=True)
+        settings.parent.resolve(strict=True)
+        if settings.parent.resolve(strict=True) != config_resolved:
+            return {"ok": False, "message": "Wyrd settings path is outside its configuration folder."}
+        if settings.exists():
+            if not settings.is_file():
+                return {"ok": False, "message": "Wyrd settings is not a regular file; nothing was changed."}
+            settings.unlink()
+        return {
+            "ok": True,
+            "message": "Wyrd preferences cleared. MO2 files, registrations, Skyrim and Steam data were left untouched.",
+        }
+    except FileNotFoundError:
+        return {"ok": True, "message": "Wyrd preferences were already clear."}
+    except OSError as error:
+        return {"ok": False, "message": f"Could not clear Wyrd preferences: {error}"}
+
+
 def mark_first_run_completed(home: Path | None = None) -> None:
     """Persist that the first-launch choices have been presented."""
     paths = managed_paths(home)
