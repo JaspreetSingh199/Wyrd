@@ -761,12 +761,14 @@ class MainWindow(QMainWindow):
                        if item.get("id") == self.selected_mo2_instance_id), None)
         if not record:
             self.active_instance_label.setText(
-                "MO2 is not connected to Wyrd yet. Find an instance and choose Add to Wyrd."
+                "MO2 is not connected to Wyrd yet. Choose Use Existing MO2 to find it."
             )
             if hasattr(self, "launch_game_button"):
                 self.launch_game_button.setEnabled(False)
             if hasattr(self, "launch_button"):
                 self.launch_button.hide()
+            if hasattr(self, "use_existing_mo2_button"):
+                self.use_existing_mo2_button.show()
             return None
         games = {item["id"]: item for item in registry["games"]}
         installations = {item["id"]: item for item in registry["installations"]}
@@ -808,6 +810,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "launch_button"):
             self.launch_button.setVisible(ready)
             self.launch_button.setEnabled(ready and not bool(self.worker and self.worker.isRunning()))
+        if hasattr(self, "use_existing_mo2_button"):
+            self.use_existing_mo2_button.setVisible(not ready)
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
