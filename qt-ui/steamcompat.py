@@ -161,12 +161,12 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
             raise RuntimeError("Selected Proton runtime is missing or unsafe.")
 
         library_root = resolved_game.parent.parent.parent
-        windows_path = "S:" + str(resolved_game.relative_to(library_root)).replace("/", "\\\\")
-        registry_path = windows_path.replace("\\\\", "\\\\\\\\")
+        windows_path = "S:" + str(resolved_game.relative_to(library_root)).replace("/", "\\")
+        registry_path = windows_path.replace("\\", "\\\\")
         reg_text = (
-            "Windows Registry Editor Version 5.00\\n\\n"
-            "[HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\WOW6432Node\\\\Bethesda Softworks\\\\Skyrim Special Edition]\\n"
-            f'"Installed Path"="{registry_path}\\\\\\n'
+            "Windows Registry Editor Version 5.00\n\n"
+            "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition]\n"
+            f'"Installed Path"="{registry_path}\\\n'
         )
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".reg", delete=False) as handle:
             handle.write(reg_text)
