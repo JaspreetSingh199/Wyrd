@@ -1856,6 +1856,15 @@ class MainWindow(QMainWindow):
         prefix: Path, install_root: Path, proton: Path, require_managed: bool,
         steam_root: Path | None = None,
     ) -> None:
+        discovery = getattr(self, "mo2_discovery_state", None)
+        if not discovery or not discovery.get("ok"):
+            QMessageBox.warning(
+                self, "MO2 game discovery is not verified",
+                "Wyrd has not verified the Skyrim S: Steam-library mapping. "
+                "The modded launch is blocked until a successful refresh.\\n\\n"
+                + (discovery or {}).get("message", "No verified Steam discovery result is available."),
+            )
+            return
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
