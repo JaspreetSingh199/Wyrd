@@ -6,8 +6,8 @@ if [[ ! -x "${PYTHON}" ]]; then
   echo "Wyrd's virtual environment is missing. Run qt-ui/run.sh first." >&2
   exit 1
 fi
-if ! "${PYTHON}" -c 'import PySide6, py7zr' >/dev/null 2>&1; then
-  echo "Installing Wyrd's Python requirements separately from the MO2 application files…"
+if ! "${PYTHON}" -c 'import PySide6' >/dev/null 2>&1; then
+  echo "Installing Wyrd's Python requirements…"
   "${PYTHON}" -m pip install --upgrade -r "${SCRIPT_DIR}/requirements.txt"
 else
   echo "Wyrd's Python requirements are already installed."
