@@ -339,7 +339,7 @@ def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
     assert result["ok"], result
     assert result["changed"] is True
     assert (dosdevices / "s:").resolve() == library.resolve()
-    assert result["windows_game_path"] == r"S:\\steamapps\\common\\Skyrim Special Edition"
+    assert result["windows_game_path"] == r"S:\steamapps\common\Skyrim Special Edition"
     assert Path(result["resolved_game_path"]) == game.resolve()
 
 
