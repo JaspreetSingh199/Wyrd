@@ -621,7 +621,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         })
         self.assertFalse(window.install_button.isEnabled())
         self.assertFalse(window.launch_button.isEnabled())
-        self.assertFalse(window.use_existing_mo2_button.isHidden())
+        self.assertTrue(window.use_existing_mo2_button.isHidden())
         window.close()
 
     def test_install_completion_rejects_failed_post_install_verification(self):
