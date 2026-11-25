@@ -658,23 +658,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(window.launch_game_button.isEnabled())
         window.close()
 
-    def test_first_launch_yes_configures_detected_environment_and_offers_mo2_install(self):
-        window = self._window()
-        yes = QMessageBox.StandardButton.Yes
-        with patch("main.mark_first_run_completed") as mark, patch(
-            "main.QMessageBox.question", side_effect=[yes, yes]
-        ), patch.object(window, "_save_selection") as save, patch.object(
-            window, "manage_mo2_library"
-        ) as sync, patch.object(window, "install_mo2") as install:
-            window._run_first_launch_setup()
-        mark.assert_called_once()
-        save.assert_called_once()
-        sync.assert_called_once()
-        install.assert_called_once_with(confirm=False)
-        self.assertTrue(window._saved_settings["first_run_completed"])
-        window.close()
-
-    def test_first_launch_overrides_saved_community_runtime_with_preferred_official_proton(self):
+    def test_first_launch_lets_user_choose_proton_before_environment_setup(self):
         official = {
             "name": "Proton - Experimental",
             "path": "/steam/steamapps/common/Proton - Experimental",
@@ -685,20 +669,47 @@ class MainWindowSmokeTests(unittest.TestCase):
             "path": "/steam/compatibilitytools.d/Proton-CachyOS Latest",
             "architecture": "x86_64",
         }
-        window = self._window(
-            builds=[official, cachyos],
-            settings={"proton": cachyos["path"]},
-        )
+        window = self._window(builds=[official, cachyos], settings={"proton": official["path"]})
         yes = QMessageBox.StandardButton.Yes
-        with patch("main.mark_first_run_completed"), patch(
-            "main.QMessageBox.question", side_effect=[yes, yes]
-        ), patch.object(window, "_save_selection") as save, patch.object(
-            window, "manage_mo2_library"
-        ), patch.object(window, "install_mo2") as install:
+        chosen = "Proton-CachyOS Latest (x86_64)"
+        with patch("main.mark_first_run_completed") as mark, patch(
+            "main.QInputDialog.getItem", return_value=(chosen, True)
+        ), patch("main.QMessageBox.question", side_effect=[yes, yes]), patch.object(
+            window, "_save_selection"
+        ) as save, patch.object(window, "manage_mo2_library"), patch.object(
+            window, "install_mo2"
+        ) as install:
             window._run_first_launch_setup()
-        self.assertEqual(window.proton_combo.currentData(), official["path"])
+        self.assertEqual(window.proton_combo.currentData(), cachyos["path"])
+        mark.assert_called_once()
         save.assert_called_once()
         install.assert_called_once_with(confirm=False)
+        window.close()
+
+    def test_cancelled_first_launch_runtime_choice_does_not_mark_setup_complete(self):
+        window = self._window()
+        with patch("main.mark_first_run_completed") as mark, patch(
+            "main.QInputDialog.getItem", return_value=("", False)
+        ):
+            window._run_first_launch_setup()
+        mark.assert_not_called()
+        self.assertFalse(window._saved_settings.get("first_run_completed", False))
+        window.close()
+
+    def test_test_selected_proton_reports_valid_runtime_without_launching_game(self):
+        window = self._window()
+        runtime = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(runtime, ignore_errors=True))
+        launcher = runtime / "proton"
+        launcher.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+        launcher.chmod(0o755)
+        (runtime / "files").mkdir()
+        window.proton_combo.addItem("Test runtime", str(runtime))
+        window.proton_combo.setCurrentIndex(window.proton_combo.count() - 1)
+        with patch("main.QMessageBox.information") as info:
+            window.test_selected_proton()
+        info.assert_called_once()
+        self.assertIn("passed", window.runtime_status.text())
         window.close()
 
     def test_first_launch_can_skip_mo2_install_and_keep_unmodded_path(self):
@@ -706,8 +717,10 @@ class MainWindowSmokeTests(unittest.TestCase):
         yes = QMessageBox.StandardButton.Yes
         no = QMessageBox.StandardButton.No
         with patch("main.mark_first_run_completed"), patch(
-            "main.QMessageBox.question", side_effect=[yes, no]
-        ), patch.object(window, "install_mo2") as install:
+            "main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)
+        ), patch("main.QMessageBox.question", side_effect=[yes, no]), patch.object(
+            window, "install_mo2"
+        ) as install:
             window._run_first_launch_setup()
         install.assert_not_called()
         self.assertIn("MO2 setup skipped", window.progress_label.text())
@@ -720,8 +733,10 @@ class MainWindowSmokeTests(unittest.TestCase):
             "prefix": "/steam/compatdata/489830",
         })
         with patch("main.mark_first_run_completed"), patch(
-            "main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes
-        ), patch.object(window, "start_mo2") as launch:
+            "main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)
+        ), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch.object(
+            window, "start_mo2"
+        ) as launch:
             window._run_first_launch_setup()
         launch.assert_called_once()
         window.close()
