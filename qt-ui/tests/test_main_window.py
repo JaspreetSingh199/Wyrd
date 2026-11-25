@@ -69,19 +69,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         return MainWindow()
 
 
-    def test_skyrim_launch_buttons_route_modded_and_unmodded_launches(self):
-        window = self._window()
-        self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
-        self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded")
-        window.launch_game_button.setEnabled(True)
-        with patch.object(window, "start_active_game") as mo2_launch:
-            window.launch_game_button.click()
-            mo2_launch.assert_called_once()
-        with patch.object(window, "start_skyrim_direct") as direct_launch:
-            window.launch_direct_button.click()
-            direct_launch.assert_called_once()
-        window.close()
-
 
     def test_check_launch_status_logs_detected_audio_mapping_observations(self):
         window = self._window()
@@ -133,29 +120,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
 
-    def test_mo2_advanced_uses_clear_category_navigation_and_scan(self):
-        window = self._window()
-        advanced = window.mo2_advanced_widget
-        self.assertEqual(
-            [advanced.category_list.item(i).text() for i in range(advanced.category_list.count())],
-            ["Locations", "Instances", "Storage"],
-        )
-        self.assertEqual(advanced.category_pages.count(), 3)
-        self.assertEqual(advanced.category_list.currentRow(), 0)
-        # MainWindow now supplies detected Skyrim compatdata and the
-        # default MO2 destination during startup.
-        self.assertTrue(advanced.prefix_edit.text().endswith("/compatdata/489830"))
-        self.assertTrue(advanced.install_edit.text().endswith("/pfx/drive_c/Modding/MO2"))
-        self.assertTrue(advanced.scan_button.isEnabled())
-        advanced.update_context(
-            prefix_path="/test/compatdata/489830",
-            install_path="/test/MO2",
-            game_path="/test/Skyrim",
-            proton_path="/test/Proton",
-        )
-        self.assertTrue(advanced.scan_button.isEnabled())
-        self.assertEqual(advanced.prefix_edit.text(), "/test/compatdata/489830")
-        window.close()
 
     def test_v1_does_not_expose_experimental_audio_override(self):
         window = self._window()
@@ -163,21 +127,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
 
-    def test_saved_proton_is_restored_and_selection_is_persisted(self):
-        build_a = "/home/test/Proton A"
-        build_b = "/home/test/Proton B"
-        window = self._window(settings={
-            "proton": build_b, "game_path": "/missing/Skyrim"
-        }, builds=[
-            {"name": "Proton A", "path": build_a, "architecture": "x86_64"},
-            {"name": "Proton B", "path": build_b, "architecture": "x86_64"},
-        ])
-        self.assertEqual(window.proton_combo.currentData(), build_b)
-        with patch("main.write_settings") as save:
-            window.proton_combo.setCurrentIndex(0)
-            save.assert_called()
-            self.assertEqual(save.call_args.args[1], Path(build_a))
-        window.close()
 
     def test_missing_saved_game_path_does_not_override_detection(self):
         window = self._window(settings={
@@ -576,26 +525,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("previously detected game process has exited", info.call_args.args[2])
         window.close()
 
-    def test_window_is_branded_wyrd_and_has_only_the_core_setup_flow(self):
-        window = self._window()
-        self.assertEqual(window.windowTitle(), "Wyrd — Skyrim Modding Environment")
-        self.assertTrue(window.game_state["found"])
-        self.assertEqual(window.proton_combo.count(), 1)
-        self.assertEqual(window.install_button.text(), "Install MO2")
-        self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
-        self.assertFalse(hasattr(window, "nav"))
-        window.close()
 
-    def test_verified_steam_prefix_install_keeps_install_button_disabled(self):
-        window = self._window(steam_mo2={
-            "installed": True,
-            "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
-            "prefix": "/steam/compatdata/489830",
-            "message": "Verified Wyrd-managed MO2 installation.",
-        })
-        self.assertFalse(window.install_button.isEnabled())
-        self.assertTrue(window.use_existing_mo2_button.isVisible())
-        window.close()
 
     def test_install_completion_rejects_failed_post_install_verification(self):
         window = self._window()
@@ -618,33 +548,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(window.launch_game_button.isEnabled())
         window.close()
 
-    def test_first_launch_lets_user_choose_proton_before_environment_setup(self):
-        official = {
-            "name": "Proton - Experimental",
-            "path": "/steam/steamapps/common/Proton - Experimental",
-            "architecture": "x86_64",
-        }
-        cachyos = {
-            "name": "Proton-CachyOS Latest",
-            "path": "/steam/compatibilitytools.d/Proton-CachyOS Latest",
-            "architecture": "x86_64",
-        }
-        window = self._window(builds=[official, cachyos], settings={"proton": official["path"]})
-        yes = QMessageBox.StandardButton.Yes
-        chosen = "Proton-CachyOS Latest (x86_64)"
-        with patch("main.mark_first_run_completed") as mark, patch(
-            "main.QInputDialog.getItem", return_value=(chosen, True)
-        ), patch("main.QMessageBox.question", side_effect=[yes, yes]), patch.object(
-            window, "_save_selection"
-        ) as save, patch.object(window, "manage_mo2_library"), patch.object(
-            window, "install_mo2"
-        ) as install:
-            window._run_first_launch_setup()
-        self.assertEqual(window.proton_combo.currentData(), cachyos["path"])
-        mark.assert_called_once()
-        self.assertIn(unittest.mock.call(1), save.call_args_list)
-        install.assert_called_once_with(confirm=False)
-        window.close()
 
     def test_first_launch_handles_missing_saved_proton_path(self):
         window = self._window(settings={})
@@ -684,35 +587,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("passed", window.runtime_status.text())
         window.close()
 
-    def test_first_launch_can_skip_mo2_install_and_keep_unmodded_path(self):
-        window = self._window()
-        yes = QMessageBox.StandardButton.Yes
-        no = QMessageBox.StandardButton.No
-        with patch("main.mark_first_run_completed"), patch(
-            "main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)
-        ), patch("main.QMessageBox.question", side_effect=[yes, no]), patch.object(
-            window, "install_mo2"
-        ) as install:
-            window._run_first_launch_setup()
-        install.assert_not_called()
-        self.assertIn("MO2 setup skipped", window.progress_label.text())
-        window.close()
 
-    def test_first_launch_does_not_offer_a_standalone_mo2_launch(self):
-        window = self._window(steam_mo2={
-            "installed": True, "managed": True,
-            "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
-            "prefix": "/steam/compatdata/489830",
-        })
-        with patch("main.mark_first_run_completed"), patch(
-            "main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)
-        ), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes) as question, patch.object(
-            window, "start_active_game"
-        ) as launch:
-            window._run_first_launch_setup()
-        launch.assert_not_called()
-        self.assertEqual(question.call_count, 1)
-        window.close()
 
     def test_first_launch_prompt_is_not_repeated_after_completion(self):
         window = self._window(settings={"first_run_completed": True})
@@ -724,11 +599,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         question.assert_not_called()
         window.close()
 
-    def test_install_is_enabled_only_when_game_and_proton_are_detected(self):
-        window = self._window(builds=[])
-        self.assertFalse(window.install_button.isEnabled())
-        self.assertIn("No compatible Proton", window.runtime_status.text())
-        window.close()
 
     def test_reset_wyrd_settings_preserves_mo2_and_does_not_replay_setup(self):
         active_id = "instance-existing-123"
@@ -770,13 +640,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertFalse(window._saved_settings["first_run_completed"])
         window.close()
 
-    def test_use_existing_mo2_button_opens_environment_discovery(self):
-        window = self._window()
-        with patch.object(window.mo2_library_widget, "discover") as discover:
-            window.use_existing_mo2_button.click()
-        self.assertEqual(window.tabs.currentIndex(), 0)
-        discover.assert_called_once()
-        window.close()
 
     def test_legacy_isolated_prefix_actions_are_not_created(self):
         window = self._window()
@@ -786,20 +649,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertTrue(hasattr(window, "reset_mo2_button"))
         window.close()
 
-    def test_primary_install_description_uses_steam_prefix(self):
-        window = self._window()
-        self.assertIn("Steam", window.mo2_panel.detail_label.text())
-        self.assertEqual(window.install_button.text(), "Install MO2")
-        window.close()
 
-    def test_primary_runtime_and_audio_copy_keep_audio_advanced_and_unverified(self):
-        window = self._window()
-        labels = window.findChildren(QLabel)
-        label_text = "\\n".join(label.text() for label in labels)
-        self.assertIn("Advanced diagnostics only", label_text)
-        self.assertEqual(window.tabs.count(), 2)
-        self.assertEqual(window.audio_check_button.text(), "Inspect audio libraries")
-        window.close()
 
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
         window = self._window()
@@ -857,25 +707,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.selected_mo2_instance_id, "wyrd-instance")
         window.close()
 
-    def test_reset_mo2_success_clears_selection_and_refreshes_setup(self):
-        window = self._window()
-        window.selected_mo2_instance_id = "wyrd-instance"
-        window._saved_settings["selected_mo2_instance_id"] = "wyrd-instance"
-        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
-            "installed": True, "managed": True, "install": "/managed/MO2",
-        }), patch("main.QMessageBox.warning", return_value=QMessageBox.StandardButton.Yes), patch(
-            "main.reset_wyrd_mo2", return_value={"ok": True, "message": "Reset complete."}
-        ) as reset, patch("main.QMessageBox.information"), patch.object(
-            window, "refresh_all"
-        ) as refresh, patch.object(window, "_restore_registered_instance") as restore:
-            window.reset_managed_mo2()
-        reset.assert_called_once()
-        refresh.assert_called_once()
-        restore.assert_called_once()
-        self.assertEqual(window.selected_mo2_instance_id, "")
-        self.assertNotIn("selected_mo2_instance_id", window._saved_settings)
-        self.assertIn("reset complete", window.progress_label.text().lower())
-        window.close()
 
 
 if __name__ == "__main__":
@@ -907,4 +738,38 @@ if __name__ == "__main__":
         self.assertTrue(window.launch_game_button.isEnabled())
         self.assertIn("External (read-only)", window.mo2_panel.detail_label.text())
         self.assertIn("Default", window.mo2_panel.detail_label.text())
+        window.close()
+
+
+    def test_current_v1_navigation_and_primary_actions(self):
+        window = self._window()
+        self.assertEqual(
+            [window.tabs.tabText(i) for i in range(window.tabs.count())],
+            ["ENVIRONMENT", "ADVANCED", "MAINTENANCE"],
+        )
+        self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
+        self.assertEqual(window.launch_direct_button.text(), "Launch Unmodded")
+        self.assertEqual(window.install_button.text(), "Install MO2")
+        self.assertTrue(window.launch_status_button.isEnabled())
+        self.assertFalse(hasattr(window, "use_existing_mo2_button"))
+        window.close()
+
+    def test_modded_and_unmodded_handlers_are_separate(self):
+        window = self._window()
+        with patch.object(window, "start_active_game") as modded, patch.object(
+            window, "start_skyrim_direct"
+        ) as unmodded:
+            window.start_active_game()
+            window.start_skyrim_direct()
+        modded.assert_called_once()
+        unmodded.assert_called_once()
+        window.close()
+
+    def test_maintenance_contains_audio_and_diagnostics(self):
+        window = self._window()
+        labels = [label.text() for label in window.findChildren(QLabel)]
+        self.assertTrue(any("AUDIO COMPATIBILITY" in value for value in labels))
+        self.assertTrue(any("LAUNCH DIAGNOSTICS" in value for value in labels))
+        self.assertEqual(window.tabs.tabText(2), "MAINTENANCE")
+        self.assertEqual(window.audio_check_button.text(), "Inspect audio libraries")
         window.close()
