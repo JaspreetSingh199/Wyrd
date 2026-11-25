@@ -888,6 +888,17 @@ class MainWindow(QMainWindow):
         )
         if self.mo2_state.get("installed"):
             summary = self.instance_state.get("message", "MO2 instance inventory unavailable.")
+            if self.mo2_discovery_state is not None:
+                if self.mo2_discovery_state.get("ok"):
+                    summary += (
+                        "\\nSteam discovery: " + self.mo2_discovery_state["windows_game_path"]
+                        + " → " + self.mo2_discovery_state["resolved_game_path"]
+                    )
+                else:
+                    summary += (
+                        "\\nSteam discovery NOT VERIFIED: "
+                        + self.mo2_discovery_state.get("message", "unknown mapping error")
+                    )
             if skyrim_instances:
                 summary += "\nSkyrim SE instance(s): " + ", ".join(x["name"] for x in skyrim_instances)
                 summary += "\nSelected MO2 profile: " + " | ".join(
