@@ -686,6 +686,18 @@ class MainWindowSmokeTests(unittest.TestCase):
         install.assert_called_once_with(confirm=False)
         window.close()
 
+    def test_first_launch_handles_missing_saved_proton_path(self):
+        window = self._window(settings={})
+        yes = QMessageBox.StandardButton.Yes
+        with patch("main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)) as choose, patch(
+            "main.QMessageBox.question", side_effect=[yes, QMessageBox.StandardButton.No]
+        ), patch("main.mark_first_run_completed"), patch.object(
+            window, "_save_selection"
+        ), patch.object(window, "manage_mo2_library"):
+            window._run_first_launch_setup()
+        self.assertEqual(choose.call_args.args[3], ["Proton Test (x86_64)"])
+        window.close()
+
     def test_cancelled_first_launch_runtime_choice_does_not_mark_setup_complete(self):
         window = self._window()
         with patch("main.mark_first_run_completed") as mark, patch(
