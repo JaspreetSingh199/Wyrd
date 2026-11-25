@@ -430,16 +430,10 @@ class Mo2LibraryDialog(QWidget):
             self.setup_status.setText(result.get("message", "Could not find MO2 instances."))
             return
         proposals = result.get("proposals", [])
-        self._proposal_registration_state = {}
         for proposal in proposals:
-            identity = os.path.normcase(os.path.realpath(proposal.get("instance_path", "")))
-            already_registered = identity in registered_paths
-            # Preserve the service-issued discovery proposal unchanged. The
-            # registration service requires its exact fresh-proposal marker.
-            self._proposal_registration_state[id(proposal)] = already_registered
             game = proposal.get("game_name") or "Skyrim Special Edition"
             kind = proposal.get("instance_type", "instance")
-            row = QListWidgetItem(f"{game} · {kind}" + (" · Already added" if already_registered else ""))
+            row = QListWidgetItem(f"{game} · {kind}")
             row.setData(Qt.ItemDataRole.UserRole, proposal)
             self.instances.addItem(row)
         if proposals:
