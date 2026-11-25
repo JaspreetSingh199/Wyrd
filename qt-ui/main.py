@@ -2,6 +2,7 @@
 """Qt 6 desktop application for Wyrd's Skyrim + Mod Organizer 2 workflow."""
 from __future__ import annotations
 
+import os
 import sys
 import time
 import shutil
@@ -422,9 +423,6 @@ class MainWindow(QMainWindow):
         """Offer first-run environment setup and let the user choose Proton."""
         if self._saved_settings.get("first_run_completed"):
             return
-        mark_first_run_completed()
-        self._saved_settings["first_run_completed"] = True
-
         game_ready = bool(self.game_state.get("found"))
         if not game_ready:
             QMessageBox.information(
@@ -461,6 +459,8 @@ class MainWindow(QMainWindow):
         if not accepted or not chosen:
             self.progress_label.setText("Setup paused. Choose a Proton runtime when ready.")
             return
+        mark_first_run_completed()
+        self._saved_settings["first_run_completed"] = True
         selected_index = choices.index(chosen)
         self.proton_combo.setCurrentIndex(selected_index)
         self._save_selection(selected_index)
