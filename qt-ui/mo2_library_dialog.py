@@ -142,6 +142,9 @@ class Mo2AdvancedSettings(QWidget):
         super().__init__(parent)
         self.setObjectName("mo2AdvancedSettings")
         self.service = RegistryService(managed_paths()["config"] / "mo2-registry.json")
+        # Hidden compatibility list for legacy storage-maintenance handlers.
+        self.registered_instances = QListWidget()
+        self.registered_instances.hide()
         self.preferred_instance_id = selected_instance_id
         self.selected_instance_record = None
         self.associations_updated = False
@@ -285,6 +288,7 @@ class Mo2AdvancedSettings(QWidget):
         self.category_selector.currentIndexChanged.connect(self.category_pages.setCurrentIndex)
         self.category_selector.setCurrentIndex(0)
         self._refresh_detected_instances()
+        self._select_detected_instance(self.detected_instances.currentRow())
 
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
