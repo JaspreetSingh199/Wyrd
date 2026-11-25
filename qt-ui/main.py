@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
-    managed_paths, _steam_root_for_game,
+    managed_paths, _steam_root_for_game, _runtime_environment,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
@@ -382,8 +382,12 @@ class MainWindow(QMainWindow):
         launch_layout.addLayout(launch_actions)
         setup_layout.addWidget(launch_panel)
 
+        self.launch_mo2_button = QPushButton("Launch MO2")
+        self.launch_mo2_button.setObjectName("secondaryAction")
+        self.launch_mo2_button.clicked.connect(self.launch_mo2_gui)
         utility_actions = QHBoxLayout()
         utility_actions.addWidget(self.install_button)
+        utility_actions.addWidget(self.launch_mo2_button)
         utility_actions.addStretch(1)
         setup_layout.addLayout(utility_actions)
 
@@ -929,12 +933,17 @@ class MainWindow(QMainWindow):
                 f"{instance_summary}"
             )
             self.install_button.hide()
+            self.launch_mo2_button.show()
+            self.launch_mo2_button.setEnabled(
+                bool(self.mo2_state.get("executable") and self.proton_combo.currentData())
+            )
             self.launch_game_button.setEnabled(False)
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
             self.install_button.show()
+            self.launch_mo2_button.hide()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
@@ -1324,6 +1333,37 @@ class MainWindow(QMainWindow):
             lines.append(f"Wyrd registry: ERROR ({error})")
 
         QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
+
+    def launch_mo2_gui(self) -> None:
+        """Open the detected MO2 installation in Skyrim's existing Proton prefix."""
+        try:
+            executable = Path(self.mo2_state.get("executable", "")).expanduser()
+            game_path = Path(self.game_state.get("game_dir", "")).expanduser()
+            prefix = _steam_prefix_for_game_path(str(game_path)) if game_path else None
+            proton_value = self.proton_combo.currentData()
+            if not executable.is_file() or executable.is_symlink():
+                raise RuntimeError("The detected ModOrganizer.exe is missing or unsafe.")
+            if not game_path.is_dir() or game_path.is_symlink() or prefix is None:
+                raise RuntimeError("Skyrim's existing Steam compatdata prefix could not be resolved.")
+            if not proton_value:
+                raise RuntimeError("Select a valid Proton runtime before launching MO2.")
+            proton = Path(proton_value).expanduser()
+            if proton.is_symlink() or not (proton / "proton").is_file():
+                raise RuntimeError("The selected Proton runtime is no longer valid.")
+            steam_root = _steam_root_for_game(game_path)
+            if not steam_root:
+                raise RuntimeError("Could not identify the Steam library containing Skyrim.")
+            env = _runtime_environment(proton, Path(steam_root), prefix)
+            process = subprocess.Popen(
+                [str(proton / "proton"), "run", str(executable)],
+                cwd=str(executable.parent), env=env, stdin=None, stdout=None,
+                stderr=None, start_new_session=True,
+            )
+            self._log(f"MO2 launch handoff started (PID {process.pid}).")
+            self.progress_label.setText("MO2 launch handoff started.")
+        except Exception as error:
+            self._log(f"MO2 launch failed: {error}")
+            QMessageBox.warning(self, "Launch MO2", str(error))
 
     def install_mo2(self, *, confirm: bool = True) -> None:
         if self.worker and self.worker.isRunning():
