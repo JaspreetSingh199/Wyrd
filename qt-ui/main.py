@@ -713,16 +713,18 @@ class MainWindow(QMainWindow):
                 f'Executable: {self.mo2_state.get("executable")}\n'
                 f'Steam compatdata: {self.mo2_state.get("prefix")}\n{summary}'
             )
-            self.install_button.setText("MO2 Ready" if self.mo2_state.get("managed", True) else "Use Existing MO2")
-            self.install_button.setEnabled(False)
-            self.launch_button.setEnabled(True)
-            self.launch_game_button.setEnabled(bool(skyrim_instances))
+            self.install_button.hide()
+            self.launch_button.setEnabled(False)
+            self.launch_button.hide()
+            self.launch_game_button.setEnabled(False)
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
+            self.install_button.show()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
             self.launch_button.setEnabled(False)
+            self.launch_button.hide()
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
@@ -756,12 +758,12 @@ class MainWindow(QMainWindow):
                        if item.get("id") == self.selected_mo2_instance_id), None)
         if not record:
             self.active_instance_label.setText(
-                f"Active MO2 instance: none selected · {len(registry['instances'])} registered"
+                "MO2 is not connected to Wyrd yet. Find an instance and choose Add to Wyrd."
             )
             if hasattr(self, "launch_game_button"):
-                legacy_ready = bool(self.game_state.get("found") and self.instance_state.get("skyrim_instances"))
-                busy = bool(self.worker and self.worker.isRunning())
-                self.launch_game_button.setEnabled(legacy_ready and not busy)
+                self.launch_game_button.setEnabled(False)
+            if hasattr(self, "launch_button"):
+                self.launch_button.hide()
             return None
         games = {item["id"]: item for item in registry["games"]}
         installations = {item["id"]: item for item in registry["installations"]}
@@ -800,6 +802,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
             self.launch_game_button.setEnabled(ready and not busy)
+        if hasattr(self, "launch_button"):
+            self.launch_button.setVisible(ready)
+            self.launch_button.setEnabled(ready and not bool(self.worker and self.worker.isRunning()))
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
@@ -1295,40 +1300,16 @@ class MainWindow(QMainWindow):
 
 
     def start_mo2(self) -> None:
-        game_path = Path(self.game_state.get("game_dir", ""))
-        proton_path = self.proton_combo.currentData()
-        if not game_path.is_dir() or not proton_path:
-            QMessageBox.warning(self, "Launch MO2", "Skyrim or the selected Proton build is unavailable.")
+        """Launch only the exact MO2 instance connected to Wyrd."""
+        record = self._restore_registered_instance()
+        if not record:
+            QMessageBox.information(
+                self, "Connect MO2 first",
+                "Find your existing MO2 instance in the Environment section and choose "
+                "Add to Wyrd. Wyrd will then launch that exact instance."
+            )
             return
-        inventory = inspect_any_skyrim_prefix_mo2_instances(game_path)
-        if not inventory.get("ok"):
-            QMessageBox.warning(self, "MO2 instance status unavailable", inventory.get("message", "Could not inspect Skyrim's Steam prefix."))
-            return
-        candidates = inventory.get("skyrim_instances", [])
-        instance_name = None
-        if candidates:
-            instance_name, accepted = QInputDialog.getItem(
-                self, "Select MO2 instance", "Skyrim Special Edition instance:",
-                [x["name"] for x in candidates], 0, False,
-            )
-            if not accepted or not instance_name:
-                return
-        if inventory.get("managed", True):
-            result = launch_mo2_in_skyrim_prefix(
-                Path(proton_path), game_path, instance_name=instance_name,
-                xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
-            )
-        else:
-            result = launch_external_mo2_in_skyrim_prefix(
-                Path(proton_path), game_path, instance_name=instance_name,
-                xaudio2_compat=self.xaudio_override_checkbox.isChecked(),
-            )
-        self._log(result.get("message", "MO2 launch failed."))
-        if result.get("ok"):
-            self.progress_label.setText("MO2 wrapper started in Skyrim's Steam prefix.")
-            QMessageBox.information(self, "Launch MO2", result["message"])
-        else:
-            QMessageBox.warning(self, "Launch MO2", result.get("message", "Could not launch MO2."))
+        self._launch_embedded_mo2_instance(record)
 
     def start_mo2_in_skyrim_prefix(self) -> None:
         """Launch MO2 in Skyrim's Steam compatdata prefix (experimental)."""
