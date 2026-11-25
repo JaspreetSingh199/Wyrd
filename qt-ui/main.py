@@ -30,8 +30,7 @@ from wyrd_mo2 import (
 from steamcompat import (
     install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
-    inspect_any_skyrim_prefix_mo2_instances, launch_external_mo2_in_skyrim_prefix,
-    launch_mo2_in_skyrim_prefix, launch_skyrim_via_mo2_in_skyrim_prefix,
+    inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
     steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
     reset_wyrd_mo2,
 )
@@ -194,6 +193,7 @@ class MainWindow(QMainWindow):
         self._saved_game_path = self._saved_settings.get("game_path")
         self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         self._restoring_selection = True
+        self.startup_checks_complete = False
 
         root = QWidget()
         outer = QVBoxLayout(root)
@@ -665,6 +665,8 @@ class MainWindow(QMainWindow):
         QCoreApplication.processEvents()
 
     def refresh_all(self) -> None:
+        self.startup_checks_complete = False
+        self.launch_game_button.setEnabled(False)
         self._reset_precheck()
         selected = self.proton_combo.currentData()
         self.game_state = detect_skyrim()
@@ -809,8 +811,10 @@ class MainWindow(QMainWindow):
         # selected Proton runtime. The default prefix is Skyrim's existing
         # Steam compatdata directory; this does not create or reset a prefix.
         self.manage_mo2_library()
+        # A modded launch stays disabled until every startup check has completed.
+        self.startup_checks_complete = True
         # Registered instances own their own game/runtime selections and can
-        # launch even when Skyrim detection is empty.
+        # launch even when Skyrim detection is empty, provided their own paths passed validation.
         active = self._restore_registered_instance()
         self._update_precheck(
             4, "Active Wyrd environment", bool(active and self.launch_game_button.isEnabled()),
@@ -859,7 +863,8 @@ class MainWindow(QMainWindow):
             "prefix": Path(prefix_value).expanduser() if prefix_value else None,
         }
         ready = bool(
-            install.get("owner") in ("wyrd", "external")
+            self.startup_checks_complete
+            and install.get("owner") in ("wyrd", "external")
             and paths["executable"].is_file()
             and paths["instance"].is_dir()
             and paths["config"].is_file()
