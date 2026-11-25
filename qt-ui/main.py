@@ -1134,7 +1134,7 @@ class MainWindow(QMainWindow):
         )
         if not state.get("installed") or not state.get("managed", True):
             QMessageBox.information(
-                self, "MO2 cannot be be removed",
+                self, "MO2 cannot be removed",
                 "Wyrd could not verify a Wyrd-managed MO2 installation. External or unverified installations will not be removed.",
             )
             return
