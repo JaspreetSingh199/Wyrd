@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
-    managed_paths,
+    managed_paths, _steam_root_for_game,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
@@ -135,13 +135,14 @@ QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 
 
 def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
-    """Resolve the Steam root only when the game path has the expected library depth."""
+    """Resolve AppID 489830 under the Steam client that owns this game library."""
     if not game_path:
         return None
-    path = Path(game_path)
-    if len(path.parents) <= 2:
+    try:
+        steam_root = _steam_root_for_game(Path(game_path), Path.home())
+        return steam_compat_prefix(steam_root)
+    except (OSError, RuntimeError, ValueError):
         return None
-    return steam_compat_prefix(path.parents[2])
 
 
 def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
