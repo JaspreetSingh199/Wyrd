@@ -768,7 +768,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
         ) as reset, patch.object(window, "_set_active_instance") as set_active, patch.object(
             window, "refresh_all"
-        ) as refresh, patch("main.undefined") as mark_completed, patch(
+        ) as refresh, patch("main.mark_first_run_completed") as mark_completed, patch(
             "main.QTimer.singleShot"
         ) as schedule:
             window.reset_wyrd_preferences()
@@ -791,7 +791,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.QTimer.singleShot"
         ) as schedule:
             window.reset_wyrd_preferences()
-        mark_completed.assert_called_once_with()
+        mark_completed.assert_not_called()
         schedule.assert_not_called()
         self.assertFalse(window._saved_settings["first_run_completed"])
         window.close()
