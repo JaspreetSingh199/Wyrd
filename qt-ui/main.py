@@ -227,6 +227,9 @@ class MainWindow(QMainWindow):
         self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
+        # Startup restoration is asynchronous: keep persistence suppressed until
+        # refresh_all has populated the runtime list and restored the saved choice.
+        self._restoring_selection = True
         self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         self._restoring_selection = True
         self.startup_checks_complete = False
@@ -987,7 +990,10 @@ class MainWindow(QMainWindow):
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
         self.proton_combo.blockSignals(False)
-        self._restoring_selection = False
+        self._restore_saved_selection()
+        # Resume persistence only after a valid runtime is selected. An unavailable
+        # saved path must not be replaced with a guessed/default Proton build.
+        self._restoring_selection = not bool(self.proton_combo.currentData())
         # Keep both MO2 panels synchronized with detected Skyrim and the
         # selected Proton runtime. The default prefix is Skyrim's existing
         # Steam compatdata directory; this does not create or reset a prefix.
@@ -1160,7 +1166,7 @@ class MainWindow(QMainWindow):
         self._saved_settings["xaudio2_compat"] = bool(enabled)
         proton = self.proton_combo.currentData()
         game = self.game_state.get("game_dir")
-        if proton and game:
+        if proton and game and not self._restoring_selection:
             try:
                 write_settings(None, Path(proton), Path(game), xaudio2_compat=bool(enabled))
                 self._log("XAudio2 compatibility override preference saved: " + ("enabled" if enabled else "disabled"))
