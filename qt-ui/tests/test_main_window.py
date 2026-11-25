@@ -179,6 +179,21 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("Automatically discovered", window.active_instance_label.text())
         window.close()
 
+    def test_inventory_launch_handoff_refuses_unverified_s_drive(self):
+        window = self._window()
+        window.mo2_discovery_state = {"ok": False, "message": "S: target mismatch"}
+        with patch("main.QInputDialog.getItem") as choose, patch(
+            "main.QMessageBox.warning"
+        ) as warning:
+            window._launch_skyrim_target_from_inventory(
+                "Skyrim Special Edition",
+                {"ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]},
+                Path("/game"), Path("/prefix"), Path("/mo2"), Path("/proton"), False,
+            )
+        warning.assert_called_once()
+        choose.assert_not_called()
+        window.close()
+
     def test_unverified_s_drive_blocks_discovered_mo2_launch(self):
         window = self._window()
         window.instance_state = {
