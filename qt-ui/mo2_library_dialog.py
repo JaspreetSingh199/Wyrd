@@ -338,7 +338,7 @@ class Mo2LibraryDialog(QWidget):
             return
 
         env = _runtime_environment(proton.resolve(strict=True), steam_root.resolve(strict=True), prefix.resolve(strict=True))
-        command = [str((proton / "proton").resolve(strict=True)), "run", str(executable.resolve(strict=True))]
+        command = [str((proton / "proton").resolve(strict=True)), "run", str(executable.resolve(strict=True)), "--pick"]
         try:
             logs = managed_paths()["root"] / "logs"
             logs.mkdir(parents=True, exist_ok=True)
@@ -360,7 +360,7 @@ class Mo2LibraryDialog(QWidget):
             return
 
         self.setup_status.setText(
-            f"Opened MO2 Instance Manager with {proton.name}. "
+            f"Opened MO2 instance picker with {proton.name}. "
             "Create the instance in MO2, close the manager, then choose Connect existing instance to add it to Wyrd."
         )
 
