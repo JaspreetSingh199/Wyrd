@@ -788,7 +788,7 @@ class MainWindow(QMainWindow):
         # launch even when Skyrim detection is empty.
         active = self._restore_registered_instance()
         self._update_precheck(
-            4, "Active Wyrd environment", bool(active),
+            4, "Active Wyrd environment", bool(active and self.launch_game_button.isEnabled()),
             "A registered environment is selected." if active
             else "No active environment selected yet. Connect or create an MO2 instance.",
         )
