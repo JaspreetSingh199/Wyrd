@@ -216,6 +216,35 @@ class MainWindow(QMainWindow):
         setup_layout.setContentsMargins(12, 16, 12, 12)
         setup_layout.setSpacing(12)
 
+        self.precheck_panel = QFrame()
+        self.precheck_panel.setObjectName("panel")
+        precheck_layout = QVBoxLayout(self.precheck_panel)
+        precheck_layout.setContentsMargins(12, 10, 12, 10)
+        precheck_heading = QLabel("STARTUP CHECKS")
+        precheck_heading.setObjectName("section")
+        precheck_layout.addWidget(precheck_heading)
+        self.precheck_rows = []
+        for label in (
+            "Skyrim installation",
+            "Compatible Proton runtime",
+            "Skyrim Steam prefix and MO2 installation",
+            "MO2 instances",
+            "Active Wyrd environment",
+        ):
+            checkbox = QCheckBox(label)
+            checkbox.setEnabled(False)
+            precheck_layout.addWidget(checkbox)
+            self.precheck_rows.append(checkbox)
+        self.precheck_progress = QProgressBar()
+        self.precheck_progress.setRange(0, len(self.precheck_rows))
+        self.precheck_progress.setValue(0)
+        precheck_layout.addWidget(self.precheck_progress)
+        self.precheck_status = QLabel("Waiting to check this computer…")
+        self.precheck_status.setObjectName("muted")
+        self.precheck_status.setWordWrap(True)
+        precheck_layout.addWidget(self.precheck_status)
+        setup_layout.addWidget(self.precheck_panel)
+
         self.game_panel = panel("SKYRIM SPECIAL EDITION", "Detecting Steam libraries…")
         setup_layout.addWidget(self.game_panel)
 
@@ -600,6 +629,17 @@ class MainWindow(QMainWindow):
                 "(read from /proc; may not reflect later runtime changes)"
             )
 
+    def _update_precheck(self, index: int, label: str, passed: bool | None, detail: str) -> None:
+        """Update the visible startup checklist as each read-only check completes."""
+        if index < 0 or index >= len(self.precheck_rows):
+            return
+        row = self.precheck_rows[index]
+        row.setChecked(bool(passed))
+        row.setText(f"{label} — {'OK' if passed else 'NOT FOUND' if passed is False else 'SKIPPED'}")
+        self.precheck_progress.setValue(index + 1)
+        self.precheck_status.setText(detail)
+        QCoreApplication.processEvents()
+
     def refresh_all(self) -> None:
         selected = self.proton_combo.currentData()
         self.game_state = detect_skyrim()
@@ -611,6 +651,10 @@ class MainWindow(QMainWindow):
                     **self.game_state, "found": True,
                     "game_dir": saved_game, "library": "saved Wyrd selection",
                 }
+        self._update_precheck(
+            0, "Skyrim installation", bool(self.game_state.get("found")),
+            self.game_state.get("game_dir", "Skyrim Special Edition was not detected."),
+        )
         if self.game_state.get("found"):
             game_path = self.game_state["game_dir"]
             self.game_panel.detail_label.setText(
@@ -628,6 +672,11 @@ class MainWindow(QMainWindow):
             self._log("Skyrim SE not detected.")
 
         self.proton_builds = discover_proton_builds()
+        self._update_precheck(
+            1, "Compatible Proton runtime", bool(self.proton_builds),
+            f"{len(self.proton_builds)} compatible Proton runtime(s) found."
+            if self.proton_builds else "No compatible Proton runtime was found.",
+        )
         self.proton_combo.clear()
         selected_index = -1
         for build in self.proton_builds:
@@ -668,6 +717,11 @@ class MainWindow(QMainWindow):
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
+        self._update_precheck(
+            2, "Skyrim prefix and MO2 installation",
+            bool(self.mo2_state.get("installed")),
+            self.mo2_state.get("message", "MO2 installation was not found."),
+        )
         self.mo2_target_occupied = bool(
             self.mo2_state.get("installed") or self.mo2_state.get("install")
         )
@@ -684,6 +738,13 @@ class MainWindow(QMainWindow):
                 "message": self.mo2_state.get("message", "MO2 is not installed.")
             }
         skyrim_instances = self.instance_state.get("skyrim_instances", [])
+        self._update_precheck(
+            3, "MO2 instances",
+            bool(self.instance_state.get("ok") and self.instance_state.get("instances")),
+            f"{len(self.instance_state.get('instances', []))} MO2 instance(s), "
+            f"{len(skyrim_instances)} Skyrim SE instance(s) found."
+            if self.instance_state.get("ok") else self.instance_state.get("message", "Instance scan unavailable."),
+        )
         if self.mo2_state.get("installed"):
             summary = self.instance_state.get("message", "MO2 instance inventory unavailable.")
             if skyrim_instances:
@@ -725,7 +786,17 @@ class MainWindow(QMainWindow):
         self.manage_mo2_library()
         # Registered instances own their own game/runtime selections and can
         # launch even when Skyrim detection is empty.
-        self._restore_registered_instance()
+        active = self._restore_registered_instance()
+        self._update_precheck(
+            4, "Active Wyrd environment", bool(active),
+            "A registered environment is selected." if active
+            else "No active environment selected yet. Connect or create an MO2 instance.",
+        )
+        self.precheck_status.setText(
+            "Startup checks complete. " +
+            ("An active environment is ready for launch." if active
+             else "Install MO2 or connect an existing instance to continue.")
+        )
 
     def _restore_registered_instance(self) -> dict | None:
         """Resolve the saved active instance and refresh the application's registry snapshot."""
@@ -1788,7 +1859,8 @@ class MainWindow(QMainWindow):
         if not item:
             return False, f"MO2 instance '{instance_name}' was not found in the selected prefix."
         instance_path = Path(item.get("path", ""))
-        config_path = Path(item.get("config", instance_path / "ModOrganizer.ini"))
+        config_value = item.get("config")
+        config_path = Path(config_value) if config_value else instance_path / "ModOrganizer.ini"
         valid = (
             not instance_path.is_symlink() and instance_path.is_dir()
             and not config_path.is_symlink() and config_path.is_file()
