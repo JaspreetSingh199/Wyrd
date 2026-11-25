@@ -635,9 +635,14 @@ class Mo2AdvancedSettings(QWidget):
         self.category_selector = QComboBox()
         self.category_selector.setObjectName("mo2AdvancedCategories")
         self.category_selector.setMinimumHeight(36)
+        self.category_selector.setMaximumWidth(280)
         self.category_pages = QStackedWidget()
-        root.addWidget(self.category_selector)
-        root.addWidget(self.category_pages, 1)
+        # Keep the selected settings page close to its contents. Letting the
+        # Paths page stretch vertically pushed diagnostics far below the fold.
+        self.category_pages.setMinimumHeight(250)
+        self.category_pages.setMaximumHeight(390)
+        root.addWidget(self.category_selector, 0, Qt.AlignmentFlag.AlignLeft)
+        root.addWidget(self.category_pages, 0)
 
         def add_category(title, page, description):
             page_layout = QVBoxLayout(page)
