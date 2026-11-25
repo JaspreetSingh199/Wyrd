@@ -23,15 +23,13 @@ from wyrd_mo2_registry_service import RegistryService
 
 
 def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
-    """Add a compact information control beside an advanced MO2 action."""
+    """Add a compact hover-help control beside an advanced action."""
     info = QPushButton("i")
     info.setObjectName("infoButton")
     info.setFixedSize(24, 24)
-    info.setToolTip("What does this do?")
+    info.setToolTip(explanation)
+    info.setToolTipDuration(15000)
     info.setAccessibleName(f"Information about {title}")
-    info.clicked.connect(
-        lambda _checked=False: QMessageBox.information(parent, title, explanation)
-    )
     layout.addWidget(info)
     return info
 
