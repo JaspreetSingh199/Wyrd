@@ -1350,7 +1350,7 @@ class MainWindow(QMainWindow):
             proton = Path(proton_value).expanduser()
             if proton.is_symlink() or not (proton / "proton").is_file():
                 raise RuntimeError("The selected Proton runtime is no longer valid.")
-            steam_root = _steam_root_for_game(game_path)
+            steam_root = _steam_root_for_game(game_path, Path.home())
             if not steam_root:
                 raise RuntimeError("Could not identify the Steam library containing Skyrim.")
             env = _runtime_environment(proton, Path(steam_root), prefix)
