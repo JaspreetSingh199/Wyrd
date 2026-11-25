@@ -98,7 +98,7 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
             raise
     if callback:
         callback(40, "Launching official MO2 installer in Skyrim's Proton prefix…")
-    env = _runtime_environment(proton, prefix, steam_root, game)
+    env = _runtime_environment(proton, steam_root, prefix)
     env["STEAM_COMPAT_APP_ID"] = APP_ID
     env["SteamAppId"] = APP_ID
     env["SteamGameId"] = APP_ID
