@@ -601,16 +601,10 @@ class MainWindow(QMainWindow):
             for item in self.proton_builds
         ]
         saved_path = self._saved_settings.get("proton")
-        saved_path_text = (
-            str(Path(saved_path).expanduser())
-            if isinstance(saved_path, (str, os.PathLike)) and str(saved_path).strip()
-            else None
-        )
         default_index = next(
             (
                 i for i, item in enumerate(self.proton_builds)
-                if saved_path_text is not None
-                and str(Path(item["path"]).expanduser()) == saved_path_text
+                if saved_path and _same_filesystem_path(item["path"], saved_path)
             ),
             0,
         )
