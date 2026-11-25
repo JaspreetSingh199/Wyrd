@@ -39,6 +39,8 @@ class Mo2LibraryDialog(QWidget):
     def __init__(self, parent=None, *, prefix_path="", install_path="", game_path="", proton_path="", selected_instance_id=""):
         super().__init__(parent)
         self.setObjectName("mo2InstancePicker")
+        # Retained for reading legacy Wyrd metadata in diagnostics only.
+        self.service = RegistryService(managed_paths()["config"] / "mo2-registry.json")
         self.prefix_path = str(prefix_path or "")
         self.install_path = str(install_path or "")
         self.game_path = str(game_path or "")
