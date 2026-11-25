@@ -770,7 +770,6 @@ class MainWindow(QMainWindow):
         self.launch_game_button.setEnabled(False)
         self._reset_precheck()
         selected = self.proton_combo.currentData()
-        self.proton_combo.blockSignals(True)
         # Suppress currentIndexChanged while rebuilding the combo. Otherwise
         # clearing it can save an empty/default selection before we restore
         # the persisted runtime, overwriting the user's choice.
