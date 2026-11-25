@@ -1217,7 +1217,6 @@ class MainWindow(QMainWindow):
             self.proton_combo.setCurrentIndex(0)
         self.proton_combo.blockSignals(False)
         self.mo2_library_widget.preferred_instance_id = active_instance_id
-        self.mo2_library_widget._refresh_connected()
         if active_instance_id:
             self._set_active_instance({"id": active_instance_id})
         # Do not schedule onboarding in this session. Leave the completion flag
