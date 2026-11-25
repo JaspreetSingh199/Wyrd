@@ -602,6 +602,28 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.close()
 
 
+    def test_refresh_restores_saved_proton_without_rewriting_default(self):
+        preferred = Path("/steam/compatibilitytools.d/Proton-GE")
+        default = Path("/steam/steamapps/common/Proton - Experimental")
+        window = self._window(settings={"proton": str(preferred), "first_run_completed": True})
+        builds = [
+            {"name": "Proton - Experimental", "path": str(default), "architecture": "x86_64"},
+            {"name": "Proton-GE", "path": str(preferred), "architecture": "x86_64"},
+        ]
+        with patch("main.detect_skyrim", return_value={"found": False, "steam_roots": []}), patch(
+            "main.discover_proton_builds", return_value=builds
+        ), patch("main.inspect_wyrd_installation", return_value={"installed": False}), patch(
+            "main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}
+        ), patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}), patch.object(
+            window, "manage_mo2_library"
+        ), patch("main.inspect_audio_compatibility", return_value={"ok": True, "dlls": {}}), patch(
+            "main.read_launch_diagnostics", return_value={}
+        ), patch("main.write_settings") as save:
+            window.refresh_all()
+            self.assertEqual(window.proton_combo.currentData(), str(preferred))
+            save.assert_not_called()
+        window.close()
+
     def test_first_launch_handles_missing_saved_proton_path(self):
         window = self._window(settings={})
         yes = QMessageBox.StandardButton.Yes
