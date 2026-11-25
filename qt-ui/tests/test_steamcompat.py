@@ -306,3 +306,62 @@ def test_external_prefix_inventory_uses_validated_install_and_is_read_only(monke
     assert [item["name"] for item in result["skyrim_instances"]] == ["Skyrim Special Edition"]
     assert config.read_bytes() == before
     assert not (exe.parent / ".wyrd-managed.json").exists()
+
+
+def _make_steam_discovery_fixture(tmp_path):
+    steam = tmp_path / "Steam"
+    library = tmp_path / "Library"
+    game = library / "steamapps/common/Skyrim Special Edition"
+    game.mkdir(parents=True)
+    (library / "steamapps/appmanifest_489830.acf").write_text(
+        '"AppState" { "appid" "489830" "installdir" "Skyrim Special Edition" }',
+        encoding="utf-8",
+    )
+    prefix = steam / "steamapps/compatdata/489830"
+    (prefix / "pfx/drive_c").mkdir(parents=True)
+    dosdevices = prefix / "pfx/dosdevices"
+    dosdevices.mkdir()
+    return steam, library, game, prefix, dosdevices
+
+
+def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    (steam / "steamapps").mkdir(parents=True)
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "' + str(steam) + '" } '
+        '"1" { "path" "' + str(library) + '" } }',
+        encoding="utf-8",
+    )
+    (dosdevices / "s:").symlink_to(steam, target_is_directory=True)
+
+    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
+
+    assert result["ok"], result
+    assert result["changed"] is True
+    assert (dosdevices / "s:").resolve() == library.resolve()
+    assert result["windows_game_path"] == r"S:\\steamapps\\common\\Skyrim Special Edition"
+    assert Path(result["resolved_game_path"]) == game.resolve()
+
+
+def test_s_drive_mapping_refuses_non_symlink_entry(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    (dosdevices / "s:").write_text("leave me alone", encoding="utf-8")
+
+    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
+
+    assert not result["ok"]
+    assert "not a symlink" in result["message"]
+    assert (dosdevices / "s:").read_text(encoding="utf-8") == "leave me alone"
+
+
+def test_s_drive_mapping_refuses_wrong_compatdata_prefix(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    wrong_prefix = tmp_path / "other-prefix"
+    (wrong_prefix / "pfx/drive_c").mkdir(parents=True)
+    (wrong_prefix / "pfx/dosdevices").mkdir()
+
+    result = steamcompat.configure_steam_library_drive(wrong_prefix, game, steam)
+
+    assert not result["ok"]
+    assert "AppID 489830" in result["message"]
+    assert not (wrong_prefix / "pfx/dosdevices/s:").exists()
