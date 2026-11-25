@@ -305,9 +305,6 @@ class MainWindow(QMainWindow):
             "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
         )
         self.check_mo2_button.clicked.connect(self.check_mo2_installation)
-        self.use_existing_mo2_button = QPushButton("Use Existing MO2")
-        self.use_existing_mo2_button.clicked.connect(self.use_existing_mo2)
-        self.use_existing_mo2_button.hide()  # Discovery is owned by the single MO2 card action.
         self.launch_game_button = QPushButton("Launch Modded Skyrim")
         self.launch_game_button.clicked.connect(self.start_active_game)
         self.launch_game_button.setEnabled(False)
@@ -808,8 +805,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
             self.launch_game_button.setEnabled(ready and not busy)
-        if hasattr(self, "use_existing_mo2_button"):
-            self.use_existing_mo2_button.setVisible(not ready)
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
@@ -1246,12 +1241,6 @@ class MainWindow(QMainWindow):
             return {"ok": False, "instances": [], "skyrim_instances": [],
                     "message": "Skyrim Special Edition was not detected."}
         return inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
-
-    def use_existing_mo2(self) -> None:
-        """Open the Environment instance picker for an existing MO2 installation."""
-        self.tabs.setCurrentIndex(0)
-        self.mo2_library_widget.discover_button.setFocus()
-        self.mo2_library_widget.discover()
 
     def copy_instance_to_skyrim_prefix(self) -> None:
         """Offer a non-destructive copy of an existing Wyrd Skyrim instance."""
