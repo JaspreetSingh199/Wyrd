@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Callable
 
-from skyrim_detection import find_steam_roots
+from skyrim_detection import find_steam_roots, steam_libraries
 from mo2_inspection import find_mo2_installations
 
 APP_ID = "489830"
@@ -222,17 +222,27 @@ def inspect_wyrd_installation(home: Path | None = None) -> dict:
 
 
 def _steam_root_for_game(game_path: Path, home: Path) -> Path:
-    resolved_game = game_path.resolve()
+    """Find the Steam client that owns the library containing this game.
+
+    A game's library may be on a secondary mount, so its directory is not
+    necessarily beneath the Steam client installation directory.
+    """
+    resolved_game = Path(game_path).expanduser().resolve(strict=True)
     for root in find_steam_roots(home):
         try:
-            resolved_game.relative_to(root.resolve())
-            return root
-        except ValueError:
-            pass
-    roots = find_steam_roots(home)
-    if roots:
-        return roots[0]
-    raise RuntimeError("Steam was not detected. Install/launch Steam once, then refresh detection.")
+            libraries = steam_libraries(root)
+        except OSError:
+            continue
+        for steamapps in libraries:
+            try:
+                resolved_game.relative_to(steamapps.parent.resolve(strict=True))
+                return root.resolve(strict=True)
+            except (OSError, ValueError, RuntimeError):
+                continue
+    raise RuntimeError(
+        "The detected game is not inside a library registered by the discovered Steam client. "
+        "Wyrd will not guess which compatdata prefix belongs to it."
+    )
 
 
 def _runtime_environment(proton: Path, steam_root: Path, prefix_root: Path) -> dict[str, str]:
