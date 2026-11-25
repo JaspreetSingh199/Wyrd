@@ -1007,15 +1007,15 @@ class MainWindow(QMainWindow):
 
 
     def reset_wyrd_preferences(self) -> None:
-        """Clear Wyrd preferences and immediately replay first-launch onboarding."""
+        """Restore Wyrd preferences to defaults without replaying onboarding."""
         if self.worker and self.worker.isRunning():
             QMessageBox.warning(self, "Reset Wyrd Settings", "Wait for the current task to finish first.")
             return
         answer = QMessageBox.question(
             self, "Reset Wyrd Settings",
-            "Clear Wyrd's saved preferences and show first-launch setup again?\n\n"
-            "This does NOT remove or reset MO2, its registrations, Skyrim, Steam compatdata, "
-            "game files or saves.",
+            "Reset Wyrd's preferences to their defaults?\n\n"
+            "This does NOT uninstall Wyrd or remove MO2, its registrations, Skyrim, "
+            "Steam compatdata, game files or saves. First-launch setup will not run again.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -1027,9 +1027,12 @@ class MainWindow(QMainWindow):
             self._log(result.get("message", "Wyrd settings reset failed."))
             return
 
-        # Reset preferences without disconnecting an already registered MO2 instance.
+        # Reset preferences, but keep the user's existing MO2 connection intact.
         active_instance_id = self.selected_mo2_instance_id or self._saved_settings.get("selected_mo2_instance_id", "")
-        self._saved_settings = {"selected_mo2_instance_id": active_instance_id} if active_instance_id else {}
+        self._saved_settings = {
+            "selected_mo2_instance_id": active_instance_id,
+            "first_run_completed": True,
+        } if active_instance_id else {"first_run_completed": True}
         self._saved_game_path = None
         self.selected_mo2_instance_id = active_instance_id
         self._restoring_selection = True
@@ -1041,11 +1044,14 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget._refresh_connected()
         if active_instance_id:
             self._set_active_instance({"id": active_instance_id})
-        self._log(result.get("message", "Wyrd preferences cleared."))
+        # Persist onboarding as dismissed so the startup timer cannot reopen it
+        # on the next launch after the settings file has been cleared.
+        mark_first_run_completed()
+        self._saved_settings["first_run_completed"] = True
+        self._log(result.get("message", "Wyrd preferences reset to defaults."))
         self.refresh_all()
         self._restoring_selection = False
-        self.progress_label.setText("Wyrd settings reset. Starting first-launch setup…")
-        QTimer.singleShot(100, self._run_first_launch_setup)
+        self.progress_label.setText("Wyrd settings reset. Default settings restored.")
 
     def reset_managed_mo2(self) -> None:
         """Remove only Wyrd-owned MO2 files; never reset Steam's Skyrim prefix."""
