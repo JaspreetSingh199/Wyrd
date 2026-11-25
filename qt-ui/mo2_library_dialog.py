@@ -22,6 +22,20 @@ from skyrim_detection import find_steam_roots
 from wyrd_mo2_registry_service import RegistryService
 
 
+def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
+    """Add a compact information control beside an advanced MO2 action."""
+    info = QPushButton("i")
+    info.setObjectName("infoButton")
+    info.setFixedSize(24, 24)
+    info.setToolTip("What does this do?")
+    info.setAccessibleName(f"Information about {title}")
+    info.clicked.connect(
+        lambda _checked=False: QMessageBox.information(parent, title, explanation)
+    )
+    layout.addWidget(info)
+    return info
+
+
 class Mo2LibraryDialog(QWidget):
     """Compact Environment widget for finding and selecting MO2 instances."""
 
@@ -712,7 +726,9 @@ class Mo2AdvancedSettings(QWidget):
         self.rename_instance_button=QPushButton("Rename")
         self.rename_instance_button.clicked.connect(self.rename_selected_instance)
         instance_actions.addWidget(self._edit_associations_button)
+        add_info_button(instance_actions, self, "Change game / Proton", "Changes the game folder, Steam AppID, initialized Proton prefix and Proton runtime recorded for the selected Wyrd instance. This updates Wyrd's association metadata only; it does not move MO2 files or change Skyrim files.")
         instance_actions.addWidget(self.rename_instance_button)
+        add_info_button(instance_actions, self, "Rename", "Changes only the display name Wyrd shows for this MO2 instance. It does not rename the MO2 folder, profile, mods, or any files.")
         instances_layout.addLayout(instance_actions)
         unregister_actions=QHBoxLayout()
         self.unregister_instance_button=QPushButton("Disconnect instance")
@@ -720,7 +736,9 @@ class Mo2AdvancedSettings(QWidget):
         self.unregister_installation_button=QPushButton("Remove unused installation")
         self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
         unregister_actions.addWidget(self.unregister_instance_button)
+        add_info_button(unregister_actions, self, "Disconnect instance", "Removes the selected instance's registration from Wyrd. The MO2 instance folder, profiles, mods, downloads, installation, Skyrim files, Proton prefix and saves are left untouched.")
         unregister_actions.addWidget(self.unregister_installation_button)
+        add_info_button(unregister_actions, self, "Remove unused installation", "Removes an unused MO2 installation record from Wyrd's registry only. It is enabled only when no verified connected instances reference that installation. The installation files are not deleted.")
         instances_layout.addLayout(unregister_actions)
 
         storage_page = QWidget()
@@ -740,6 +758,7 @@ class Mo2AdvancedSettings(QWidget):
             browse.clicked.connect(lambda _checked=False, category=key: self._choose_storage_path(category))
             row.addWidget(field,1)
             row.addWidget(browse)
+            add_info_button(row, self, f"Choose {label} folder", f"Select the {label.lower()} storage directory MO2 should use for this instance. Saving changes the instance's ModOrganizer.ini and creates only explicitly approved missing empty folders. Existing files are never moved, copied, merged, or deleted.")
             self.storage_fields[key]=field
             self.storage_browse_buttons[key]=browse
             storage_form.addRow(label,row)
@@ -760,7 +779,9 @@ class Mo2AdvancedSettings(QWidget):
         self.apply_storage_button.clicked.connect(self.apply_storage)
         self.restore_storage_button.clicked.connect(self.restore_config_backup)
         storage_actions.addWidget(self.apply_storage_button)
+        add_info_button(storage_actions, self, "Save storage settings", "Writes the selected storage paths to this managed instance's ModOrganizer.ini after validation and confirmation. Wyrd backs up the INI first. Existing mod, download, profile and overwrite data is never moved, copied, merged, or deleted; changing paths can make existing content appear missing if the chosen folders are not already prepared.")
         storage_actions.addWidget(self.restore_storage_button)
+        add_info_button(storage_actions, self, "Restore INI backup", "Restores a previously created Wyrd backup of this instance's ModOrganizer.ini. Wyrd backs up the current INI before restoring. This changes configuration only; it does not restore, move, or delete mod files.")
         storage_layout.addLayout(storage_actions)
         storage_layout.addStretch(1)
 
