@@ -1,7 +1,8 @@
-"""Launch Wyrd-managed MO2 inside Skyrim's Steam Proton compatdata.
+"""Configure and launch MO2 inside Skyrim's Steam Proton compatdata.
 
-This is an experimental mode: it reuses Skyrim's existing AppID prefix but does
-not reset, install dependencies into, or otherwise mutate that prefix itself.
+This integration reuses Skyrim's existing AppID prefix. It never resets the
+prefix or modifies saves/game files; narrowly scoped drive and game-registry
+discovery metadata may be provisioned for MO2 compatibility.
 """
 from __future__ import annotations
 
