@@ -400,13 +400,26 @@ class MainWindow(QMainWindow):
         advanced_layout.addWidget(mo2_advanced_heading)
         mo2_advanced_help = QLabel(
             "Inspect detected paths, manage instance associations and configure per-instance storage. "
-            "Audio and launch diagnostics are below; recovery actions are at the bottom."
+            "Audio, launch diagnostics and recovery tools are grouped under Maintenance."
         )
         mo2_advanced_help.setObjectName("muted")
         mo2_advanced_help.setWordWrap(True)
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
 
+        advanced_layout.addStretch(1)
+        advanced_scroll = QScrollArea()
+        advanced_scroll.setWidgetResizable(True)
+        advanced_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        advanced_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        advanced_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        advanced_scroll.setWidget(advanced_page)
+        self.tabs.addTab(advanced_scroll, "ADVANCED")
+
+        maintenance_page = QWidget()
+        maintenance_layout = QVBoxLayout(maintenance_page)
+        maintenance_layout.setContentsMargins(12, 16, 12, 12)
+        maintenance_layout.setSpacing(12)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(12)
         diagnostics_grid.setVerticalSpacing(12)
@@ -473,19 +486,7 @@ class MainWindow(QMainWindow):
         advanced_layout.addWidget(logs_panel)
 
 
-        advanced_layout.addStretch(1)
-        advanced_scroll = QScrollArea()
-        advanced_scroll.setWidgetResizable(True)
-        advanced_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        advanced_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        advanced_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        advanced_scroll.setWidget(advanced_page)
-        self.tabs.addTab(advanced_scroll, "ADVANCED")
 
-        maintenance_page = QWidget()
-        maintenance_layout = QVBoxLayout(maintenance_page)
-        maintenance_layout.setContentsMargins(12, 16, 12, 12)
-        maintenance_layout.setSpacing(12)
         recovery_panel = panel(
             "RECOVERY & MAINTENANCE",
             "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
