@@ -385,6 +385,39 @@ def test_s_drive_mapping_refuses_non_symlink_entry(tmp_path):
     assert (dosdevices / "s:").read_text(encoding="utf-8") == "leave me alone"
 
 
+def test_s_drive_mapping_refuses_symlinked_prefix_ancestor(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    real_steam = tmp_path / "real-steam"
+    steam.rename(real_steam)
+    steam_link = tmp_path / "Steam"
+    steam_link.symlink_to(real_steam, target_is_directory=True)
+    linked_prefix = steam_link / "steamapps/compatdata/489830"
+    linked_dosdevices = linked_prefix / "pfx/dosdevices"
+
+    result = steamcompat.configure_steam_library_drive(
+        linked_prefix, game, steam_link
+    )
+
+    assert not result["ok"]
+    assert "symlinked component" in result["message"]
+    assert not (linked_dosdevices / "s:").exists()
+    assert not (linked_dosdevices / "s:").is_symlink()
+
+
+def test_s_drive_mapping_refuses_symlinked_library_ancestor(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    linked_library = tmp_path / "Linked Library"
+    linked_library.symlink_to(library, target_is_directory=True)
+    linked_game = linked_library / "steamapps/common/Skyrim Special Edition"
+
+    result = steamcompat.configure_steam_library_drive(prefix, linked_game, steam)
+
+    assert not result["ok"]
+    assert "symlinked component" in result["message"]
+    assert not (dosdevices / "s:").exists()
+    assert not (dosdevices / "s:").is_symlink()
+
+
 def test_s_drive_mapping_refuses_wrong_compatdata_prefix(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
     wrong_prefix = tmp_path / "other-prefix"
