@@ -317,6 +317,12 @@ def _make_steam_discovery_fixture(tmp_path):
         '"AppState" { "appid" "489830" "installdir" "Skyrim Special Edition" }',
         encoding="utf-8",
     )
+    (steam / "steamapps").mkdir(parents=True, exist_ok=True)
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "' + str(steam) + '" } '
+        '"1" { "path" "' + str(library) + '" } }',
+        encoding="utf-8",
+    )
     prefix = steam / "steamapps/compatdata/489830"
     (prefix / "pfx/drive_c").mkdir(parents=True)
     dosdevices = prefix / "pfx/dosdevices"
@@ -326,12 +332,6 @@ def _make_steam_discovery_fixture(tmp_path):
 
 def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    (steam / "steamapps").mkdir(parents=True)
-    (steam / "steamapps/libraryfolders.vdf").write_text(
-        '"libraryfolders" { "0" { "path" "' + str(steam) + '" } '
-        '"1" { "path" "' + str(library) + '" } }',
-        encoding="utf-8",
-    )
     (dosdevices / "s:").symlink_to(steam, target_is_directory=True)
 
     result = steamcompat.configure_steam_library_drive(prefix, game, steam)
