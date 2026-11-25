@@ -274,7 +274,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_start_skyrim_default_audio_is_first_and_passed_unchanged(self):
         window = self._window()
         with patch("main.QInputDialog.getItem", side_effect=[
-            ("Skyrim", True), ("Skyrim", True), ("Default Proton audio", True)
+            ("Skyrim", True), ("Skyrim", True)
         ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
             "main.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
@@ -291,7 +291,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
             window.mo2_state = {"metadata": {"game_path": window.game_state["game_dir"]}}
             window.start_skyrim()
-        self.assertEqual(launch.call_args.kwargs["audio_mode"], "default")
+        self.assertFalse(launch.call_args.kwargs["xaudio2_compat"])
         window.close()
 
 
