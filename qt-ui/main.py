@@ -10,17 +10,17 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog, QDialog,
     QWidget, QTabWidget, QScrollArea,
 )
 
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
-    install_mo2_environment, launch_mo2, managed_paths,
+    launch_mo2, managed_paths,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
@@ -147,26 +147,6 @@ def panel(title: str, description: str) -> QFrame:
     layout.addWidget(detail)
     frame.detail_label = detail
     return frame
-
-
-class InstallWorker(QThread):
-    progress = Signal(int, str)
-    completed = Signal(dict)
-
-    def __init__(self, proton_path: str, game_path: str):
-        super().__init__()
-        self.proton_path = Path(proton_path)
-        self.game_path = Path(game_path)
-
-    def run(self) -> None:
-        try:
-            result = install_mo2_environment(
-                self.proton_path, self.game_path,
-                callback=lambda value, message: self.progress.emit(value, message),
-            )
-        except Exception as error:
-            result = {"ok": False, "message": str(error)}
-        self.completed.emit(result)
 
 
 class SteamPrefixInstallWorker(QThread):
@@ -1690,6 +1670,131 @@ class MainWindow(QMainWindow):
             instance_name, target_state, game_path, prefix, install_root, proton, False, steam_root,
         )
 
+    def _run_launch_preflight(
+        self, instance_name: str, target_state: dict, selected_target: dict,
+        game_path: Path, prefix: Path, install_root: Path, proton: Path,
+        steam_root: Path | None,
+    ) -> bool:
+        """Show a visible, read-only checklist and require all checks before launch."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Preparing modded Skyrim")
+        dialog.setMinimumWidth(520)
+        layout = QVBoxLayout(dialog)
+        heading = QLabel("Launch pre-check")
+        heading.setObjectName("section")
+        layout.addWidget(heading)
+        detail = QLabel("Wyrd is checking the selected environment before starting MO2.")
+        detail.setWordWrap(True)
+        detail.setObjectName("muted")
+        layout.addWidget(detail)
+        rows = []
+        checks = [
+            ("Skyrim installation", lambda: (
+                not game_path.is_symlink() and game_path.is_dir(),
+                f"Detected game folder: {game_path}",
+            )),
+            ("Skyrim Steam prefix", lambda: (
+                not prefix.is_symlink()
+                and prefix.is_dir()
+                and (prefix / "pfx/drive_c/users").is_dir()
+                and (steam_root is None or prefix.resolve(strict=True) == steam_compat_prefix(steam_root).resolve(strict=True)),
+                f"AppID 489830 prefix: {prefix}",
+            )),
+            ("MO2 application", lambda: (
+                not (install_root / "ModOrganizer.exe").is_symlink()
+                and (install_root / "ModOrganizer.exe").is_file(),
+                f"MO2 executable: {install_root / 'ModOrganizer.exe'}",
+            )),
+            ("Selected Proton runtime", lambda: (
+                not proton.is_symlink()
+                and proton.is_dir()
+                and not (proton / "proton").is_symlink()
+                and (proton / "proton").is_file()
+                and os.access(proton / "proton", os.X_OK),
+                f"Runtime: {proton}",
+            )),
+            ("Selected MO2 instance", lambda: self._preflight_instance_exists(
+                prefix, install_root, instance_name
+            )),
+            ("Configured Skyrim executable", lambda: (
+                bool(target_state.get("ok"))
+                and any(item.get("title") == selected_target.get("title")
+                        and item.get("binary") == selected_target.get("binary")
+                        for item in target_state.get("targets", [])),
+                f"MO2 target: {selected_target.get('title', 'Unknown')}",
+            )),
+        ]
+        for label, _ in checks:
+            checkbox = QCheckBox(label)
+            checkbox.setEnabled(False)
+            layout.addWidget(checkbox)
+            rows.append(checkbox)
+        progress = QProgressBar()
+        progress.setRange(0, len(checks))
+        progress.setValue(0)
+        layout.addWidget(progress)
+        status = QLabel("Starting checks…")
+        status.setWordWrap(True)
+        status.setObjectName("muted")
+        layout.addWidget(status)
+        buttons = QHBoxLayout()
+        continue_button = QPushButton("Continue to launch")
+        continue_button.setObjectName("primaryAction")
+        continue_button.setEnabled(False)
+        cancel_button = QPushButton("Cancel")
+        buttons.addStretch(1)
+        buttons.addWidget(cancel_button)
+        buttons.addWidget(continue_button)
+        layout.addLayout(buttons)
+        cancel_button.clicked.connect(dialog.reject)
+        continue_button.clicked.connect(dialog.accept)
+
+        failed = False
+        for index, (label, check) in enumerate(checks):
+            detail.setText(f"Checking {label.lower()}…")
+            QCoreApplication.processEvents()
+            try:
+                passed, message = check()
+            except Exception as error:
+                passed, message = False, str(error)
+            rows[index].setChecked(bool(passed))
+            rows[index].setText(f"{label} — {'OK' if passed else 'FAILED'}")
+            progress.setValue(index + 1)
+            status.setText(message)
+            QCoreApplication.processEvents()
+            if not passed:
+                failed = True
+                detail.setText("Pre-check failed. Wyrd will not launch Skyrim.")
+                status.setText(f"{label}: {message}")
+                break
+
+        if failed:
+            cancel_button.setText("Close")
+            continue_button.hide()
+            dialog.exec()
+            return False
+        detail.setText("All checks passed. Review the checklist, then continue.")
+        status.setText(f"Ready to launch '{selected_target.get('title')}' through MO2 instance '{instance_name}'.")
+        continue_button.setEnabled(True)
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    @staticmethod
+    def _preflight_instance_exists(prefix: Path, install_root: Path, instance_name: str) -> tuple[bool, str]:
+        inventory = inspect_mo2_instances(prefix, install_root, require_managed=False)
+        if not inventory.get("ok"):
+            return False, inventory.get("message", "MO2 instance inventory is unavailable.")
+        item = next((entry for entry in inventory.get("instances", [])
+                     if entry.get("name") == instance_name), None)
+        if not item:
+            return False, f"MO2 instance '{instance_name}' was not found in the selected prefix."
+        instance_path = Path(item.get("path", ""))
+        config_path = Path(item.get("config", instance_path / "ModOrganizer.ini"))
+        valid = (
+            not instance_path.is_symlink() and instance_path.is_dir()
+            and not config_path.is_symlink() and config_path.is_file()
+        )
+        return valid, f"Instance folder: {instance_path}; configuration: {config_path}"
+
     def _launch_skyrim_target_from_inventory(
         self, instance_name: str, target_state: dict, game_path: Path,
         prefix: Path, install_root: Path, proton: Path, require_managed: bool,
@@ -1719,6 +1824,11 @@ class MainWindow(QMainWindow):
             return
         selected_target = targets[labels.index(selected_label)]
         selected = selected_target["title"]
+        if not self._run_launch_preflight(
+            instance_name, target_state, selected_target,
+            game_path, prefix, install_root, proton, steam_root,
+        ):
+            return
         answer = QMessageBox.question(
             self, "Confirm Skyrim launch",
             f"MO2 will launch '{selected}' in instance '{instance_name}' using its virtual filesystem. Continue?",
