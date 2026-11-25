@@ -76,36 +76,48 @@ class GameProcess:
 
 
 STYLE = """
-QWidget { background: #17191b; color: #e7dfc8; font-size: 14px; }
-QMainWindow, QScrollArea, QTabWidget::pane { background: #17191b; }
+/* Nordic Frost: SkyUI-inspired charcoal, slate and glacial-blue palette. */
+QWidget { background: #11191f; color: #dce5e9; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 13px; }
+QMainWindow, QScrollArea, QTabWidget::pane { background: #11191f; }
 QLabel { background: transparent; border: none; }
-QFrame#panel { background: #202326; border: 1px solid #514d42; border-radius: 10px; }
-QFrame#runtimePanel { background: #20262a; border: 1px solid #5e604f; border-radius: 12px; }
-QPushButton { background: #292f33; color: #e7dfc8; border: 1px solid #625d4e; border-radius: 7px; padding: 10px 16px; min-height: 20px; }
-QPushButton#primaryAction { background: #806b42; color: #fff4d5; border: 1px solid #b49a62; font-weight: 600; }
-QPushButton#primaryAction:hover { background: #967d4e; }
-QPushButton#secondaryAction { background: #252d31; border-color: #647078; }
-QLabel#heading { color: #e9dfc3; font-family: Georgia, serif; font-size: 31px; font-weight: 600; letter-spacing: 2px; padding: 3px 0; }
-QLabel#section { color: #d9c28b; font-family: Georgia, serif; font-size: 17px; font-weight: 600; }
-QLabel#muted { color: #aaa18d; }
-QPushButton:hover { background: #39434a; color: #fff3cf; border-color: #c2a76b; }
-QPushButton:pressed { background: #202629; }
-QPushButton:disabled { color: #716d62; background: #242627; border-color: #454239; }
-QComboBox { background: #202629; color: #e7dfc8; border: 1px solid #626b6d; border-radius: 7px; padding: 9px 12px; min-height: 22px; }
-QComboBox QAbstractItemView { background: #202326; color: #e7dfc8; selection-background-color: #43515a; }
-QTabWidget::pane { border: 1px solid #665b43; top: -1px; }
-QTabBar::tab { background: #202326; color: #aaa18d; border: 1px solid #514a3a; border-top-left-radius: 7px; border-top-right-radius: 7px; padding: 11px 24px; margin-right: 5px; }
-QTabBar::tab:selected { background: #343a3b; color: #e9dfc3; border-bottom: 2px solid #c2a76b; }
-QTabBar::tab:hover { color: #fff3cf; }
-QProgressBar { background: #24282a; border: 1px solid #665b43; border-radius: 3px; height: 13px; text-align: center; color: #e7dfc8; }
-QProgressBar::chunk { background: #8c7546; }
-QPlainTextEdit { background: #111416; color: #cfc6ad; border: 1px solid #514a3a; border-radius: 3px; padding: 6px; }
+QFrame#panel { background: #19252d; border: 1px solid #40515c; border-radius: 6px; }
+QFrame#runtimePanel { background: #1b2a34; border: 1px solid #4b6270; border-radius: 6px; }
+QPushButton { background: #263640; color: #dce5e9; border: 1px solid #526875; border-radius: 3px; padding: 9px 15px; min-height: 20px; }
+QPushButton:hover { background: #334955; color: #f0f6f8; border-color: #8eafbf; }
+QPushButton:pressed { background: #1a2931; }
+QPushButton:disabled { color: #71818a; background: #1b252b; border-color: #34434b; }
+QPushButton#primaryAction { background: #385666; color: #f0f6f8; border: 1px solid #82a9bc; font-weight: 600; }
+QPushButton#primaryAction:hover { background: #466a7c; }
+QPushButton#secondaryAction { background: #202f38; border-color: #536b78; }
+QLabel#heading { color: #e5edf0; font-family: Georgia, serif; font-size: 31px; font-weight: 600; letter-spacing: 3px; padding: 3px 0; }
+QLabel#section { color: #a9c3d0; font-family: Georgia, serif; font-size: 16px; font-weight: 600; letter-spacing: 1px; }
+QLabel#muted { color: #a5b3ba; }
+QComboBox, QLineEdit { background: #17232b; color: #dce5e9; border: 1px solid #526875; border-radius: 3px; padding: 8px 10px; min-height: 21px; selection-background-color: #456779; }
+QComboBox:hover, QLineEdit:focus { border-color: #91b6c8; }
+QComboBox QAbstractItemView { background: #19252d; color: #dce5e9; selection-background-color: #385666; border: 1px solid #526875; }
+QTabWidget::pane { background: #141f26; border: 1px solid #40515c; top: -1px; }
+QTabBar::tab { background: #17232b; color: #9eafb8; border: 1px solid #344650; padding: 10px 22px; margin-right: 3px; }
+QTabBar::tab:selected { background: #243640; color: #e5edf0; border-bottom: 2px solid #8fb4c6; }
+QTabBar::tab:hover { color: #e5edf0; }
+QProgressBar { background: #17232b; border: 1px solid #40515c; border-radius: 2px; height: 12px; text-align: center; color: #dce5e9; }
+QProgressBar::chunk { background: #63899c; }
+QPlainTextEdit { background: #0d151a; color: #c7d4da; border: 1px solid #40515c; border-radius: 3px; padding: 7px; }
 QScrollArea { border: none; background: transparent; }
-QListWidget#mo2AdvancedCategories { background: #202326; border: 1px solid #514a3a; padding: 4px; outline: none; }
-QListWidget#mo2AdvancedCategories::item { color: #aaa18d; padding: 12px 10px; border-bottom: 1px solid #35383a; }
-QListWidget#mo2AdvancedCategories::item:hover { color: #f0e4c5; background: #292d30; }
-QListWidget#mo2AdvancedCategories::item:selected { color: #f0d89b; background: #343a3b; border-left: 3px solid #c2a76b; }
-QGroupBox { border: 1px solid #514a3a; border-radius: 3px; margin-top: 12px; padding: 10px 8px 8px 8px; color: #d9c28b; }
+QScrollBar:vertical { background: #11191f; width: 11px; margin: 0; }
+QScrollBar::handle:vertical { background: #405763; min-height: 24px; }
+QScrollBar::handle:vertical:hover { background: #64899b; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QListWidget#mo2AdvancedCategories { background: #19252d; border: 1px solid #40515c; padding: 4px; outline: none; }
+QListWidget#mo2AdvancedCategories::item { color: #a5b3ba; padding: 11px 10px; border-bottom: 1px solid #2b3a43; }
+QListWidget#mo2AdvancedCategories::item:hover { color: #e5edf0; background: #243640; }
+QListWidget#mo2AdvancedCategories::item:selected { color: #d9edf5; background: #2a414e; border-left: 3px solid #8fb4c6; }
+QListWidget { background: #17232b; color: #dce5e9; border: 1px solid #40515c; outline: none; }
+QListWidget::item { padding: 7px; border-bottom: 1px solid #293942; }
+QListWidget::item:selected { background: #2a414e; color: #eef6f8; }
+QCheckBox { spacing: 8px; color: #cbd7dc; }
+QCheckBox::indicator { width: 15px; height: 15px; background: #17232b; border: 1px solid #617985; }
+QCheckBox::indicator:checked { background: #63899c; border-color: #a9c8d6; }
+QGroupBox { border: 1px solid #40515c; border-radius: 3px; margin-top: 12px; padding: 10px 8px 8px 8px; color: #a9c3d0; }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 """
 
@@ -180,8 +192,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
-        self.resize(1040, 780)
-        self.setMinimumSize(820, 640)
+        self.resize(1100, 820)
+        self.setMinimumSize(900, 680)
         self.worker: QThread | None = None
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
@@ -290,6 +302,7 @@ class MainWindow(QMainWindow):
         self.install_button.clicked.connect(self.install_mo2)
         self.use_existing_mo2_button = QPushButton("Use Existing MO2")
         self.use_existing_mo2_button.clicked.connect(self.use_existing_mo2)
+        self.use_existing_mo2_button.hide()  # Discovery is owned by the single MO2 card action.
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
@@ -309,8 +322,7 @@ class MainWindow(QMainWindow):
 
         primary_actions = QHBoxLayout()
         primary_actions.addWidget(self.install_button)
-        primary_actions.addWidget(self.use_existing_mo2_button)
-        primary_actions.addWidget(self.launch_button)
+                primary_actions.addWidget(self.launch_button)
         primary_actions.addStretch(1)
         setup_layout.addLayout(primary_actions)
 
