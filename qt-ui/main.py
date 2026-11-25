@@ -99,8 +99,8 @@ QPushButton:disabled { color: #71818a; background: #1b252b; border-color: #34434
 QPushButton#primaryAction { background: #385666; color: #f0f6f8; border: 1px solid #82a9bc; font-weight: 600; }
 QPushButton#primaryAction:hover { background: #466a7c; }
 QPushButton#secondaryAction { background: #202f38; border-color: #536b78; }
-QLabel#heading { color: #e5edf0; font-family: Georgia, serif; font-size: 31px; font-weight: 600; letter-spacing: 3px; padding: 3px 0; }
-QLabel#section { color: #a9c3d0; font-family: Georgia, serif; font-size: 16px; font-weight: 600; letter-spacing: 1px; }
+QLabel#heading { color: #eef4f6; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 2px; padding: 2px 0; }
+QLabel#section { color: #d5e4ea; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .6px; }
 QLabel#muted { color: #a5b3ba; }
 QComboBox, QLineEdit { background: #17232b; color: #dce5e9; border: 1px solid #526875; border-radius: 3px; padding: 8px 10px; min-height: 21px; selection-background-color: #456779; }
 QComboBox:hover, QLineEdit:focus { border-color: #91b6c8; }
@@ -269,8 +269,9 @@ class MainWindow(QMainWindow):
         self.precheck_progress = QProgressBar()
         self.precheck_progress.setRange(0, len(self.precheck_rows))
         self.precheck_progress.setValue(0)
-        self.precheck_progress.setMaximumHeight(6)
-        precheck_layout.addWidget(self.precheck_progress)
+        # The checklist itself communicates readiness. A 6px progress bar with
+        # centered text was unreadable and visually collided with the checks.
+        self.precheck_progress.hide()
         setup_layout.addWidget(self.precheck_panel)
 
         configuration_grid = QGridLayout()
@@ -843,10 +844,25 @@ class MainWindow(QMainWindow):
             elif self.instance_state.get("ok"):
                 summary += "\nCreate a Skyrim Special Edition instance in MO2 to continue."
             owner = "Wyrd-managed" if self.mo2_state.get("managed", True) else "External (read-only)"
+            # Keep the main screen human-readable. Full filesystem paths belong
+            # on Advanced → Paths, not in the primary setup/launch workflow.
+            if skyrim_instances:
+                instance_summary = (
+                    f"{len(skyrim_instances)} Skyrim Special Edition instance(s) detected: "
+                    + ", ".join(item["name"] for item in skyrim_instances)
+                )
+            elif self.instance_state.get("ok"):
+                instance_summary = (
+                    "MO2 is installed, but no Skyrim Special Edition instance is configured yet. "
+                    "Open MO2 and create a Skyrim Special Edition instance, then return here."
+                )
+            else:
+                instance_summary = self.instance_state.get(
+                    "message", "MO2 instance discovery is unavailable."
+                )
             self.mo2_panel.detail_label.setText(
-                f"{owner} MO2 is available in Skyrim's Steam prefix.\n"
-                f'Executable: {self.mo2_state.get("executable")}\n'
-                f'Steam compatdata: {self.mo2_state.get("prefix")}\n{summary}'
+                f"{owner} installation · {self.mo2_state.get('version', 'MO2')}\n"
+                f"{instance_summary}"
             )
             self.install_button.hide()
             self.launch_game_button.setEnabled(False)
@@ -881,7 +897,7 @@ class MainWindow(QMainWindow):
             "A registered environment is selected." if active
             else "No active environment selected yet. Connect or create an MO2 instance.",
         )
-        self.precheck_progress.setFormat("Checks complete")
+        self.precheck_progress.setFormat("")
         self.precheck_status.setText(
             "Startup checks complete. " +
             ("An active environment is ready for launch." if active
