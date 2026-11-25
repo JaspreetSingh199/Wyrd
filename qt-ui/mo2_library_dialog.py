@@ -63,17 +63,16 @@ class Mo2LibraryDialog(QWidget):
         self.setup_status.setWordWrap(True)
         layout.addWidget(self.setup_status)
 
-        self.discover_button = QPushButton("+ Add environment")
-        self.discover_button.setToolTip(
-            "Open Mod Organizer 2's Instance Manager using the selected Proton runtime."
+        # MO2 instances are discovered automatically by the parent scan. Do not
+        # expose a second create/register workflow here: it duplicated discovery
+        # and previously referenced a removed create_environment handler.
+        self.refresh_button = QPushButton("Refresh MO2 scan")
+        self.refresh_button.setToolTip(
+            "Rescan the selected MO2 installation for Skyrim Special Edition instances."
         )
-        self.discover_button.clicked.connect(self.create_environment)
-        self.connect_existing_button = QPushButton("Connect existing instance")
-        self.connect_existing_button.clicked.connect(self.discover)
+        self.refresh_button.clicked.connect(self.discover)
         environment_entry_actions = QHBoxLayout()
-        environment_entry_actions.setSpacing(8)
-        environment_entry_actions.addWidget(self.discover_button)
-        environment_entry_actions.addWidget(self.connect_existing_button)
+        environment_entry_actions.addWidget(self.refresh_button)
         environment_entry_actions.addStretch(1)
         layout.addLayout(environment_entry_actions)
 
