@@ -761,12 +761,10 @@ class MainWindow(QMainWindow):
                        if item.get("id") == self.selected_mo2_instance_id), None)
         if not record:
             self.active_instance_label.setText(
-                "MO2 is not connected to Wyrd yet. Choose Use Existing MO2 to find it."
+                "No verified MO2 environment is active. Use Connect existing instance below, or install MO2."
             )
             if hasattr(self, "launch_game_button"):
                 self.launch_game_button.setEnabled(False)
-            if hasattr(self, "use_existing_mo2_button"):
-                self.use_existing_mo2_button.show()
             return None
         games = {item["id"]: item for item in registry["games"]}
         installations = {item["id"]: item for item in registry["installations"]}
