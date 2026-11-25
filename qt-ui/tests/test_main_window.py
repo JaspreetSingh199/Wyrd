@@ -757,6 +757,22 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("No compatible Proton", window.runtime_status.text())
         window.close()
 
+    def test_reset_wyrd_settings_button_replays_first_launch_without_resetting_mo2(self):
+        window = self._window()
+        self.assertEqual(window.reset_settings_button.text(), "Reset Wyrd Settings")
+        with patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
+            "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
+        ) as reset, patch.object(window, "refresh_all") as refresh, patch(
+            "main.QTimer.singleShot"
+        ) as schedule:
+            window.reset_wyrd_preferences()
+        reset.assert_called_once_with()
+        refresh.assert_called_once()
+        schedule.assert_called_once()
+        self.assertEqual(window._saved_settings, {})
+        self.assertFalse(window._saved_settings.get("first_run_completed", False))
+        window.close()
+
     def test_legacy_isolated_prefix_actions_are_not_created(self):
         window = self._window()
         self.assertFalse(hasattr(window, "launch_game_prefix_button"))
