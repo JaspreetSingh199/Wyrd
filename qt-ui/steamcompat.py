@@ -5,20 +5,21 @@ not reset, install dependencies into, or otherwise mutate that prefix itself.
 """
 from __future__ import annotations
 
-import os
-import re
-import subprocess
-from pathlib import Path
-
-from wyrd_mo2 import (inspect_wyrd_installation, inspect_proton_build, _runtime_environment,
-                     inspect_mo2_instances, copy_mo2_instance_to_prefix,
-                     _steam_root_for_game, managed_paths)
-from skyrim_detection import steam_libraries
 import json
 import os
+import re
 import shutil
+import subprocess
 import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
+
+from skyrim_detection import steam_libraries
+from wyrd_mo2 import (
+    inspect_wyrd_installation, inspect_proton_build, _runtime_environment,
+    inspect_mo2_instances, copy_mo2_instance_to_prefix,
+    _steam_root_for_game, managed_paths,
+)
 
 APP_ID = "489830"
 
