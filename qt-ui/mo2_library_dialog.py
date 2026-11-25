@@ -341,12 +341,12 @@ class Mo2LibraryDialog(QWidget):
         # the Windows registry. Steam's stale S: mapping can otherwise win over
         # the real Linux installation. Update only Skyrim SE's Installed Path
         # value in this selected Proton prefix, after explicit user approval.
-        game_windows_path = "Z:" + str(resolved_game).replace("/", "\\\\")
+        game_windows_path = "Z:" + str(resolved_game).replace("/", "\\")
         answer = QMessageBox.question(
             self, "Prepare Skyrim path for MO2",
             "Wyrd can point Skyrim Special Edition's Bethesda registry entry in this "
-            "Proton prefix at the detected Linux game folder:\\n\\n"
-            f"{game_windows_path}\\n\\n"
+            "Proton prefix at the detected Linux game folder:\n\n"
+            f"{game_windows_path}\n\n"
             "This changes only the 'Installed Path' registry value for Skyrim Special Edition "
             "inside the selected Proton prefix. It does not change Steam library files, game "
             "files, saves, or other registry entries. Continue?",
@@ -360,7 +360,7 @@ class Mo2LibraryDialog(QWidget):
         proton_wrapper = str((proton / "proton").resolve(strict=True))
         registry_command = [
             proton_wrapper, "run", "reg.exe", "add",
-            r"HKLM\\Software\\Bethesda Softworks\\Skyrim Special Edition",
+            r"HKLM\Software\Bethesda Softworks\Skyrim Special Edition",
             "/v", "Installed Path", "/t", "REG_SZ", "/d", game_windows_path, "/f",
         ]
         try:
