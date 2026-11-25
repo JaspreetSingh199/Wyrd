@@ -325,7 +325,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "gameName=Fallout 4\n", encoding="utf-8"
             )
             before = ini.read_bytes()
-            result = inspect_mo2_instances(prefix)
+            result = inspect_mo2_instances(prefix, detected_game_path=Path("/games/Skyrim Special Edition"))
             self.assertTrue(result["ok"])
             self.assertEqual(len(result["instances"]), 2)
             self.assertEqual([item["name"] for item in result["skyrim_instances"]],
