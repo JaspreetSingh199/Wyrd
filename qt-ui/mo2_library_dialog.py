@@ -41,7 +41,7 @@ class Mo2LibraryDialog(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
-        self.intro = QLabel("Connect an existing MO2 instance to Wyrd. Your MO2 files will not be changed.")
+        self.intro = QLabel("Connect an existing MO2 instance. Your files will not be changed.")
         self.intro.setWordWrap(True)
         layout.addWidget(self.intro)
         self.setup_status = QLabel()
@@ -127,7 +127,7 @@ class Mo2LibraryDialog(QWidget):
             else:
                 self.connected_instances.hide()
         else:
-            self.setup_status.setText("MO2 is not connected yet. Find your existing instance to get started.")
+            self.setup_status.setText("Not connected")
             self.connected_instances.hide()
 
     def _select_connected(self, row: int):
