@@ -28,11 +28,13 @@ def steam_compat_prefix(steam_root: Path) -> Path:
 
 def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
                                       home: Path | None = None, callback=None) -> dict:
-    """Install MO2 inside Skyrim's AppID prefix without creating a separate Wyrd prefix.
+    """Download and run the official MO2 Windows installer in Skyrim's existing prefix.
 
-    Only the MO2 install directory is owned by Wyrd. Skyrim's compatdata prefix
-    remains Steam-owned and is never initialized, reset, or marked by Wyrd.
+    The installer is interactive so the user can review its options. Wyrd supplies
+    the intended C:\\Modding\\MO2 target and never creates or resets a prefix.
     """
+    import urllib.request
+
     home = (home or Path.home()).expanduser()
     proton = Path(proton_path).expanduser().resolve()
     game = Path(game_path).expanduser().resolve()
@@ -49,83 +51,89 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
         prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
     except (OSError, ValueError, RuntimeError):
         raise RuntimeError("Skyrim compatdata prefix is outside the detected Steam root.")
-    proton_prefix = prefix / "pfx"
-    wine_drive = proton_prefix / "drive_c"
-    modding_root = wine_drive / "Modding"
-    if (proton_prefix.is_symlink() or wine_drive.is_symlink()
-            or modding_root.is_symlink()):
-        raise RuntimeError("Refusing to install MO2 through a symlinked Proton prefix path.")
-    if not wine_drive.is_dir():
-        raise RuntimeError("Skyrim's Proton prefix is not initialized. Launch Skyrim through Steam once first.")
+    pfx, wine_drive = prefix / "pfx", prefix / "pfx/drive_c"
+    if pfx.is_symlink() or wine_drive.is_symlink() or not wine_drive.is_dir():
+        raise RuntimeError("Skyrim's Proton prefix is missing, uninitialized or unsafe.")
     install = wine_drive / "Modding/MO2"
     if install.is_symlink() or install.parent.is_symlink() or install.parent.parent.is_symlink():
         raise RuntimeError("Refusing to install MO2 through a symlinked path inside Skyrim's prefix.")
-    marker = install / ".wyrd-managed.json"
-    executable = install / "ModOrganizer.exe"
+    marker, executable = install / ".wyrd-managed.json", install / "ModOrganizer.exe"
     if install.exists():
-        if executable.is_file() and not executable.is_symlink() and marker.is_file() and not marker.is_symlink():
-            try:
-                ownership = json.loads(marker.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                ownership = {}
-            if ownership.get("managed_by") == "Wyrd" and ownership.get("game_app_id") == APP_ID:
-                return {"ok": True, "already_installed": True, "executable": str(executable),
-                        "prefix": str(prefix), "install": str(install),
-                        "message": "Wyrd-managed MO2 is already installed in Skyrim's Steam compatdata prefix."}
-        raise RuntimeError(f"MO2 install target exists but is not a verified Wyrd installation: {install}. It was left untouched.")
-    root = managed_paths(home)["root"]
-    staging_root = root / "staging"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    downloads_root = root / "downloads"
-    downloads_root.mkdir(parents=True, exist_ok=True)
-    version, archive_name, url = _latest_mo2_archive()
-    # Keep the official release archive in Wyrd's download cache. A failed
-    # install/retry should not force another large download.
-    archive = downloads_root / archive_name
-    stage = Path(tempfile.mkdtemp(prefix="mo2-steam-prefix-", dir=staging_root))
-    try:
-        if callback:
-            callback(10, f"Preparing MO2 {version} for Skyrim's prefix…")
-        if not archive.is_file() or archive.is_symlink() or archive.stat().st_size == 0:
-            partial = downloads_root / (archive_name + ".part")
-            partial.unlink(missing_ok=True)
-            _download_archive(url, partial, callback)
-            if partial.is_symlink() or not partial.is_file() or partial.stat().st_size == 0:
-                raise RuntimeError("MO2 download did not produce a valid archive.")
-            os.replace(partial, archive)
-        try:
-            extracted = _extract_mo2(archive, stage / "extracted", callback)
-        except Exception:
-            # A stale/corrupt cache must not make every retry fail forever.
-            archive.unlink(missing_ok=True)
-            partial = downloads_root / (archive_name + ".part")
-            partial.unlink(missing_ok=True)
-            _download_archive(url, partial, callback)
-            os.replace(partial, archive)
-            extracted = _extract_mo2(archive, stage / "extracted", callback)
-        if not (extracted / "ModOrganizer.exe").is_file():
-            raise RuntimeError("MO2 verification failed: ModOrganizer.exe is missing.")
-        extracted_marker = extracted / ".wyrd-managed.json"
-        extracted_marker.write_text(json.dumps({
-            "managed_by": "Wyrd", "version": version,
-            "installed": datetime.now(timezone.utc).isoformat(),
-            "proton": str(proton), "steam_root": str(steam_root),
-            "game_app_id": APP_ID, "game_path": str(game),
-            "prefix": str(prefix), "install": str(install),
-            "installation_mode": "skyrim-steam-prefix",
-        }, indent=2), encoding="utf-8")
-        install.parent.mkdir(parents=True, exist_ok=True)
-        if install.exists():
-            raise RuntimeError(f"Install target appeared during setup: {install}. Existing files were not changed.")
-        os.replace(extracted, install)
-    finally:
-        shutil.rmtree(stage, ignore_errors=True)
+        if executable.is_file() and not executable.is_symlink():
+            return {"ok": True, "already_installed": True, "executable": str(executable),
+                    "prefix": str(prefix), "install": str(install),
+                    "message": "An MO2 executable already exists at the intended install location."}
+        raise RuntimeError(f"MO2 target already exists and will not be overwritten: {install}")
+
+    version = "2.5.2"
+    installer_name = f"Mod.Organizer-{version}.exe"
+    url = f"https://github.com/ModOrganizer2/modorganizer/releases/download/v{version}/{installer_name}"
+    downloads = managed_paths(home)["root"] / "downloads"
+    downloads.mkdir(parents=True, exist_ok=True)
+    installer = downloads / installer_name
     if callback:
-        callback(100, "MO2 installed and verified inside Skyrim's Steam compatdata prefix.")
+        callback(5, f"Downloading official Mod Organizer 2 {version} installer…")
+    if not installer.is_file() or installer.is_symlink() or installer.stat().st_size < 50_000_000:
+        partial = downloads / (installer_name + ".part")
+        partial.unlink(missing_ok=True)
+        request = urllib.request.Request(url, headers={"User-Agent": "Wyrd MO2 installer"})
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
+                total = int(response.headers.get("Content-Length", "0") or 0)
+                downloaded = 0
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    output.write(chunk)
+                    downloaded += len(chunk)
+                    if callback and total:
+                        callback(min(35, 5 + int(30 * downloaded / total)),
+                                 f"Downloading MO2 installer… {downloaded // (1024 * 1024)} MB")
+            if partial.stat().st_size < 50_000_000:
+                raise RuntimeError("Downloaded MO2 installer is unexpectedly small.")
+            os.replace(partial, installer)
+        except Exception:
+            partial.unlink(missing_ok=True)
+            raise
+    if callback:
+        callback(40, "Launching official MO2 installer in Skyrim's Proton prefix…")
+    env = _runtime_environment(proton, prefix, steam_root, game)
+    env["STEAM_COMPAT_APP_ID"] = APP_ID
+    env["SteamAppId"] = APP_ID
+    env["SteamGameId"] = APP_ID
+    command = [str(proton / "proton"), "run", str(installer),
+               "/DIR=C:\\Modding\\MO2"]
+    process = subprocess.Popen(command, cwd=str(steam_root), env=env,
+                               stdin=subprocess.DEVNULL, start_new_session=True)
+    if callback:
+        callback(45, "MO2 installer opened. Complete its wizard; Wyrd will verify the installation when it closes.")
+    try:
+        return_code = process.wait(timeout=1800)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        raise RuntimeError("MO2 installer did not finish within 30 minutes.")
+    if return_code != 0:
+        raise RuntimeError(f"MO2 installer exited with status {return_code}.")
+    if not executable.is_file() or executable.is_symlink():
+        raise RuntimeError(
+            "MO2 installer closed, but ModOrganizer.exe was not found at "
+            f"{install}. Check the installer's destination and retry."
+        )
+    marker.write_text(json.dumps({
+        "managed_by": "Wyrd", "version": version,
+        "installed": datetime.now(timezone.utc).isoformat(),
+        "proton": str(proton), "steam_root": str(steam_root),
+        "game_app_id": APP_ID, "game_path": str(game),
+        "prefix": str(prefix), "install": str(install),
+        "installation_mode": "official-windows-installer",
+    }, indent=2), encoding="utf-8")
+    if callback:
+        callback(100, "Official MO2 installer completed; ModOrganizer.exe verified.")
     return {"ok": True, "already_installed": False, "executable": str(executable),
             "version": version, "proton": str(proton), "prefix": str(prefix),
             "install": str(install), "game_path": str(game),
-            "message": f"MO2 {version} installed and verified inside Skyrim's Steam compatdata prefix."}
+            "message": f"MO2 {version} installed and verified in Skyrim's existing Steam prefix."}
 
 
 def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = None) -> dict:
