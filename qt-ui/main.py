@@ -1190,6 +1190,48 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         self._restore_registered_instance()
 
+    def install_requirements(self) -> None:
+        """Run the dedicated dependency installer without blocking the UI."""
+        worker = getattr(self, "requirements_worker", None)
+        if worker is not None and worker.isRunning():
+            return
+        script = Path(__file__).resolve().parent / "install-requirements.sh"
+        if not script.is_file():
+            QMessageBox.warning(
+                self, "Install requirements",
+                f"Requirements installer script is missing:\\n{script}",
+            )
+            return
+        self.requirements_worker = RequirementsInstallWorker()
+        self.requirements_worker.completed.connect(self._on_requirements_installed)
+        self.install_requirements_button.setEnabled(False)
+        self.requirements_status.setText("Installing/checking Python requirements…")
+        self._log("Starting Wyrd Python requirements installer.")
+        self.requirements_worker.start()
+
+    def _on_requirements_installed(self, result: dict) -> None:
+        self.install_requirements_button.setEnabled(True)
+        output = "\\n".join(
+            value for value in (result.get("stdout"), result.get("stderr"), result.get("message"))
+            if value
+        )
+        if result.get("ok"):
+            self.requirements_status.setText("Python requirements are installed in Wyrd's .venv.")
+            self._log("Wyrd Python requirements are ready. Restart Wyrd if PySide6 was upgraded.")
+            QMessageBox.information(
+                self, "Requirements installed",
+                (output + "\\n\\n" if output else "")
+                + "Wyrd's Python requirements are installed in its local .venv. "
+                + "Restart Wyrd if the installer upgraded PySide6.",
+            )
+        else:
+            self.requirements_status.setText("Requirements installation failed. See Setup Log.")
+            self._log("Wyrd requirements installation failed: " + (output or "No installer output."))
+            QMessageBox.warning(
+                self, "Requirements installation failed",
+                output or "The requirements installer failed without additional output.",
+            )
+
     def check_mo2_installation(self) -> None:
         """Show a read-only inventory of Skyrim prefix, MO2 files and instances."""
         lines = []
