@@ -395,6 +395,117 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     }
 
 
+
+def launch_skyrim_via_mo2_in_skyrim_prefix(
+    proton_path: Path, game_path: Path, instance_name: str,
+    executable_title: str, expected_binary: Path | str,
+    *, prefix_path: Path | None = None, install_root: Path | None = None,
+    steam_root_path: Path | None = None, xaudio2_compat: bool = False,
+    home: Path | None = None,
+) -> dict:
+    """Launch a verified MO2 Skyrim target using the established Steam-prefix context.
+
+    This is the single Skyrim launch adapter for registered environments. It
+    deliberately builds the same Steam AppID environment used by
+    launch_mo2_in_skyrim_prefix(), including SteamAppId, SteamGameId,
+    STEAM_COMPAT_APP_ID and STEAM_COMPAT_DATA_PATH. It never creates or resets
+    the Steam prefix.
+    """
+    from wyrd_mo2 import inspect_skyrim_launch_targets
+    import uuid
+
+    home = (home or Path.home()).expanduser()
+    game = Path(game_path).expanduser()
+    proton = Path(proton_path).expanduser()
+    if game.is_symlink() or not game.is_dir():
+        return {"ok": False, "message": "Skyrim game directory is missing or unsafe."}
+    if proton.is_symlink() or not proton.is_dir():
+        return {"ok": False, "message": "Selected Proton runtime is missing or unsafe."}
+    validation = inspect_proton_build(proton)
+    if not validation.get("ok"):
+        return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
+
+    try:
+        steam_root = Path(steam_root_path).expanduser() if steam_root_path else _steam_root_for_game(game, home)
+        expected_prefix = steam_compat_prefix(steam_root)
+        prefix = Path(prefix_path).expanduser() if prefix_path else expected_prefix
+        if prefix.is_symlink() or not prefix.is_dir():
+            return {"ok": False, "message": "Skyrim's existing Steam compatdata prefix is missing or unsafe."}
+        if prefix.resolve(strict=True) != expected_prefix.resolve(strict=True):
+            return {"ok": False, "message": "Registered prefix does not match Skyrim's existing Steam AppID 489830 prefix."}
+        if not (prefix / "pfx/drive_c/users").is_dir():
+            return {"ok": False, "message": "Skyrim's Steam Proton prefix is not initialized."}
+        install = Path(install_root).expanduser() if install_root else prefix / "pfx/drive_c/Modding/MO2"
+        executable = install / "ModOrganizer.exe"
+        if install.is_symlink() or not install.is_dir() or executable.is_symlink() or not executable.is_file():
+            return {"ok": False, "message": "Registered MO2 installation is missing or unsafe."}
+        executable.resolve(strict=True).relative_to(install.resolve(strict=True))
+        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"ok": False, "message": f"Steam compatibility paths could not be verified: {error}"}
+
+    targets = inspect_skyrim_launch_targets(
+        prefix, game, instance_name=instance_name, install_root=install,
+        require_managed=False,
+    )
+    if not targets.get("ok"):
+        return {"ok": False, "message": targets.get("message", "Could not inspect the selected MO2 instance.")}
+    wanted = Path(expected_binary).expanduser()
+    matches = [
+        item for item in targets.get("targets", [])
+        if item.get("title") == executable_title
+        and Path(item.get("binary", "")).resolve() == wanted.resolve()
+    ]
+    if len(matches) != 1 or wanted.is_symlink() or not wanted.is_file():
+        return {"ok": False, "message": "Selected Skyrim executable is no longer uniquely verified in this MO2 instance."}
+
+    env = _runtime_environment(proton, steam_root, prefix)
+    env.update({
+        "SteamAppId": APP_ID, "SteamGameId": APP_ID,
+        "STEAM_COMPAT_APP_ID": APP_ID,
+        "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
+    })
+    if xaudio2_compat:
+        current = env.get("WINEDLLOVERRIDES", "")
+        overrides = [item for item in current.split(";")
+                     if item and not item.lower().startswith("xaudio2_7=")]
+        overrides.append("xaudio2_7=n,b")
+        env["WINEDLLOVERRIDES"] = ";".join(overrides)
+
+    launch_token = uuid.uuid4().hex
+    env["WYRD_LAUNCHED"] = "1"
+    env["WYRD_LAUNCH_ID"] = launch_token
+    command = [
+        str(proton / "proton"), "run", str(executable),
+        "--instance", instance_name, "run", "--executable", executable_title,
+    ]
+    diagnostics = managed_paths(home)["root"] / "logs" / "skyrim-launch.log"
+    try:
+        diagnostics.parent.mkdir(parents=True, exist_ok=True)
+        with diagnostics.open("a", encoding="utf-8") as log:
+            log.write("\\n=== Wyrd SteamCompat Skyrim launch ===\\n")
+            log.write(f"instance: {instance_name}\\nexecutable: {executable_title}\\n")
+            log.write(f"binary: {wanted}\\naudio_mode: {'xaudio2_compat' if xaudio2_compat else 'default'}\\n")
+            log.write("command: " + json.dumps(command) + "\\n")
+            log.write("SteamAppId: 489830\\n")
+            log.flush()
+            process = subprocess.Popen(
+                command, cwd=str(install), env=env,
+                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.flush()
+    except OSError as error:
+        return {"ok": False, "message": f"Could not start MO2 through SteamCompat: {error}"}
+    return {
+        "ok": True, "pid": process.pid, "prefix": str(prefix.resolve()),
+        "instance": instance_name, "launch_token": launch_token,
+        "log_path": str(diagnostics),
+        "message": f"Started '{executable_title}' through MO2 instance '{instance_name}' using Skyrim's SteamCompat environment.",
+    }
+
+
 def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> dict:
     """Remove verified Wyrd MO2 files while preserving Steam's Skyrim prefix."""
     import json
