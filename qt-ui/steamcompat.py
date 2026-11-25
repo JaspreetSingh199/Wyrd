@@ -6,12 +6,14 @@ not reset, install dependencies into, or otherwise mutate that prefix itself.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
 from wyrd_mo2 import (inspect_wyrd_installation, inspect_proton_build, _runtime_environment,
                      inspect_mo2_instances, copy_mo2_instance_to_prefix,
                      _steam_root_for_game, managed_paths)
+from skyrim_detection import steam_libraries
 import json
 import os
 import shutil
@@ -23,6 +25,91 @@ APP_ID = "489830"
 
 def steam_compat_prefix(steam_root: Path) -> Path:
     return Path(steam_root).expanduser() / "steamapps/compatdata" / APP_ID
+
+
+def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root: Path) -> dict:
+    """Make S: inside Skyrim's AppID prefix resolve to the detected game library.
+
+    Only the S: dosdevices symlink is changed. The game, Steam manifests,
+    saves, and other prefix entries are never modified.
+    """
+    prefix = Path(prefix_root).expanduser()
+    game = Path(game_path).expanduser()
+    steam = Path(steam_root).expanduser()
+    try:
+        if any(path.is_symlink() for path in (prefix, steam, game)):
+            raise RuntimeError("The selected Steam prefix, client root, or game path is symlinked; S: mapping was not changed.")
+        resolved_prefix = prefix.resolve(strict=True)
+        resolved_steam = steam.resolve(strict=True)
+        expected_prefix = steam_compat_prefix(resolved_steam).resolve(strict=True)
+        if resolved_prefix != expected_prefix:
+            raise RuntimeError("The selected prefix is not this game's Steam AppID 489830 compatdata prefix.")
+
+        resolved_game = game.resolve(strict=True)
+        if (not resolved_game.is_dir()
+                or resolved_game.parent.name.casefold() != "common"
+                or resolved_game.parent.parent.name.casefold() != "steamapps"):
+            raise RuntimeError("The detected Skyrim directory is not inside a Steam library's steamapps/common directory.")
+        library_steamapps = resolved_game.parent.parent
+        library_root = library_steamapps.parent.resolve(strict=True)
+        registered_libraries = [item.resolve(strict=True) for item in steam_libraries(resolved_steam)]
+        if library_steamapps.resolve(strict=True) not in registered_libraries:
+            raise RuntimeError("The detected Skyrim directory is not in a library registered by this Steam client.")
+
+        manifest = library_steamapps / f"appmanifest_{APP_ID}.acf"
+        if manifest.is_symlink() or not manifest.is_file():
+            raise RuntimeError("The detected Steam library has no safe Skyrim AppID manifest.")
+        manifest_text = manifest.read_text(encoding="utf-8", errors="replace")
+        app_id_match = re.search(r'"appid"\\s+"([^"]+)"', manifest_text)
+        install_dir_match = re.search(r'"installdir"\\s+"([^"]+)"', manifest_text)
+        if (not app_id_match or app_id_match.group(1) != APP_ID
+                or not install_dir_match or install_dir_match.group(1) != resolved_game.name):
+            raise RuntimeError("The Steam AppID manifest does not identify the detected Skyrim directory.")
+
+        pfx = resolved_prefix / "pfx"
+        drive_c = pfx / "drive_c"
+        dosdevices = pfx / "dosdevices"
+        drive_link = dosdevices / "s:"
+        if (pfx.is_symlink() or drive_c.is_symlink() or dosdevices.is_symlink()
+                or not drive_c.is_dir() or not dosdevices.is_dir()):
+            raise RuntimeError("The Skyrim Proton dosdevices path is missing or unsafe.")
+        if drive_link.exists() and not drive_link.is_symlink():
+            raise RuntimeError("The S: entry is not a symlink; it was left untouched.")
+
+        current_target = None
+        if drive_link.is_symlink():
+            try:
+                current_target = drive_link.resolve(strict=True)
+            except (OSError, RuntimeError):
+                current_target = None
+        changed = current_target != library_root
+        if changed:
+            temporary_link = dosdevices / f".wyrd-s-drive-{os.getpid()}"
+            if temporary_link.exists() or temporary_link.is_symlink():
+                raise RuntimeError("A previous S: mapping transaction artifact exists; manual inspection is required.")
+            temporary_link.symlink_to(library_root, target_is_directory=True)
+            try:
+                os.replace(temporary_link, drive_link)
+            finally:
+                temporary_link.unlink(missing_ok=True)
+
+        verified_target = drive_link.resolve(strict=True)
+        verified_game = (verified_target / "steamapps" / "common" / resolved_game.name).resolve(strict=True)
+        if verified_target != library_root or verified_game != resolved_game or not verified_game.is_dir():
+            raise RuntimeError("S: mapping verification failed after configuration.")
+        return {
+            "ok": True, "changed": changed, "drive": "S:",
+            "library_root": str(library_root),
+            "windows_game_path": "S:\\\\steamapps\\\\common\\\\ " + resolved_game.name,
+            "resolved_game_path": str(verified_game),
+            "message": ("Corrected" if changed else "Verified") + " MO2 S: Steam-library mapping.",
+        }
+    except (OSError, ValueError, RuntimeError) as error:
+        return {
+            "ok": False, "changed": False, "drive": "S:",
+            "library_root": None, "windows_game_path": None,
+            "resolved_game_path": None, "message": str(error),
+        }
 
 
 def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
