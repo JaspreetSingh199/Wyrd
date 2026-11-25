@@ -396,44 +396,14 @@ class MainWindow(QMainWindow):
         mo2_advanced_heading.setObjectName("section")
         advanced_layout.addWidget(mo2_advanced_heading)
         mo2_advanced_help = QLabel(
-            "Change MO2 paths, game or Proton links, and storage options here. "
-            "Most people can leave these settings as they are."
+            "Inspect detected paths, manage instance associations and configure per-instance storage. "
+            "Audio and launch diagnostics are below; recovery actions are at the bottom."
         )
         mo2_advanced_help.setObjectName("muted")
         mo2_advanced_help.setWordWrap(True)
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
 
-        recovery_panel = panel(
-            "RECOVERY & MAINTENANCE",
-            "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
-        )
-        requirements_row = QHBoxLayout()
-        self.install_requirements_button = QPushButton("Install requirements")
-        self.install_requirements_button.clicked.connect(self.install_requirements)
-        self.requirements_status = QLabel("Requirements are checked automatically when Wyrd starts.")
-        self.requirements_status.setObjectName("muted")
-        self.requirements_status.setWordWrap(True)
-        requirements_row.addWidget(self.install_requirements_button)
-        requirements_row.addWidget(self.requirements_status, 1)
-        recovery_panel.layout().addLayout(requirements_row)
-
-        maintenance_row = QHBoxLayout()
-        self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
-        self.reset_mo2_button.setToolTip(
-            "Resets only a verified Wyrd-managed installation. External MO2 installations are never reset."
-        )
-        self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
-        maintenance_row.addWidget(self.reset_mo2_button)
-        self.reset_settings_button = QPushButton("Reset Wyrd Settings")
-        self.reset_settings_button.setToolTip(
-            "Clears Wyrd's saved preferences and lets you run first-launch setup again. Does not reset or remove MO2."
-        )
-        self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
-        maintenance_row.addWidget(self.reset_settings_button)
-        maintenance_row.addStretch(1)
-        recovery_panel.layout().addLayout(maintenance_row)
-        advanced_layout.addWidget(recovery_panel)
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
             "Advanced diagnostics only. A library inventory cannot prove in-game audio; verify dialogue and music in Skyrim.",
@@ -475,6 +445,37 @@ class MainWindow(QMainWindow):
         self.log_view.setPlaceholderText("Detection and installation progress will appear here.")
         self.log_view.setMinimumHeight(220)
         advanced_layout.addWidget(self.log_view)
+
+        recovery_panel = panel(
+            "RECOVERY & MAINTENANCE",
+            "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
+        )
+        requirements_row = QHBoxLayout()
+        self.install_requirements_button = QPushButton("Install requirements")
+        self.install_requirements_button.clicked.connect(self.install_requirements)
+        self.requirements_status = QLabel("Requirements are checked automatically when Wyrd starts.")
+        self.requirements_status.setObjectName("muted")
+        self.requirements_status.setWordWrap(True)
+        requirements_row.addWidget(self.install_requirements_button)
+        requirements_row.addWidget(self.requirements_status, 1)
+        recovery_panel.layout().addLayout(requirements_row)
+
+        maintenance_row = QHBoxLayout()
+        self.reset_mo2_button = QPushButton("Reset Wyrd-managed MO2")
+        self.reset_mo2_button.setToolTip(
+            "Resets only a verified Wyrd-managed installation. External MO2 installations are never reset."
+        )
+        self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
+        maintenance_row.addWidget(self.reset_mo2_button)
+        self.reset_settings_button = QPushButton("Reset Wyrd Settings")
+        self.reset_settings_button.setToolTip(
+            "Clears Wyrd's saved preferences and lets you run first-launch setup again. Does not reset or remove MO2."
+        )
+        self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
+        maintenance_row.addWidget(self.reset_settings_button)
+        maintenance_row.addStretch(1)
+        recovery_panel.layout().addLayout(maintenance_row)
+        advanced_layout.addWidget(recovery_panel)
         advanced_layout.addStretch(1)
         advanced_scroll = QScrollArea()
         advanced_scroll.setWidgetResizable(True)
