@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QInputDialog, QDialog,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QInputDialog, QDialog,
     QWidget, QTabWidget, QScrollArea,
 )
 
@@ -321,17 +321,14 @@ class MainWindow(QMainWindow):
         self.active_instance_label.setObjectName("muted")
         setup_layout.addWidget(self.active_instance_label)
 
-        primary_actions = QHBoxLayout()
-        primary_actions.addWidget(self.install_button)
-        primary_actions.addWidget(self.check_mo2_button)
-        primary_actions.addStretch(1)
-        setup_layout.addLayout(primary_actions)
-
-        game_actions = QHBoxLayout()
-        game_actions.addWidget(self.launch_game_button)
-        game_actions.addWidget(self.launch_direct_button)
-        game_actions.addStretch(1)
-        setup_layout.addLayout(game_actions)
+        environment_actions = QHBoxLayout()
+        environment_actions.setSpacing(8)
+        environment_actions.addWidget(self.install_button)
+        environment_actions.addWidget(self.check_mo2_button)
+        environment_actions.addStretch(1)
+        environment_actions.addWidget(self.launch_game_button)
+        environment_actions.addWidget(self.launch_direct_button)
+        setup_layout.addLayout(environment_actions)
 
 
         self.progress_label = QLabel("Ready")
@@ -367,9 +364,13 @@ class MainWindow(QMainWindow):
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
 
+        diagnostics_grid = QGridLayout()
+        diagnostics_grid.setHorizontalSpacing(12)
+        diagnostics_grid.setVerticalSpacing(12)
+
         proton_diagnostics_panel = panel(
             "PROTON DIAGNOSTICS",
-            "Run a local, non-destructive check of the selected Proton runtime. This does not launch Skyrim or prove in-game compatibility."
+            "Check the selected runtime locally. This does not launch Skyrim or prove in-game compatibility."
         )
         proton_diagnostics_row = QHBoxLayout()
         self.test_proton_button = QPushButton("Test selected Proton")
@@ -378,11 +379,11 @@ class MainWindow(QMainWindow):
         proton_diagnostics_row.addWidget(self.test_proton_button)
         proton_diagnostics_row.addStretch(1)
         proton_diagnostics_panel.layout().addLayout(proton_diagnostics_row)
-        advanced_layout.addWidget(proton_diagnostics_panel)
+        diagnostics_grid.addWidget(proton_diagnostics_panel, 0, 0)
 
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
-            "Advanced diagnostics only. A library inventory cannot prove in-game audio; verify dialogue and music in Skyrim.",
+            "Inspect audio components or enable the XAudio2 override."
         )
         audio_layout = self.audio_panel.layout()
         self.audio_detail = QLabel("Audio diagnostics will be checked during detection.")
@@ -399,7 +400,7 @@ class MainWindow(QMainWindow):
         audio_actions.addWidget(self.xaudio_override_checkbox)
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
-        advanced_layout.addWidget(self.audio_panel)
+        diagnostics_grid.addWidget(self.audio_panel, 0, 1)
 
         diagnostics_panel = panel(
             "LAUNCH DIAGNOSTICS",
@@ -410,17 +411,23 @@ class MainWindow(QMainWindow):
         diagnostic_row.addWidget(self.launch_status_button)
         diagnostic_row.addStretch(1)
         diagnostics_panel.layout().addLayout(diagnostic_row)
-        advanced_layout.addWidget(diagnostics_panel)
+        diagnostics_grid.addWidget(diagnostics_panel, 1, 0, 1, 2)
+        diagnostics_grid.setColumnStretch(0, 1)
+        diagnostics_grid.setColumnStretch(1, 1)
+        advanced_layout.addLayout(diagnostics_grid)
 
-        logs_heading = QLabel("SETUP LOG")
-        logs_heading.setObjectName("section")
-        advanced_layout.addWidget(logs_heading)
+        logs_panel = panel(
+            "SETUP LOG",
+            "Recent detection, installation and launch messages."
+        )
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(400)
         self.log_view.setPlaceholderText("Detection and installation progress will appear here.")
-        self.log_view.setMinimumHeight(220)
-        advanced_layout.addWidget(self.log_view)
+        self.log_view.setMinimumHeight(180)
+        self.log_view.setMaximumHeight(260)
+        logs_panel.layout().addWidget(self.log_view)
+        advanced_layout.addWidget(logs_panel)
 
 
         advanced_layout.addStretch(1)
