@@ -660,70 +660,29 @@ class Mo2AdvancedSettings(QWidget):
 
         locations_page = QWidget()
         locations_layout = add_category(
-            "Locations",
+            "Paths",
             locations_page,
-            "Where Wyrd finds MO2, Skyrim and Proton. These are normally detected for you."
+            "Read-only locations detected by Wyrd. Change game and Proton associations from the Instances page."
         )
-        paths_box = QGroupBox("Folders and runtime")
+        paths_box = QGroupBox("Detected locations")
         form = QFormLayout(paths_box)
         self.prefix_edit = QLineEdit()
         self.install_edit = QLineEdit()
-        self.game_name_edit = QLineEdit("Skyrim Special Edition")
-        self.game_id_edit = QLineEdit("steam-489830")
-        self.game_appid_edit = QLineEdit("489830")
         self.game_path_edit = QLineEdit()
         self.proton_edit = QLineEdit()
-        for field in (self.prefix_edit,self.install_edit,self.game_name_edit,self.game_id_edit,
-                      self.game_appid_edit,self.game_path_edit,self.proton_edit):
+        for field in (self.prefix_edit, self.install_edit, self.game_path_edit, self.proton_edit):
             field.setMinimumHeight(30)
-        self.prefix_edit.setPlaceholderText("Detected Skyrim Proton prefix")
-        self.install_edit.setPlaceholderText("Detected MO2 installation folder")
-        self.game_path_edit.setPlaceholderText("Detected Skyrim game folder")
-        self.proton_edit.setPlaceholderText("Selected Proton runtime")
-        def browse_row(field, title):
-            row=QHBoxLayout()
-            row.addWidget(field,1)
-            button=QPushButton("Browse…")
-            button.clicked.connect(lambda: self._browse_directory(title, field))
-            row.addWidget(button)
-            return row
-        form.addRow("Skyrim Steam compatdata:", browse_row(self.prefix_edit,"Select Skyrim Steam compatdata folder"))
-        form.addRow("MO2 folder:", browse_row(self.install_edit,"Select MO2 folder"))
-        form.addRow("Game folder:", browse_row(self.game_path_edit,"Select game folder"))
-        form.addRow("Proton runtime:", browse_row(self.proton_edit,"Select Proton runtime"))
-        identity_box = QGroupBox("Game identity")
-        identity_form = QFormLayout(identity_box)
-        identity_form.addRow("Game name:", self.game_name_edit)
-        identity_form.addRow("Game ID:", self.game_id_edit)
-        identity_form.addRow("Steam AppID:", self.game_appid_edit)
-        identity_box.setToolTip("Reference values used when Wyrd links an MO2 instance to Skyrim.")
+            field.setReadOnly(True)
+            field.setCursorPosition(0)
+        self.prefix_edit.setPlaceholderText("No Skyrim Steam compatdata prefix detected")
+        self.install_edit.setPlaceholderText("No MO2 installation detected")
+        self.game_path_edit.setPlaceholderText("No Skyrim game folder detected")
+        self.proton_edit.setPlaceholderText("No Proton runtime selected")
+        form.addRow("Skyrim Steam compatdata:", self.prefix_edit)
+        form.addRow("MO2 installation:", self.install_edit)
+        form.addRow("Skyrim game:", self.game_path_edit)
+        form.addRow("Proton runtime:", self.proton_edit)
         locations_layout.addWidget(paths_box)
-        locations_layout.addWidget(identity_box)
-
-        install_box = QGroupBox("MO2 installation")
-        install_layout = QVBoxLayout(install_box)
-        self.install_mo2_button = QPushButton("Install MO2 in Skyrim's Proton prefix")
-        self.install_mo2_button.clicked.connect(self._install_mo2_from_advanced)
-        install_help = QLabel(
-            "MO2 is installed inside Skyrim's existing Steam compatdata prefix. "
-            "This does not reset the prefix or change Skyrim saves."
-        )
-        install_help.setObjectName("muted")
-        install_help.setWordWrap(True)
-        install_layout.addWidget(install_help)
-        install_layout.addWidget(self.install_mo2_button, 0, Qt.AlignmentFlag.AlignLeft)
-        locations_layout.addWidget(install_box)
-
-        scan_row = QHBoxLayout()
-        self.scan_button = QPushButton("Scan for MO2 instances")
-        self.scan_button.clicked.connect(self.scan_locations)
-        self.scan_button.setEnabled(False)
-        self.scan_status = QLabel("Wyrd will find MO2 here without changing any files.")
-        self.scan_status.setObjectName("muted")
-        self.scan_status.setWordWrap(True)
-        scan_row.addWidget(self.scan_button)
-        scan_row.addWidget(self.scan_status, 1)
-        locations_layout.addLayout(scan_row)
         locations_layout.addStretch(1)
 
         instances_page = QWidget()
@@ -767,7 +726,7 @@ class Mo2AdvancedSettings(QWidget):
         storage_layout = add_category(
             "Storage",
             storage_page,
-            "Choose where mods, downloads and profiles live. External MO2 storage stays read-only."
+            "Configure this instance's storage locations. Shared-folder controls are hidden in V1; existing settings are preserved."
         )
         storage_box=QGroupBox("Storage folders")
         storage_form=QFormLayout(storage_box)
@@ -787,8 +746,12 @@ class Mo2AdvancedSettings(QWidget):
         self.share_mods_check=QCheckBox("Share Mods folder with other instances")
         self.share_downloads_check=QCheckBox("Share Downloads folder with other instances")
         self.create_storage_check=QCheckBox("Create missing empty folders when saving")
-        storage_layout.addWidget(self.share_mods_check)
-        storage_layout.addWidget(self.share_downloads_check)
+        # Sharing is intentionally not exposed in V1. Keep existing values loaded
+        # so saving other paths does not silently rewrite a prior sharing policy.
+        self.share_mods_check.hide()
+        self.share_downloads_check.hide()
+        self.share_mods_check.setEnabled(False)
+        self.share_downloads_check.setEnabled(False)
         storage_layout.addWidget(self.create_storage_check)
         storage_actions=QHBoxLayout()
         self.apply_storage_button=QPushButton("Save storage settings")
@@ -804,64 +767,13 @@ class Mo2AdvancedSettings(QWidget):
         self.category_list.setCurrentRow(0)
         self._refresh_registered()
 
-    def _install_mo2_from_advanced(self):
-        parent = self.parent()
-        installer = getattr(parent, "install_mo2", None)
-        if callable(installer):
-            installer()
-
-    def scan_locations(self):
-        """Read-only scan from the paths shown in Advanced settings."""
-        prefix = Path(self.prefix_edit.text()).expanduser()
-        install = Path(self.install_edit.text()).expanduser()
-        if not self.prefix_edit.text().strip() or not self.install_edit.text().strip():
-            self.scan_status.setText("Choose a Proton prefix and MO2 folder first.")
-            return
-        self.scan_button.setEnabled(False)
-        try:
-            result = self.service.discover(prefix, install)
-            if not result.get("ok"):
-                self.scan_status.setText(result.get("message", "Scan could not be completed."))
-                return
-            proposals = result.get("proposals", [])
-            registered = {
-                os.path.normcase(os.path.realpath(item.get("instance_path", "")))
-                for item in self.service.load().get("instances", [])
-            }
-            new_count = sum(
-                os.path.normcase(os.path.realpath(item.get("instance_path", ""))) not in registered
-                for item in proposals
-            )
-            self.scan_status.setText(
-                f"Found {len(proposals)} instance(s): {new_count} not connected to Wyrd. "
-                "Use Environment to connect a new instance."
-            )
-        except Exception as error:
-            self.scan_status.setText(f"Scan failed: {error}")
-        finally:
-            self.scan_button.setEnabled(True)
-
-    def _browse_directory(self, title, field):
-        selected=QFileDialog.getExistingDirectory(self,title,field.text())
-        if selected: field.setText(selected)
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
         self.prefix_edit.setText(str(prefix_path or ""))
         self.install_edit.setText(str(install_path or ""))
         self.game_path_edit.setText(str(game_path or ""))
         self.proton_edit.setText(str(proton_path or ""))
-        ready = bool(prefix_path and install_path)
-        self.scan_button.setEnabled(ready)
-        parent = self.parent()
-        installed = bool(getattr(parent, "mo2_state", {}).get("installed"))
-        self.install_mo2_button.setVisible(not installed)
-        self.install_mo2_button.setEnabled(
-            bool(game_path and proton_path and not installed)
-        )
-        if ready:
-            self.scan_status.setText("Search these locations for MO2 instances.")
-        else:
-            self.scan_status.setText("Choose a Proton prefix and MO2 folder to scan.")
+
 
 
     def _registry_maps(self):
@@ -929,7 +841,7 @@ class Mo2AdvancedSettings(QWidget):
         writable=bool(record.get("config")) and installation.get("owner")=="wyrd"
         self.apply_storage_button.setEnabled(writable); self.restore_storage_button.setEnabled(writable and bool(record.get("config_backups")))
         for button in self.storage_browse_buttons.values(): button.setEnabled(writable)
-        self.create_storage_check.setEnabled(writable); self.share_mods_check.setEnabled(writable); self.share_downloads_check.setEnabled(writable)
+        self.create_storage_check.setEnabled(writable)
         self.associations_updated=False
 
 
