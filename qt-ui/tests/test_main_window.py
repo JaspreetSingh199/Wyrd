@@ -209,13 +209,16 @@ class MainWindowSmokeTests(unittest.TestCase):
             self.assertFalse(window.install_button.isVisible())
             window.close()
 
-    def test_start_mo2_requires_a_registered_active_instance(self):
+    def test_start_mo2_without_active_instance_opens_existing_picker(self):
         window = self._window()
-        with patch.object(window, "_restore_registered_instance", return_value=None), patch(
-            "main.QMessageBox.information"
-        ) as info, patch.object(window, "_launch_embedded_mo2_instance") as launch:
+        with patch.object(window, "_restore_registered_instance", return_value=None), patch.object(
+            window, "use_existing_mo2"
+        ) as use_existing, patch("main.QMessageBox.information") as info, patch.object(
+            window, "_launch_embedded_mo2_instance"
+        ) as launch:
             window.start_mo2()
-        info.assert_called_once()
+        use_existing.assert_called_once()
+        info.assert_not_called()
         launch.assert_not_called()
         window.close()
 
@@ -618,7 +621,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         })
         self.assertFalse(window.install_button.isEnabled())
         self.assertFalse(window.launch_button.isEnabled())
-        self.assertTrue(window.use_existing_mo2_button.isVisible())
+        self.assertFalse(window.use_existing_mo2_button.isHidden())
         window.close()
 
     def test_install_completion_rejects_failed_post_install_verification(self):
