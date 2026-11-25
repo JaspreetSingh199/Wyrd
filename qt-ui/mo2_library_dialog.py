@@ -178,6 +178,8 @@ class Mo2LibraryDialog(QWidget):
         if callable(self.on_registry_changed):
             self.on_registry_changed(self.selected_instance_record, False)
         self._refresh_connected()
+        self.rename_environment_button.setEnabled(True)
+        self.disconnect_environment_button.setEnabled(True)
 
     def rename_selected_environment(self):
         record = self.selected_instance_record
