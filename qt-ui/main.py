@@ -322,7 +322,7 @@ class MainWindow(QMainWindow):
 
         primary_actions = QHBoxLayout()
         primary_actions.addWidget(self.install_button)
-                primary_actions.addWidget(self.launch_button)
+        primary_actions.addWidget(self.launch_button)
         primary_actions.addStretch(1)
         setup_layout.addLayout(primary_actions)
 
