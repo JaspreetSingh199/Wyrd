@@ -92,14 +92,42 @@ class Mo2LibraryDialog(QWidget):
         self.proton_path = str(proton_path or "")
         self._show_inventory()
 
+    def discover(self):
+        parent = self.parent()
+        refresh = getattr(parent, "refresh_all", None)
+        if callable(refresh):
+            refresh()
+        self._show_inventory()
+
+    def _show_inventory(self):
+        self.instances.clear()
+        inventory = getattr(self.parent(), "instance_state", {}) or {}
+        instances = inventory.get("skyrim_instances", [])
+        for instance in instances:
+            name = instance.get("name", "Unnamed MO2 instance")
+            profile = instance.get("selected_profile") or "No profile selected"
+            row = QListWidgetItem(f"{name} · {profile}")
+            row.setData(Qt.ItemDataRole.UserRole, instance)
+            self.instances.addItem(row)
+        self.instances.setVisible(bool(instances))
+        if instances:
+            self.setup_status.setText(
+                f"Automatically discovered {len(instances)} Skyrim MO2 instance(s). "
+                "Select one to inspect it; no Wyrd registration is needed."
+            )
+        else:
+            self.setup_status.setText(
+                inventory.get("message", "No Skyrim Special Edition MO2 instances were found.")
+            )
+
     def _show_selected(self, row: int):
         item = self.instances.item(row) if row >= 0 else None
         proposal = item.data(Qt.ItemDataRole.UserRole) if item else None
         self.selected_instance_record = dict(proposal) if isinstance(proposal, dict) else None
         if self.selected_instance_record:
             self.setup_status.setText(
-                f"Discovered: {self.selected_instance_record.get('game_name') or 'Skyrim Special Edition'} · "
-                f"{self.selected_instance_record.get('instance_type', 'instance')}. "
+                f"Discovered: {self.selected_instance_record.get('name') or 'Skyrim Special Edition'} · "
+                f"{self.selected_instance_record.get('selected_profile') or 'No profile selected'}. "
                 "No Wyrd registration is required."
             )
 
