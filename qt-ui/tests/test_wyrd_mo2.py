@@ -452,6 +452,35 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertEqual(ini.read_bytes(), before)
 
 
+    def test_instance_discovery_rejects_stale_skyrim_labels_when_gamepath_is_wrong(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Stale Skyrim"
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            game = root / "actual-skyrim"
+            game.mkdir()
+            (game / "SkyrimSE.exe").write_bytes(b"skyrim")
+            other = root / "other-game"
+            other.mkdir()
+            (other / "SkyrimSE.exe").write_bytes(b"not-the-detected-game")
+            ini = instance / "ModOrganizer.ini"
+            ini.write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                "gamePath=Z:" + str(other).replace("/", "\\\\") + "\\n",
+                encoding="utf-8",
+            )
+            result = inspect_mo2_instances(prefix, detected_game_path=game)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["instances"][0]["name"], "Stale Skyrim")
+            self.assertEqual(result["skyrim_instances"], [])
+            self.assertEqual(ini.read_text(encoding="utf-8").splitlines()[1], "gameName=Skyrim Special Edition")
+
+
     def test_launch_target_inspection_validates_skyrim_and_skse_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
