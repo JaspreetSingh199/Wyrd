@@ -75,6 +75,17 @@ class GameProcess:
         ))
 
 
+def _same_filesystem_path(left: str | os.PathLike | None,
+                         right: str | os.PathLike | None) -> bool:
+    """Compare discovered and persisted paths after normalizing aliases."""
+    if not left or not right:
+        return False
+    try:
+        return Path(left).expanduser().resolve(strict=False) == Path(right).expanduser().resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        return os.path.normpath(os.path.expanduser(str(left))) == os.path.normpath(os.path.expanduser(str(right)))
+
+
 STYLE = """
 /* Nordic Frost: SkyUI-inspired charcoal, slate and glacial-blue palette. */
 QWidget { background: #11191f; color: #dce5e9; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 13px; }
@@ -806,14 +817,14 @@ class MainWindow(QMainWindow):
             label = f'{build["name"]} ({build["architecture"]})'
             self.proton_combo.addItem(label, build["path"])
             self.proton_combo.setItemData(self.proton_combo.count() - 1, build["path"], 3)
-            if selected and selected == build["path"]:
+            if selected and _same_filesystem_path(selected, build["path"]):
                 selected_index = self.proton_combo.count() - 1
         saved_proton = self._saved_settings.get("proton")
         preferred_proton = selected or saved_proton
         if preferred_proton:
             selected_index = next(
                 (index for index, build in enumerate(self.proton_builds)
-                 if str(Path(build["path"]).expanduser()) == str(Path(preferred_proton).expanduser())),
+                 if _same_filesystem_path(build["path"], preferred_proton)),
                 -1,
             )
         if selected_index >= 0:
@@ -1114,7 +1125,7 @@ class MainWindow(QMainWindow):
         if not saved:
             return
         for index in range(self.proton_combo.count()):
-            if self.proton_combo.itemData(index) == saved:
+            if _same_filesystem_path(self.proton_combo.itemData(index), saved):
                 self.proton_combo.setCurrentIndex(index)
                 self._log("Restored saved Proton selection: " + saved)
                 return
