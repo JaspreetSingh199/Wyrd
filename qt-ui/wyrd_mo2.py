@@ -1376,7 +1376,11 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     if not validation.get("ok"):
         return {"ok": False, "message": validation.get("message", "Selected Proton build is invalid.")}
 
-    prefix_check = inspect_mo2_instances(prefix, install, require_managed=require_managed if explicit_prefix else True)
+    prefix_check = inspect_mo2_instances(
+        prefix, install,
+        require_managed=require_managed if explicit_prefix else True,
+        detected_game_path=game,
+    )
     instance_match = next(
         (item for item in prefix_check.get("skyrim_instances", []) if item["name"] == instance),
         None,
