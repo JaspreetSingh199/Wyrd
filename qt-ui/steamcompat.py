@@ -11,8 +11,7 @@ from pathlib import Path
 
 from wyrd_mo2 import (inspect_wyrd_installation, inspect_proton_build, _runtime_environment,
                      inspect_mo2_instances, copy_mo2_instance_to_prefix,
-                     _steam_root_for_game, _latest_mo2_archive, _download_archive, _extract_mo2,
-                     managed_paths)
+                     _steam_root_for_game, managed_paths)
 import json
 import os
 import shutil
@@ -103,7 +102,7 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
     env["SteamAppId"] = APP_ID
     env["SteamGameId"] = APP_ID
     command = [str(proton / "proton"), "run", str(installer),
-               "/DIR=C:\\Modding\\MO2"]
+               r"/DIR=C:\\Modding\\MO2"]
     process = subprocess.Popen(command, cwd=str(steam_root), env=env,
                                stdin=subprocess.DEVNULL, start_new_session=True)
     if callback:
