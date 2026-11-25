@@ -60,6 +60,18 @@ class Mo2LibraryDialog(QWidget):
         self.connected_instances.hide()
         layout.addWidget(self.connected_instances)
 
+        environment_actions = QHBoxLayout()
+        self.rename_environment_button = QPushButton("Rename")
+        self.rename_environment_button.clicked.connect(self.rename_selected_environment)
+        self.rename_environment_button.setEnabled(False)
+        self.disconnect_environment_button = QPushButton("Disconnect")
+        self.disconnect_environment_button.clicked.connect(self.disconnect_selected_environment)
+        self.disconnect_environment_button.setEnabled(False)
+        environment_actions.addWidget(self.rename_environment_button)
+        environment_actions.addWidget(self.disconnect_environment_button)
+        environment_actions.addStretch(1)
+        layout.addLayout(environment_actions)
+
         self.instances = QListWidget()
         self.instances.setMinimumHeight(55)
         self.instances.setMaximumHeight(120)
@@ -93,58 +105,137 @@ class Mo2LibraryDialog(QWidget):
 
     def _refresh_connected(self):
         try:
-            registry, installations, games, runtimes = self._registry_maps()
+            registry, _installations, games, runtimes = self._registry_maps()
         except Exception as error:
             self.setup_status.setText(f"Could not load MO2 connections: {error}")
             return
         self.connected_records = registry["instances"]
-        record = next((x for x in self.connected_records if x.get("id") == self.preferred_instance_id), None)
+        record = next(
+            (item for item in self.connected_records if item.get("id") == self.preferred_instance_id),
+            None,
+        )
+        self.connected_instances.blockSignals(True)
+        self.connected_instances.clear()
+        for connected in self.connected_records:
+            game = games.get(connected.get("game_id"), {})
+            runtime = runtimes.get(connected.get("runtime_id"), {})
+            instance_name = Path(connected.get("instance_path", "")).name or "MO2"
+            display_name = connected.get("display_name") or instance_name
+            runtime_name = runtime.get("name") or "Proton runtime not set"
+            active = connected.get("id") == self.preferred_instance_id
+            label = (
+                f"{'● ' if active else ''}{display_name} · "
+                f"{connected.get('instance_type', 'instance').title()} · {runtime_name}"
+            )
+            row = QListWidgetItem(label)
+            row.setData(Qt.ItemDataRole.UserRole, connected)
+            self.connected_instances.addItem(row)
+        self.connected_instances.blockSignals(False)
+        self.connected_instances.setVisible(bool(self.connected_records))
+        self.rename_environment_button.setEnabled(False)
+        self.disconnect_environment_button.setEnabled(False)
         if record:
             game = games.get(record.get("game_id"), {})
-            self.setup_status.setText(f"Connected: {record.get('display_name') or game.get('name', 'MO2')}")
+            self.selected_instance_record = dict(record)
+            self.setup_status.setText(
+                f"Active environment: {record.get('display_name') or Path(record.get('instance_path', '')).name} · "
+                f"{game.get('name', 'Skyrim Special Edition')}"
+            )
+            for row_index in range(self.connected_instances.count()):
+                row = self.connected_instances.item(row_index)
+                value = row.data(Qt.ItemDataRole.UserRole)
+                if isinstance(value, dict) and value.get("id") == record.get("id"):
+                    self.connected_instances.blockSignals(True)
+                    self.connected_instances.setCurrentRow(row_index)
+                    self.connected_instances.blockSignals(False)
+                    self.rename_environment_button.setEnabled(True)
+                    self.disconnect_environment_button.setEnabled(True)
+                    break
         elif self.connected_records:
-            self.setup_status.setText(f"{len(self.connected_records)} MO2 instance(s) connected. Choose one below.")
-        if self.connected_records:
-            if self.connected_records:
-                self.connected_instances.clear()
-                for item in self.connected_records:
-                    game = games.get(item.get("game_id"), {})
-                    label = f"{item.get('display_name') or Path(item.get('instance_path', '')).name or game.get('name', 'MO2')}  ·  {item.get('instance_type', 'instance').title()}"
-                    if item.get("id") == self.preferred_instance_id:
-                        label += " · Active"
-                    row = QListWidgetItem(label)
-                    row.setData(Qt.ItemDataRole.UserRole, item)
-                    self.connected_instances.addItem(row)
-                self.connected_instances.blockSignals(True)
-                if record:
-                    for row_index in range(self.connected_instances.count()):
-                        row = self.connected_instances.item(row_index)
-                        value = row.data(Qt.ItemDataRole.UserRole)
-                        if isinstance(value, dict) and value.get("id") == record.get("id"):
-                            self.connected_instances.setCurrentRow(row_index)
-                            break
-                self.connected_instances.blockSignals(False)
-                self.connected_instances.show()
-            else:
-                self.connected_instances.hide()
+            self.selected_instance_record = None
+            self.setup_status.setText(
+                f"{len(self.connected_records)} environment(s) connected. Choose one below."
+            )
         else:
-            self.setup_status.setText("No environments connected yet. Add an existing MO2 instance to get started.")
-            self.connected_instances.hide()
+            self.selected_instance_record = None
+            self.setup_status.setText(
+                "No environments connected yet. Add an existing MO2 instance to get started."
+            )
 
     def _select_connected(self, row: int):
         item = self.connected_instances.item(row) if row >= 0 else None
         record = item.data(Qt.ItemDataRole.UserRole) if item else None
         if not isinstance(record, dict):
             self.selected_instance_record = None
+            self.rename_environment_button.setEnabled(False)
+            self.disconnect_environment_button.setEnabled(False)
             return
         self.selected_instance_record = dict(record)
         self.selection_changed = True
         self.preferred_instance_id = record.get("id", "")
+        self.rename_environment_button.setEnabled(True)
+        self.disconnect_environment_button.setEnabled(True)
         if callable(self.on_registry_changed):
             self.on_registry_changed(self.selected_instance_record, False)
-        self.setup_status.setText(
-            f"Active: {self.selected_instance_record.get('display_name') or self.selected_instance_record.get('instance_type', 'MO2')}"
+        self._refresh_connected()
+
+    def rename_selected_environment(self):
+        record = self.selected_instance_record
+        if not record:
+            return
+        name, accepted = QInputDialog.getText(
+            self, "Rename environment", "Wyrd display name:",
+            text=record.get("display_name", ""),
         )
+        if not accepted:
+            return
+        try:
+            self.service.rename_instance(record["id"], name)
+            self._refresh_connected()
+            if callable(self.on_registry_changed):
+                self.on_registry_changed(self.selected_instance_record or record, False)
+            self.setup_status.setText(
+                f"Environment renamed to '{name.strip() or Path(record.get('instance_path', '')).name}'. "
+                "Only Wyrd's display label changed."
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Rename environment", str(error))
+
+    def disconnect_selected_environment(self):
+        record = self.selected_instance_record
+        if not record:
+            return
+        answer = QMessageBox.question(
+            self, "Disconnect environment",
+            "Remove this environment from Wyrd? Only its Wyrd registration metadata will be removed. "
+            "The MO2 installation, instance, mods, profiles, downloads, Skyrim files, Proton prefix "
+            "and saves will remain untouched.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            was_active = record.get("id") == self.preferred_instance_id
+            self.service.unregister_instance(record["id"])
+            remaining = self.service.load().get("instances", [])
+            self.preferred_instance_id = (
+                remaining[0]["id"] if was_active and remaining else
+                self.preferred_instance_id if not was_active else ""
+            )
+            self.selected_instance_record = next(
+                (item for item in remaining if item.get("id") == self.preferred_instance_id),
+                None,
+            )
+            self.selection_changed = was_active
+            self._refresh_connected()
+            if callable(self.on_registry_changed) and (self.selected_instance_record or was_active):
+                self.on_registry_changed(self.selected_instance_record, False)
+            self.setup_status.setText(
+                "Environment disconnected. Wyrd registration metadata was removed; all files were left untouched."
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Disconnect environment", str(error))
 
     def discover(self):
         self.instances.clear()
