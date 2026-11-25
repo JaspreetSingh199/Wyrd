@@ -527,12 +527,7 @@ class MainWindow(QMainWindow):
         )
 
         if self.mo2_state.get("installed"):
-            answer = QMessageBox.question(
-                self, "Mod Organizer 2",
-                "MO2 is already installed in Skyrim's Proton prefix. You can launch a configured Skyrim instance with Launch Modded Skyrim.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
+            # MO2 is only entered through the modded Skyrim launch action.
             return
 
         answer = QMessageBox.question(
@@ -729,7 +724,7 @@ class MainWindow(QMainWindow):
             self.install_button.setText("Install MO2")
             self.install_button.show()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
-                self.launch_game_button.setEnabled(False)
+            self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
         self._refresh_audio_status()
