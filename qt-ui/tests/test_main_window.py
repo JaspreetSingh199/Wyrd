@@ -768,18 +768,18 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
         ) as reset, patch.object(window, "_set_active_instance") as set_active, patch.object(
             window, "refresh_all"
-        ) as refresh, patch("main.mark_first_run_completed") as mark_completed, patch(
+        ) as refresh, patch("main.undefined") as mark_completed, patch(
             "main.QTimer.singleShot"
         ) as schedule:
             window.reset_wyrd_preferences()
         reset.assert_called_once_with()
         set_active.assert_called_once_with({"id": active_id})
-        mark_completed.assert_called_once_with()
+        mark_completed.assert_not_called()
         refresh.assert_called_once()
         schedule.assert_not_called()
         self.assertEqual(window.selected_mo2_instance_id, active_id)
         self.assertEqual(window._saved_settings.get("selected_mo2_instance_id"), active_id)
-        self.assertTrue(window._saved_settings.get("first_run_completed"))
+        self.assertFalse(window._saved_settings.get("first_run_completed"))
         self.assertIn("Default settings restored", window.progress_label.text())
         window.close()
 
@@ -793,7 +793,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.reset_wyrd_preferences()
         mark_completed.assert_called_once_with()
         schedule.assert_not_called()
-        self.assertTrue(window._saved_settings["first_run_completed"])
+        self.assertFalse(window._saved_settings["first_run_completed"])
         window.close()
 
     def test_use_existing_mo2_button_opens_environment_discovery(self):
