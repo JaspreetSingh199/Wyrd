@@ -300,6 +300,11 @@ class MainWindow(QMainWindow):
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("primaryAction")
         self.install_button.clicked.connect(self.install_mo2)
+        self.check_mo2_button = QPushButton("Check installation")
+        self.check_mo2_button.setToolTip(
+            "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
+        )
+        self.check_mo2_button.clicked.connect(self.check_mo2_installation)
         self.use_existing_mo2_button = QPushButton("Use Existing MO2")
         self.use_existing_mo2_button.clicked.connect(self.use_existing_mo2)
         self.use_existing_mo2_button.hide()  # Discovery is owned by the single MO2 card action.
@@ -319,6 +324,7 @@ class MainWindow(QMainWindow):
 
         primary_actions = QHBoxLayout()
         primary_actions.addWidget(self.install_button)
+        primary_actions.addWidget(self.check_mo2_button)
         primary_actions.addStretch(1)
         setup_layout.addLayout(primary_actions)
 
@@ -1077,6 +1083,73 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "MO2 reset incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
         self._restore_registered_instance()
+
+    def check_mo2_installation(self) -> None:
+        """Show a read-only inventory of Skyrim prefix, MO2 files and instances."""
+        lines = []
+        game_value = self.game_state.get("game_dir") if self.game_state.get("found") else None
+        if not game_value:
+            lines.append("Skyrim game: NOT DETECTED")
+            prefix = None
+        else:
+            game = Path(game_value).expanduser()
+            lines.append(f"Skyrim game: {'OK' if game.is_dir() else 'MISSING'}")
+            lines.append(f"Game path: {game}")
+            try:
+                state = inspect_skyrim_prefix_mo2_installation(game)
+            except Exception as error:
+                state = {"installed": False, "message": str(error)}
+            prefix_value = state.get("prefix")
+            prefix = Path(prefix_value).expanduser() if prefix_value else None
+            if prefix is None:
+                try:
+                    from steamcompat import steam_compat_prefix
+                    from wyrd_mo2 import _steam_root_for_game
+                    prefix = steam_compat_prefix(_steam_root_for_game(game, Path.home()))
+                except Exception as error:
+                    lines.append(f"Steam prefix: UNKNOWN ({error})")
+            if prefix is not None:
+                pfx = prefix / "pfx"
+                drive_c = pfx / "drive_c"
+                lines.append(f"Skyrim compatdata prefix: {'EXISTS' if prefix.is_dir() else 'MISSING'}")
+                lines.append(f"Prefix initialized (pfx/drive_c): {'YES' if drive_c.is_dir() else 'NO'}")
+                lines.append(f"Prefix path: {prefix}")
+                install = prefix / "pfx/drive_c/Modding/MO2"
+                executable = install / "ModOrganizer.exe"
+                marker = install / ".wyrd-managed.json"
+                lines.append(f"MO2 install directory: {'EXISTS' if install.is_dir() else 'MISSING'}")
+                lines.append(f"ModOrganizer.exe: {'EXISTS' if executable.is_file() and not executable.is_symlink() else 'MISSING'}")
+                lines.append(f"Wyrd ownership marker: {'EXISTS' if marker.is_file() and not marker.is_symlink() else 'MISSING'}")
+                try:
+                    from steamcompat import inspect_any_skyrim_prefix_mo2_instances
+                    inventory = inspect_any_skyrim_prefix_mo2_instances(game)
+                    instances = inventory.get("instances", []) if inventory.get("ok") else []
+                    skyrim_instances = inventory.get("skyrim_instances", []) if inventory.get("ok") else []
+                    lines.append(f"MO2 instance folders found: {len(instances)}")
+                    lines.append(f"Skyrim SE instances found: {len(skyrim_instances)}")
+                    for item in instances:
+                        lines.append(f"  • {item.get('name', 'Unnamed')} — {item.get('instance_path', 'path unknown')}")
+                    if not inventory.get("ok"):
+                        lines.append("Instance scan: " + inventory.get("message", "unavailable"))
+                except Exception as error:
+                    lines.append(f"MO2 instance scan: ERROR ({error})")
+
+        try:
+            registry = self.mo2_library_widget.service.load()
+            registered_instances = registry.get("instances", [])
+            registered_installations = registry.get("installations", [])
+            lines.append("")
+            lines.append(f"Wyrd-registered MO2 installations: {len(registered_installations)}")
+            lines.append(f"Wyrd-registered environments: {len(registered_instances)}")
+            for item in registered_instances:
+                lines.append(
+                    f"  • {item.get('display_name') or item.get('instance_name') or item.get('id')} "
+                    f"— {'folder exists' if Path(item.get('instance_path', '')).is_dir() else 'FOLDER MISSING'}"
+                )
+        except Exception as error:
+            lines.append(f"Wyrd registry: ERROR ({error})")
+
+        QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
 
     def install_mo2(self, *, confirm: bool = True) -> None:
         if self.worker and self.worker.isRunning():
