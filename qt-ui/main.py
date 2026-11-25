@@ -99,6 +99,8 @@ QPushButton:disabled { color: #71818a; background: #1b252b; border-color: #34434
 QPushButton#primaryAction { background: #385666; color: #f0f6f8; border: 1px solid #82a9bc; font-weight: 600; }
 QPushButton#primaryAction:hover { background: #466a7c; }
 QPushButton#secondaryAction { background: #202f38; border-color: #536b78; }
+QPushButton#infoButton { background: #1b2a33; color: #a9cbd9; border: 1px solid #63899c; border-radius: 12px; padding: 0; min-height: 22px; font-weight: 700; }
+QPushButton#infoButton:hover { background: #385666; color: #f0f6f8; border-color: #a9cbd9; }
 QLabel#heading { color: #eef4f6; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 2px; padding: 2px 0; }
 QLabel#section { color: #d5e4ea; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .6px; }
 QLabel#muted { color: #a5b3ba; }
