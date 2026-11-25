@@ -20,7 +20,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2, launch_mo2,
     read_launch_diagnostics, launch_process_status, detect_skyrim_processes,
     _proc_start_time, _proc_identity, _is_descendant_process, classify_launch_diagnostics,
-    inspect_mo2_storage,
+    inspect_mo2_storage, reset_wyrd_settings,
 )
 
 
@@ -262,6 +262,39 @@ class WyrdMO2Tests(unittest.TestCase):
                 settings_path.write_text("{invalid", encoding="utf-8")
                 self.assertEqual(read_settings(home), {})
 
+
+    def test_reset_wyrd_settings_removes_only_preferences_and_preserves_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config_home = home / ".config"
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": str(config_home)}):
+                paths = managed_paths(home)
+                paths["config"].mkdir(parents=True)
+                paths["settings"].write_text(json.dumps({
+                    "proton": "/old/proton", "first_run_completed": True,
+                }), encoding="utf-8")
+                registry = paths["config"] / "mo2-registry.json"
+                registry.write_text('{"kind":"wyrd-mo2-registry","version":1}', encoding="utf-8")
+                result = reset_wyrd_settings(home)
+                self.assertTrue(result["ok"])
+                self.assertFalse(paths["settings"].exists())
+                self.assertTrue(registry.is_file())
+                self.assertEqual(read_settings(home), {})
+
+    def test_reset_wyrd_settings_refuses_symlink_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config_home = home / ".config"
+            external = home / "important.json"
+            external.write_text('{"keep":true}', encoding="utf-8")
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": str(config_home)}):
+                paths = managed_paths(home)
+                paths["config"].mkdir(parents=True)
+                paths["settings"].symlink_to(external)
+                result = reset_wyrd_settings(home)
+                self.assertFalse(result["ok"])
+                self.assertEqual(external.read_text(encoding="utf-8"), '{"keep":true}')
+                self.assertTrue(paths["settings"].is_symlink())
 
     def test_read_only_instance_inspection_finds_skyrim_and_executables(self):
         with tempfile.TemporaryDirectory() as tmp:
