@@ -100,7 +100,7 @@ def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root
         return {
             "ok": True, "changed": changed, "drive": "S:",
             "library_root": str(library_root),
-            "windows_game_path": r"S:\steamapps\common\\" + resolved_game.name,
+            "windows_game_path": "S:\\steamapps\\common\\" + resolved_game.name,
             "resolved_game_path": str(verified_game),
             "message": ("Corrected" if changed else "Verified") + " MO2 S: Steam-library mapping.",
         }
