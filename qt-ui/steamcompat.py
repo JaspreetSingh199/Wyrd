@@ -76,14 +76,33 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
     root = managed_paths(home)["root"]
     staging_root = root / "staging"
     staging_root.mkdir(parents=True, exist_ok=True)
+    downloads_root = root / "downloads"
+    downloads_root.mkdir(parents=True, exist_ok=True)
     version, archive_name, url = _latest_mo2_archive()
+    # Keep the official release archive in Wyrd's download cache. A failed
+    # install/retry should not force another large download.
+    archive = downloads_root / archive_name
     stage = Path(tempfile.mkdtemp(prefix="mo2-steam-prefix-", dir=staging_root))
-    archive = stage / archive_name
     try:
         if callback:
             callback(10, f"Preparing MO2 {version} for Skyrim's prefix…")
-        _download_archive(url, archive, callback)
-        extracted = _extract_mo2(archive, stage / "extracted", callback)
+        if not archive.is_file() or archive.is_symlink() or archive.stat().st_size == 0:
+            partial = downloads_root / (archive_name + ".part")
+            partial.unlink(missing_ok=True)
+            _download_archive(url, partial, callback)
+            if partial.is_symlink() or not partial.is_file() or partial.stat().st_size == 0:
+                raise RuntimeError("MO2 download did not produce a valid archive.")
+            os.replace(partial, archive)
+        try:
+            extracted = _extract_mo2(archive, stage / "extracted", callback)
+        except Exception:
+            # A stale/corrupt cache must not make every retry fail forever.
+            archive.unlink(missing_ok=True)
+            partial = downloads_root / (archive_name + ".part")
+            partial.unlink(missing_ok=True)
+            _download_archive(url, partial, callback)
+            os.replace(partial, archive)
+            extracted = _extract_mo2(archive, stage / "extracted", callback)
         if not (extracted / "ModOrganizer.exe").is_file():
             raise RuntimeError("MO2 verification failed: ModOrganizer.exe is missing.")
         extracted_marker = extracted / ".wyrd-managed.json"
