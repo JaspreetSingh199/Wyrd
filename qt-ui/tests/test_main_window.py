@@ -682,7 +682,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             window._run_first_launch_setup()
         self.assertEqual(window.proton_combo.currentData(), cachyos["path"])
         mark.assert_called_once()
-        save.assert_called_once()
+        self.assertIn(unittest.mock.call(1), save.call_args_list)
         install.assert_called_once_with(confirm=False)
         window.close()
 
