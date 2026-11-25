@@ -535,44 +535,21 @@ class Mo2AdvancedSettings(QWidget):
 
         instances_page = QWidget()
         instances_layout = add_category(
-            "Instances",
+            "Detected instances",
             instances_page,
-            "Choose which MO2 instance Wyrd uses. Removing a connection never deletes MO2 files."
+            "Read-only inventory from the MO2 installation Wyrd discovered. No Wyrd registration or connection records are needed."
         )
-        self.installation_filter=QComboBox()
-        self.installation_filter.addItem("All installations",None)
-        self.installation_filter.currentIndexChanged.connect(self._refresh_registered)
-        instances_layout.addWidget(QLabel("Installation"))
-        instances_layout.addWidget(self.installation_filter)
-        self.installation_summary=QLabel("Select an installation.")
-        self.installation_summary.setWordWrap(True)
-        self.installation_summary.setObjectName("muted")
-        instances_layout.addWidget(self.installation_summary)
-        instances_layout.addWidget(QLabel("Connected instances"))
-        self.registered_instances=QListWidget()
-        self.registered_instances.setMaximumHeight(220)
-        self.registered_instances.currentRowChanged.connect(self._select_registered)
-        instances_layout.addWidget(self.registered_instances, 1)
-        instance_actions = QHBoxLayout()
-        self._edit_associations_button=QPushButton("Change game / Proton")
-        self._edit_associations_button.clicked.connect(self.edit_associations)
-        self.rename_instance_button=QPushButton("Rename")
-        self.rename_instance_button.clicked.connect(self.rename_selected_instance)
-        instance_actions.addWidget(self._edit_associations_button)
-        add_info_button(instance_actions, self, "Change game / Proton", "Changes the game folder, Steam AppID, initialized Proton prefix and Proton runtime recorded for the selected Wyrd instance. This updates Wyrd's association metadata only; it does not move MO2 files or change Skyrim files.")
-        instance_actions.addWidget(self.rename_instance_button)
-        add_info_button(instance_actions, self, "Rename", "Changes only the display name Wyrd shows for this MO2 instance. It does not rename the MO2 folder, profile, mods, or any files.")
-        instances_layout.addLayout(instance_actions)
-        unregister_actions=QHBoxLayout()
-        self.unregister_instance_button=QPushButton("Disconnect instance")
-        self.unregister_instance_button.clicked.connect(self.unregister_selected_instance)
-        self.unregister_installation_button=QPushButton("Remove unused installation")
-        self.unregister_installation_button.clicked.connect(self.unregister_selected_installation)
-        unregister_actions.addWidget(self.unregister_instance_button)
-        add_info_button(unregister_actions, self, "Disconnect instance", "Removes the selected instance's registration from Wyrd. The MO2 instance folder, profiles, mods, downloads, installation, Skyrim files, Proton prefix and saves are left untouched.")
-        unregister_actions.addWidget(self.unregister_installation_button)
-        add_info_button(unregister_actions, self, "Remove unused installation", "Removes an unused MO2 installation record from Wyrd's registry only. It is enabled only when no verified connected instances reference that installation. The installation files are not deleted.")
-        instances_layout.addLayout(unregister_actions)
+        self.detected_instances = QListWidget()
+        self.detected_instances.setMinimumHeight(120)
+        self.detected_instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        instances_layout.addWidget(self.detected_instances, 1)
+        self.detected_instances_summary = QLabel("Instances are scanned automatically.")
+        self.detected_instances_summary.setObjectName("muted")
+        self.detected_instances_summary.setWordWrap(True)
+        instances_layout.addWidget(self.detected_instances_summary)
+        refresh_detected = QPushButton("Refresh MO2 scan")
+        refresh_detected.clicked.connect(self._refresh_parent_mo2_scan)
+        instances_layout.addWidget(refresh_detected, 0, Qt.AlignmentFlag.AlignLeft)
 
         storage_page = QWidget()
         storage_layout = add_category(
@@ -620,7 +597,7 @@ class Mo2AdvancedSettings(QWidget):
 
         self.category_selector.currentIndexChanged.connect(self.category_pages.setCurrentIndex)
         self.category_selector.setCurrentIndex(0)
-        self._refresh_registered()
+        self._refresh_detected_instances()
 
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
@@ -641,56 +618,39 @@ class Mo2AdvancedSettings(QWidget):
         )
 
     def _refresh_registered(self, _index: int = -1) -> None:
-        selected_filter=self.installation_filter.currentData() if self.installation_filter.count() else None
-        self.registered_instances.clear(); self.selected_instance_record=None
-        try:
-            registry, installations, games, runtimes=self._registry_maps()
-        except Exception as error:
-            self.registered_instances.addItem(f"Registry unavailable: {error}"); return
+        """Compatibility hook: refresh the live MO2 inventory, not registrations."""
+        self._refresh_detected_instances()
 
-        # The registry is historical metadata, not proof that an instance still
-        # exists. Apply the same read-only filesystem validation as the main
-        # Environment picker so stale Portable entries never appear here.
-        valid_records = [
-            item for item in registry.get("instances", [])
-            if Mo2LibraryDialog._registered_environment_exists(
-                item, installations, games, runtimes
+    def _refresh_parent_mo2_scan(self) -> None:
+        parent = self.parent()
+        refresh = getattr(parent, "refresh_all", None)
+        if callable(refresh):
+            refresh()
+        self._refresh_detected_instances()
+
+    def _refresh_detected_instances(self) -> None:
+        widget = getattr(self, "detected_instances", None)
+        summary = getattr(self, "detected_instances_summary", None)
+        if widget is None or summary is None:
+            return
+        widget.clear()
+        parent = self.parent()
+        inventory = getattr(parent, "instance_state", {}) or {}
+        instances = inventory.get("skyrim_instances", [])
+        for instance in instances:
+            name = instance.get("name", "Unnamed MO2 instance")
+            profile = instance.get("selected_profile") or "No profile selected"
+            widget.addItem(f"{name} · {profile}")
+        if instances:
+            summary.setText(
+                f"Automatically discovered {len(instances)} Skyrim Special Edition instance(s). "
+                "The scan reads MO2 directly; it does not create Wyrd registration records."
             )
-        ]
-        valid_installation_ids = {item.get("installation_id") for item in valid_records}
-        valid_installations = [
-            item for item in registry.get("installations", [])
-            if item.get("id") in valid_installation_ids
-            or (
-                item.get("executable")
-                and Path(item["executable"]).expanduser().is_file()
-                and not Path(item["executable"]).expanduser().is_symlink()
-            )
-        ]
-        self.installation_filter.blockSignals(True); self.installation_filter.clear()
-        self.installation_filter.addItem("All installations",None)
-        for installation in sorted(valid_installations,key=lambda item: Path(item.get("executable","")).parent.name.casefold()):
-            executable=Path(installation.get("executable",""))
-            self.installation_filter.addItem(f"{executable.parent.name or 'MO2'} · {installation.get('owner','unknown')} · {installation.get('executable','')}",installation.get("id"))
-        selected_index=self.installation_filter.findData(selected_filter)
-        self.installation_filter.setCurrentIndex(max(0,selected_index)); self.installation_filter.blockSignals(False)
-        active_filter=self.installation_filter.currentData()
-        selected_installation=installations.get(active_filter) if active_filter else None
-        if selected_installation:
-            references=sum(1 for item in valid_records if item.get("installation_id")==active_filter)
-            self.installation_summary.setText(f"{selected_installation.get('executable')}\nOwner: {selected_installation.get('owner','unknown')} · Instances: {references}\nRemoving a reference never deletes files.")
-            self.unregister_installation_button.setEnabled(references==0)
         else:
-            self.installation_summary.setText(f"{len(valid_installations)} installation(s) · {len(valid_records)} verified instance(s)")
-            self.unregister_installation_button.setEnabled(False)
-        active=self.installation_filter.currentData()
-        for record in valid_records:
-            if active and record.get("installation_id")!=active: continue
-            game=games.get(record.get("game_id"),{})
-            row=QListWidgetItem(f"{record.get('display_name') or game.get('name','MO2')} · {record.get('instance_type','instance')}")
-            row.setData(Qt.ItemDataRole.UserRole,record); self.registered_instances.addItem(row)
-        self._edit_associations_button.setEnabled(False); self.rename_instance_button.setEnabled(False)
-        self.unregister_instance_button.setEnabled(False); self.apply_storage_button.setEnabled(False); self.restore_storage_button.setEnabled(False)
+            summary.setText(
+                inventory.get("message", "No Skyrim Special Edition instances were found in the detected MO2 installation.")
+            )
+
 
     def _select_registered(self,row):
         item=self.registered_instances.item(row) if row>=0 else None
