@@ -5,6 +5,7 @@ import configparser
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -16,7 +17,8 @@ from PySide6.QtWidgets import (
     QInputDialog, QVBoxLayout, QWidget, QStackedWidget,
 )
 
-from wyrd_mo2 import managed_paths
+from wyrd_mo2 import _runtime_environment, managed_paths
+from skyrim_detection import find_steam_roots
 from wyrd_mo2_registry_service import RegistryService
 
 
@@ -51,8 +53,15 @@ class Mo2LibraryDialog(QWidget):
         layout.addWidget(self.setup_status)
 
         self.discover_button = QPushButton("+ Add environment")
-        self.discover_button.clicked.connect(self.discover)
+        self.discover_button.setToolTip(
+            "Open Mod Organizer 2's Instance Manager using the selected Proton runtime."
+        )
+        self.discover_button.clicked.connect(self.create_environment)
         layout.addWidget(self.discover_button, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self.connect_existing_button = QPushButton("Connect existing instance")
+        self.connect_existing_button.clicked.connect(self.discover)
+        layout.addWidget(self.connect_existing_button, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.connected_instances = QListWidget()
         self.connected_instances.setMinimumHeight(90)
@@ -272,6 +281,88 @@ class Mo2LibraryDialog(QWidget):
             )
         except Exception as error:
             QMessageBox.warning(self, "Disconnect environment", str(error))
+
+    def create_environment(self):
+        """Open MO2's own Instance Manager under the currently selected Proton runtime."""
+        game_path = Path(self.game_path).expanduser()
+        prefix = Path(self.prefix_path).expanduser()
+        install = Path(self.install_path).expanduser()
+        proton = Path(self.proton_path).expanduser()
+        executable = install / "ModOrganizer.exe"
+
+        for path, label in (
+            (game_path, "Skyrim game directory"),
+            (prefix, "selected Proton prefix"),
+            (install, "MO2 installation"),
+            (proton, "selected Proton runtime"),
+        ):
+            if not str(path) or path.is_symlink() or not path.is_dir():
+                QMessageBox.warning(
+                    self, "Cannot create MO2 instance",
+                    f"The {label} is missing or unsafe: {path}",
+                )
+                return
+        if not (prefix / "pfx/drive_c/users").is_dir():
+            QMessageBox.warning(
+                self, "Cannot create MO2 instance",
+                "The selected Proton prefix is not initialized. Initialize it through Wyrd first.",
+            )
+            return
+        if executable.is_symlink() or not executable.is_file():
+            QMessageBox.warning(
+                self, "Cannot create MO2 instance",
+                f"ModOrganizer.exe was not found in the selected installation: {executable}",
+            )
+            return
+        if proton.is_symlink() or not (proton / "proton").is_file():
+            QMessageBox.warning(
+                self, "Cannot create MO2 instance",
+                f"The selected Proton runtime has no Proton launcher: {proton}",
+            )
+            return
+
+        steam_roots = find_steam_roots(Path.home())
+        resolved_game = game_path.resolve(strict=True)
+        steam_root = next(
+            (root for root in steam_roots
+             if not root.is_symlink()
+             and resolved_game == root.resolve(strict=True)
+             or not root.is_symlink() and root.resolve(strict=True) in resolved_game.parents),
+            None,
+        )
+        if steam_root is None:
+            QMessageBox.warning(
+                self, "Cannot create MO2 instance",
+                "Wyrd could not identify the Steam installation for this game. Refresh Steam detection first.",
+            )
+            return
+
+        env = _runtime_environment(proton.resolve(strict=True), steam_root.resolve(strict=True), prefix.resolve(strict=True))
+        command = [str((proton / "proton").resolve(strict=True)), "run", str(executable.resolve(strict=True))]
+        try:
+            logs = managed_paths()["root"] / "logs"
+            logs.mkdir(parents=True, exist_ok=True)
+            log_path = logs / "mo2-instance-manager.log"
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write("\n=== Open MO2 Instance Manager ===\n")
+                log.write(f"MO2: {executable}\nProton: {proton}\nPrefix: {prefix}\n")
+                log.write(f"Command: {command!r}\n")
+                log.flush()
+                process = subprocess.Popen(
+                    command, cwd=str(proton), env=env,
+                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                log.write(f"wrapper_pid: {process.pid}\n")
+                log.flush()
+        except OSError as error:
+            QMessageBox.warning(self, "Could not launch MO2", str(error))
+            return
+
+        self.setup_status.setText(
+            f"Opened MO2 Instance Manager with {proton.name}. "
+            "Create the instance in MO2, close the manager, then choose Connect existing instance to add it to Wyrd."
+        )
 
     def discover(self):
         self.instances.clear()
