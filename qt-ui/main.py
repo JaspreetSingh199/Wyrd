@@ -569,8 +569,6 @@ class MainWindow(QMainWindow):
         self.precheck_status.setText("Preparing startup checks…")
         self.precheck_progress.setFormat("Waiting…")
         QTimer.singleShot(150, self.refresh_all)
-        self._restore_saved_selection()
-        self._save_selection(self.proton_combo.currentIndex())
         # Show onboarding only after initial detection and path population finish.
         QTimer.singleShot(250, self._run_first_launch_setup)
 
@@ -776,6 +774,11 @@ class MainWindow(QMainWindow):
         self.launch_game_button.setEnabled(False)
         self._reset_precheck()
         selected = self.proton_combo.currentData()
+        # Suppress currentIndexChanged while rebuilding the combo. Otherwise
+        # clearing it can save an empty/default selection before we restore
+        # the persisted runtime, overwriting the user's choice.
+        self._restoring_selection = True
+        self.proton_combo.blockSignals(True)
         self.game_state = detect_skyrim()
         saved_game = self._saved_settings.get("game_path")
         if saved_game and Path(saved_game).is_dir():
@@ -983,6 +986,8 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
+        self.proton_combo.blockSignals(False)
+        self._restoring_selection = False
         # Keep both MO2 panels synchronized with detected Skyrim and the
         # selected Proton runtime. The default prefix is Skyrim's existing
         # Steam compatdata directory; this does not create or reset a prefix.
