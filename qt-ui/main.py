@@ -25,7 +25,7 @@ from wyrd_mo2 import (
     inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
-    inspect_audio_compatibility, reset_mo2_compatdata,
+    inspect_audio_compatibility, reset_mo2_compatdata, reset_wyrd_settings,
 )
 from steamcompat import (
     install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
@@ -365,6 +365,21 @@ class MainWindow(QMainWindow):
         maintenance_row.addStretch(1)
         maintenance_panel.layout().addLayout(maintenance_row)
         advanced_layout.addWidget(maintenance_panel)
+
+        preferences_panel = panel(
+            "WYRD PREFERENCES",
+            "Use this to repeat the first-launch setup. This clears Wyrd's saved choices only; MO2, Skyrim and Steam files stay untouched.",
+        )
+        preferences_row = QHBoxLayout()
+        self.reset_settings_button = QPushButton("Reset Wyrd Settings")
+        self.reset_settings_button.setToolTip(
+            "Clears Wyrd's saved preferences and lets you run first-launch setup again. Does not reset or remove MO2."
+        )
+        self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
+        preferences_row.addWidget(self.reset_settings_button)
+        preferences_row.addStretch(1)
+        preferences_panel.layout().addLayout(preferences_row)
+        advanced_layout.addWidget(preferences_panel)
 
         self.audio_panel = panel(
             "AUDIO COMPATIBILITY",
@@ -970,6 +985,43 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "MO2 compatdata reset failed", result.get("message", "Reset failed."))
         self.refresh_all()
 
+
+    def reset_wyrd_preferences(self) -> None:
+        """Clear Wyrd preferences and immediately replay first-launch onboarding."""
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, "Reset Wyrd Settings", "Wait for the current task to finish first.")
+            return
+        answer = QMessageBox.question(
+            self, "Reset Wyrd Settings",
+            "Clear Wyrd's saved preferences and show first-launch setup again?\n\n"
+            "This does NOT remove or reset MO2, its registrations, Skyrim, Steam compatdata, "
+            "game files or saves.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = reset_wyrd_settings()
+        if not result.get("ok"):
+            QMessageBox.warning(self, "Reset Wyrd Settings", result.get("message", "Could not reset Wyrd settings."))
+            self._log(result.get("message", "Wyrd settings reset failed."))
+            return
+
+        self._saved_settings = {}
+        self._saved_game_path = None
+        self.selected_mo2_instance_id = ""
+        self._restoring_selection = True
+        self.proton_combo.blockSignals(True)
+        if self.proton_combo.count():
+            self.proton_combo.setCurrentIndex(0)
+        self.proton_combo.blockSignals(False)
+        self.mo2_library_widget.preferred_instance_id = ""
+        self.mo2_library_widget._refresh_connected()
+        self._log(result.get("message", "Wyrd preferences cleared."))
+        self.refresh_all()
+        self._restoring_selection = False
+        self.progress_label.setText("Wyrd settings reset. Starting first-launch setup…")
+        QTimer.singleShot(100, self._run_first_launch_setup)
 
     def reset_managed_mo2(self) -> None:
         """Remove only Wyrd-owned MO2 files; never reset Steam's Skyrim prefix."""
