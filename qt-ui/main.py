@@ -1092,7 +1092,20 @@ class MainWindow(QMainWindow):
         state = inspect_skyrim_prefix_mo2_installation(game_path)
         if not state.get("installed"):
             state = inspect_external_skyrim_prefix_mo2_installation(game_path)
-        if state.get("installed") or state.get("install"):
+        if state.get("installed"):
+            self._log("MO2 installation already exists in Skyrim's Steam prefix; refreshing detection.")
+            self.refresh_all()
+            return
+        occupied_target = Path(state["install"]).expanduser() if state.get("install") else None
+        if occupied_target is not None and (occupied_target.exists() or occupied_target.is_symlink()):
+            self._log(f"MO2 installation target is occupied; refusing to overwrite: {occupied_target}")
+            QMessageBox.warning(
+                self, "MO2 installation target is occupied",
+                state.get("message") or (
+                    f"The MO2 target already exists but is not a verified Wyrd installation:\n{occupied_target}\n\n"
+                    "Wyrd will leave it untouched. Inspect or connect the existing installation instead."
+                ),
+            )
             self.refresh_all()
             return
         if confirm:
