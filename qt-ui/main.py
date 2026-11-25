@@ -470,7 +470,7 @@ class MainWindow(QMainWindow):
         diagnostics_grid.addWidget(diagnostics_panel, 1, 0, 1, 2)
         diagnostics_grid.setColumnStretch(0, 1)
         diagnostics_grid.setColumnStretch(1, 1)
-        advanced_layout.addLayout(diagnostics_grid)
+        maintenance_layout.addLayout(diagnostics_grid)
 
         logs_panel = panel(
             "SETUP LOG",
@@ -483,7 +483,7 @@ class MainWindow(QMainWindow):
         self.log_view.setMinimumHeight(180)
         self.log_view.setMaximumHeight(260)
         logs_panel.layout().addWidget(self.log_view)
-        advanced_layout.addWidget(logs_panel)
+        maintenance_layout.addWidget(logs_panel)
 
 
 
