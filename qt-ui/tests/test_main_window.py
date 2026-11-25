@@ -203,47 +203,30 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "executable": "/test/MO2/ModOrganizer.exe",
                 "prefix": "/test/compatdata/489830", "install": "/test/MO2",
             })
-            self.assertTrue(window.launch_button.isEnabled())
+            self.assertFalse(window.launch_button.isVisible())
+            self.assertFalse(window.launch_button.isEnabled())
             self.assertFalse(window.launch_game_button.isEnabled())
+            self.assertFalse(window.install_button.isVisible())
             window.close()
 
-    def test_start_mo2_refuses_when_instance_inspection_is_unsafe(self):
-        state = {
-            "installed": True, "prefix_ready": True,
-            "executable": "/home/test/.local/share/wyrd/mo2/ModOrganizer.exe",
-            "metadata": {"version": "v2.5.2"},
-            "external_installations": [],
-        }
-        window = self._window(state=state)
-        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value={
-            "ok": False, "instances": [], "skyrim_instances": [],
-            "message": "The Steam prefix could not be safely inspected."
-        }), patch("main.QMessageBox.warning") as warning, patch("main.launch_mo2_in_skyrim_prefix") as launch, patch("main.launch_external_mo2_in_skyrim_prefix") as external_launch, patch("main.launch_mo2") as legacy_launch:
+    def test_start_mo2_requires_a_registered_active_instance(self):
+        window = self._window()
+        with patch.object(window, "_restore_registered_instance", return_value=None), patch(
+            "main.QMessageBox.information"
+        ) as info, patch.object(window, "_launch_embedded_mo2_instance") as launch:
             window.start_mo2()
-            warning.assert_called_once()
-            launch.assert_not_called()
-            external_launch.assert_not_called()
-            legacy_launch.assert_not_called()
+        info.assert_called_once()
+        launch.assert_not_called()
         window.close()
 
-    def test_primary_launch_mo2_uses_verified_steam_prefix_launcher(self):
+    def test_primary_launch_mo2_uses_the_registered_instance_launcher(self):
         window = self._window()
-        inventory = {
-            "ok": True, "instances": [],
-            "skyrim_instances": [{"name": "Skyrim"}],
-            "message": "One Skyrim instance found.",
-        }
-        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), patch(
-            "main.QInputDialog.getItem", return_value=("Skyrim", True)
-        ), patch("main.launch_mo2_in_skyrim_prefix", return_value={
-            "ok": True, "message": "Started Steam-prefix MO2."
-        }) as steam_launch, patch("main.launch_mo2") as legacy_launch, patch(
-            "main.QMessageBox.information"
-        ):
+        record = {"id": "instance-1", "instance_type": "portable"}
+        with patch.object(window, "_restore_registered_instance", return_value=record), patch.object(
+            window, "_launch_embedded_mo2_instance"
+        ) as launch:
             window.start_mo2()
-        steam_launch.assert_called_once()
-        self.assertEqual(steam_launch.call_args.kwargs["instance_name"], "Skyrim")
-        legacy_launch.assert_not_called()
+        launch.assert_called_once_with(record)
         window.close()
 
     def test_game_process_identity_rejects_pid_reuse(self):
