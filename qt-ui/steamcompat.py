@@ -181,7 +181,7 @@ def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = 
             executable.is_file() and not executable.is_symlink()
             and metadata.get("managed_by") == "Wyrd"
             and metadata.get("game_app_id") == APP_ID
-            and metadata.get("installation_mode") == "skyrim-steam-prefix"
+            and metadata.get("installation_mode") in {"skyrim-steam-prefix", "official-windows-installer"}
             and Path(metadata.get("install", "")).expanduser() == install
         )
         return {
