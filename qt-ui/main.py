@@ -1214,7 +1214,13 @@ class MainWindow(QMainWindow):
         instance_path = Path(record.get("instance_path", "")).expanduser()
         config = Path(record.get("config", "")).expanduser()
         game_path = Path(game.get("path", "")).expanduser()
-        proton = Path(runtime.get("path", "")).expanduser()
+        # The Environment selector is the user's active Proton choice for
+        # every launch action. Keep the registered runtime association as
+        # metadata only; do not silently launch with a different runtime.
+        selected_proton = self.proton_combo.currentData()
+        if not selected_proton:
+            return {"ok": False, "message": "No Proton runtime is selected. Choose a runtime before launching MO2."}
+        proton = Path(str(selected_proton)).expanduser()
         prefix_value = record.get("prefix_path") or game.get("prefix_path") or installation.get("prefix_path")
         if not prefix_value:
             return {"ok": False, "message": "This instance has no Proton prefix association. Edit its game/runtime association first."}
@@ -1323,7 +1329,7 @@ class MainWindow(QMainWindow):
             "ok": True, "pid": process.pid, "instance": instance_path.name,
             "game": game.get("name"), "runtime": runtime.get("name"),
             "installation_owner": installation.get("owner"),
-            "message": f"Opened MO2 instance '{record.get('display_name') or instance_path.name}' for {game.get('name')} using {runtime.get('name')}.",
+            "message": f"Opened MO2 instance '{record.get('display_name') or instance_path.name}' for {game.get('name')} using {self.proton_combo.currentText()}.",
         }
 
 
