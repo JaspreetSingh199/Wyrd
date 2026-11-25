@@ -968,6 +968,7 @@ class MainWindow(QMainWindow):
         )
 
     def _update_active_instance_from_scan(self) -> None:
+        """Derive launch readiness exclusively from current Steam/MO2 filesystem scans."""
         instances = self.instance_state.get("skyrim_instances", [])
         if not self.game_state.get("found"):
             detail = "Skyrim Special Edition has not been detected."
@@ -979,69 +980,46 @@ class MainWindow(QMainWindow):
         else:
             detail = "MO2 is installed, but no Skyrim Special Edition instance was found. Create one in MO2, then refresh."
         proton = bool(self.proton_combo.currentData())
-        mapping_ok = self.mo2_discovery_state is None or self.mo2_discovery_state.get("ok")
-        self.active_instance_label.setText(detail)
+        mapping_ok = bool(
+            self.mo2_discovery_state
+            and self.mo2_discovery_state.get("ok")
+        )
         busy = bool(self.worker and self.worker.isRunning())
-        self.launch_game_button.setEnabled(bool(instances and proton and mapping_ok and not busy))
+        ready = bool(
+            self.startup_checks_complete
+            and self.game_state.get("found")
+            and self.mo2_state.get("installed")
+            and instances
+            and proton
+            and mapping_ok
+            and not busy
+        )
+        self.active_instance_label.setText(detail)
+        self.launch_game_button.setEnabled(ready)
         self.launch_direct_button.setEnabled(bool(self.game_state.get("found") and not busy))
 
     def _restore_registered_instance(self) -> dict | None:
-        """Resolve the saved active instance and refresh the application's registry snapshot."""
+        """Load legacy associations for maintenance, never use them as launch authority."""
         from wyrd_mo2_registry_service import RegistryService
         try:
             registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
             self.registered_instance_registry = registry
-        except Exception as error:
-            self._log(f"Could not load MO2 registry: {error}")
-            self.registered_instance_registry = None
-            return None
-        record = next((item for item in registry["instances"]
-                       if item.get("id") == self.selected_mo2_instance_id), None)
-        if not record:
-            self.active_instance_label.setText(
-                "No verified MO2 environment is active. Use Connect existing instance below, or install MO2."
+            record = next(
+                (item for item in registry.get("instances", [])
+                 if item.get("id") == self.selected_mo2_instance_id),
+                None,
             )
-            if hasattr(self, "launch_game_button"):
-                self.launch_game_button.setEnabled(False)
-            return None
-        games = {item["id"]: item for item in registry["games"]}
-        installations = {item["id"]: item for item in registry["installations"]}
-        runtimes = {item["id"]: item for item in registry["runtimes"]}
-        game = games.get(record.get("game_id"), {})
-        install = installations.get(record.get("installation_id"), {})
-        runtime = runtimes.get(record.get("runtime_id"), {})
-        prefix_value = record.get("prefix_path") or game.get("prefix_path") or install.get("prefix_path")
-        paths = {
-            "executable": Path(install.get("executable", "")).expanduser(),
-            "instance": Path(record.get("instance_path", "")).expanduser(),
-            "config": Path(record.get("config", "")).expanduser(),
-            "game": Path(game.get("path", "")).expanduser(),
-            "runtime": Path(runtime.get("path", "")).expanduser(),
-            "prefix": Path(prefix_value).expanduser() if prefix_value else None,
-        }
-        ready = bool(
-            self.startup_checks_complete
-            and install.get("owner") in ("wyrd", "external")
-            and paths["executable"].is_file()
-            and paths["instance"].is_dir()
-            and paths["config"].is_file()
-            and paths["game"].is_dir()
-            and paths["runtime"].is_dir()
-            and (paths["runtime"] / "proton").is_file()
-            and paths["prefix"] is not None
-            and paths["prefix"].is_dir()
-            and (paths["prefix"] / "pfx/drive_c/users").is_dir()
-            and all(not path.is_symlink() for path in paths.values() if path is not None)
-        )
-        label = record.get("display_name") or paths["instance"].name
-        self.active_instance_label.setText(
-            f"Active MO2 instance: {label} · {game.get('name', 'unknown game')} · "
-            f"{runtime.get('name', 'no runtime')} · "
-            + ("Ready" if ready else "Association/path unavailable — open MO2 setup")
-        )
-        if hasattr(self, "launch_game_button"):
-            busy = bool(self.worker and self.worker.isRunning())
-            self.launch_game_button.setEnabled(ready and not busy)
+        except Exception as error:
+            self._log(f"Could not load legacy MO2 associations: {error}")
+            self.registered_instance_registry = None
+            record = None
+
+        # A missing/old registry is not a reason to disable a filesystem-discovered
+        # MO2 instance. The current scan and verified S: mapping own readiness.
+        if (hasattr(self, "instance_state")
+                and hasattr(self, "launch_game_button")
+                and hasattr(self, "mo2_discovery_state")):
+            self._update_active_instance_from_scan()
         return record
 
     def _set_active_instance(self, record: dict | None) -> None:
@@ -1670,7 +1648,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Skyrim unavailable", "Skyrim Special Edition was not detected.")
             return
         discovery = getattr(self, "mo2_discovery_state", None)
-        if discovery is not None and not discovery.get("ok"):
+        if not discovery or not discovery.get("ok"):
             QMessageBox.warning(
                 self, "MO2 game discovery is not verified",
                 "Wyrd could not verify MO2's S: Steam-library mapping. "
@@ -1727,6 +1705,15 @@ class MainWindow(QMainWindow):
         target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
         steam_root: Path | None = None,
     ) -> None:
+        discovery = getattr(self, "mo2_discovery_state", None)
+        if not discovery or not discovery.get("ok"):
+            QMessageBox.warning(
+                self, "MO2 game discovery is not verified",
+                "Wyrd has not verified the Skyrim S: Steam-library mapping. "
+                "The modded launch is blocked until a successful refresh.\\n\\n"
+                + (discovery or {}).get("message", "No verified Steam discovery result is available."),
+            )
+            return
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
