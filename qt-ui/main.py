@@ -288,7 +288,6 @@ class MainWindow(QMainWindow):
             selected_instance_id=self.selected_mo2_instance_id,
         )
         self.mo2_library_widget.on_registry_changed = self._on_mo2_registry_changed
-        self.mo2_library_widget.on_launch_requested = self._launch_embedded_mo2_instance
         setup_layout.addWidget(self.mo2_library_widget)
         self.mo2_advanced_widget = Mo2AdvancedSettings(
             self, selected_instance_id=self.selected_mo2_instance_id
@@ -303,9 +302,6 @@ class MainWindow(QMainWindow):
         self.use_existing_mo2_button = QPushButton("Use Existing MO2")
         self.use_existing_mo2_button.clicked.connect(self.use_existing_mo2)
         self.use_existing_mo2_button.hide()  # Discovery is owned by the single MO2 card action.
-        self.launch_button = QPushButton("Launch MO2")
-        self.launch_button.clicked.connect(self.start_mo2)
-        self.launch_button.setEnabled(False)
         self.launch_game_button = QPushButton("Launch Modded Skyrim")
         self.launch_game_button.clicked.connect(self.start_active_game)
         self.launch_game_button.setEnabled(False)
@@ -322,7 +318,6 @@ class MainWindow(QMainWindow):
 
         primary_actions = QHBoxLayout()
         primary_actions.addWidget(self.install_button)
-        primary_actions.addWidget(self.launch_button)
         primary_actions.addStretch(1)
         setup_layout.addLayout(primary_actions)
 
@@ -534,12 +529,10 @@ class MainWindow(QMainWindow):
         if self.mo2_state.get("installed"):
             answer = QMessageBox.question(
                 self, "Mod Organizer 2",
-                "MO2 is already installed in Skyrim's Proton prefix. Would you like to launch it now?",
+                "MO2 is already installed in Skyrim's Proton prefix. You can launch a configured Skyrim instance with Launch Modded Skyrim.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
             )
-            if answer == QMessageBox.StandardButton.Yes:
-                self.start_mo2()
             return
 
         answer = QMessageBox.question(
@@ -729,8 +722,6 @@ class MainWindow(QMainWindow):
                 f'Steam compatdata: {self.mo2_state.get("prefix")}\n{summary}'
             )
             self.install_button.hide()
-            self.launch_button.setEnabled(False)
-            self.launch_button.hide()
             self.launch_game_button.setEnabled(False)
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
@@ -738,8 +729,7 @@ class MainWindow(QMainWindow):
             self.install_button.setText("Install MO2")
             self.install_button.show()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
-            self.launch_button.setEnabled(False)
-            self.launch_button.hide()
+                self.launch_button.hide()
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
@@ -777,8 +767,6 @@ class MainWindow(QMainWindow):
             )
             if hasattr(self, "launch_game_button"):
                 self.launch_game_button.setEnabled(False)
-            if hasattr(self, "launch_button"):
-                self.launch_button.hide()
             if hasattr(self, "use_existing_mo2_button"):
                 self.use_existing_mo2_button.show()
             return None
@@ -819,9 +807,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "launch_game_button"):
             busy = bool(self.worker and self.worker.isRunning())
             self.launch_game_button.setEnabled(ready and not busy)
-        if hasattr(self, "launch_button"):
-            self.launch_button.setVisible(ready)
-            self.launch_button.setEnabled(ready and not bool(self.worker and self.worker.isRunning()))
         if hasattr(self, "use_existing_mo2_button"):
             self.use_existing_mo2_button.setVisible(not ready)
         return record
@@ -1338,14 +1323,6 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(0)
         self.mo2_library_widget.discover_button.setFocus()
         self.mo2_library_widget.discover()
-
-    def start_mo2(self) -> None:
-        """Launch only the exact active registered MO2 instance."""
-        record = self._restore_registered_instance()
-        if not record:
-            self.use_existing_mo2()
-            return
-        self._launch_embedded_mo2_instance(record)
 
     def start_mo2_in_skyrim_prefix(self) -> None:
         """Launch MO2 in Skyrim's Steam compatdata prefix (experimental)."""
