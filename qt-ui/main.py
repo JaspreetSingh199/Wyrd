@@ -288,6 +288,8 @@ class MainWindow(QMainWindow):
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("primaryAction")
         self.install_button.clicked.connect(self.install_mo2)
+        self.use_existing_mo2_button = QPushButton("Use Existing MO2")
+        self.use_existing_mo2_button.clicked.connect(self.use_existing_mo2)
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
         self.launch_button.setEnabled(False)
@@ -307,6 +309,7 @@ class MainWindow(QMainWindow):
 
         primary_actions = QHBoxLayout()
         primary_actions.addWidget(self.install_button)
+        primary_actions.addWidget(self.use_existing_mo2_button)
         primary_actions.addWidget(self.launch_button)
         primary_actions.addStretch(1)
         setup_layout.addLayout(primary_actions)
@@ -1020,16 +1023,20 @@ class MainWindow(QMainWindow):
             self._log(result.get("message", "Wyrd settings reset failed."))
             return
 
-        self._saved_settings = {}
+        # Reset preferences without disconnecting an already registered MO2 instance.
+        active_instance_id = self.selected_mo2_instance_id or self._saved_settings.get("selected_mo2_instance_id", "")
+        self._saved_settings = {"selected_mo2_instance_id": active_instance_id} if active_instance_id else {}
         self._saved_game_path = None
-        self.selected_mo2_instance_id = ""
+        self.selected_mo2_instance_id = active_instance_id
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
         if self.proton_combo.count():
             self.proton_combo.setCurrentIndex(0)
         self.proton_combo.blockSignals(False)
-        self.mo2_library_widget.preferred_instance_id = ""
+        self.mo2_library_widget.preferred_instance_id = active_instance_id
         self.mo2_library_widget._refresh_connected()
+        if active_instance_id:
+            self._set_active_instance({"id": active_instance_id})
         self._log(result.get("message", "Wyrd preferences cleared."))
         self.refresh_all()
         self._restoring_selection = False
@@ -1299,15 +1306,17 @@ class MainWindow(QMainWindow):
         }
 
 
+    def use_existing_mo2(self) -> None:
+        """Open the Environment instance picker for an existing MO2 installation."""
+        self.tabs.setCurrentIndex(0)
+        self.mo2_library_widget.discover_button.setFocus()
+        self.mo2_library_widget.discover()
+
     def start_mo2(self) -> None:
-        """Launch only the exact MO2 instance connected to Wyrd."""
+        """Launch only the exact active registered MO2 instance."""
         record = self._restore_registered_instance()
         if not record:
-            QMessageBox.information(
-                self, "Connect MO2 first",
-                "Find your existing MO2 instance in the Environment section and choose "
-                "Add to Wyrd. Wyrd will then launch that exact instance."
-            )
+            self.use_existing_mo2()
             return
         self._launch_embedded_mo2_instance(record)
 
