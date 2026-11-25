@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 )
 
 from wyrd_mo2 import _runtime_environment, managed_paths, _steam_root_for_game
-from skyrim_detection import find_steam_roots
 from wyrd_mo2_registry_service import RegistryService
 
 
@@ -69,11 +68,14 @@ class Mo2LibraryDialog(QWidget):
             "Open Mod Organizer 2's Instance Manager using the selected Proton runtime."
         )
         self.discover_button.clicked.connect(self.create_environment)
-        layout.addWidget(self.discover_button, 0, Qt.AlignmentFlag.AlignLeft)
-
         self.connect_existing_button = QPushButton("Connect existing instance")
         self.connect_existing_button.clicked.connect(self.discover)
-        layout.addWidget(self.connect_existing_button, 0, Qt.AlignmentFlag.AlignLeft)
+        environment_entry_actions = QHBoxLayout()
+        environment_entry_actions.setSpacing(8)
+        environment_entry_actions.addWidget(self.discover_button)
+        environment_entry_actions.addWidget(self.connect_existing_button)
+        environment_entry_actions.addStretch(1)
+        layout.addLayout(environment_entry_actions)
 
         self.connected_instances = QListWidget()
         self.connected_instances.setMinimumHeight(90)
