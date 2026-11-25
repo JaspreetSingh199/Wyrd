@@ -161,6 +161,37 @@ class MainWindowSmokeTests(unittest.TestCase):
             self.assertFalse(window.install_button.isVisible())
             window.close()
 
+    def test_missing_legacy_registration_does_not_disable_discovered_mo2(self):
+        window = self._window()
+        window.instance_state = {
+            "ok": True,
+            "skyrim_instances": [{"name": "Skyrim Special Edition", "selected_profile": "Default"}],
+        }
+        window.mo2_state = {"installed": True, "managed": False}
+        window.mo2_discovery_state = {"ok": True}
+        window.startup_checks_complete = True
+        with patch(
+            "wyrd_mo2_registry_service.RegistryService.load",
+            return_value={"instances": [], "games": [], "installations": [], "runtimes": []},
+        ):
+            window._restore_registered_instance()
+        self.assertTrue(window.launch_game_button.isEnabled())
+        self.assertIn("Automatically discovered", window.active_instance_label.text())
+        window.close()
+
+    def test_unverified_s_drive_blocks_discovered_mo2_launch(self):
+        window = self._window()
+        window.instance_state = {
+            "ok": True,
+            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+        }
+        window.mo2_state = {"installed": True, "managed": False}
+        window.mo2_discovery_state = {"ok": False, "message": "S: target mismatch"}
+        window.startup_checks_complete = True
+        window._update_active_instance_from_scan()
+        self.assertFalse(window.launch_game_button.isEnabled())
+        window.close()
+
     def test_game_process_identity_rejects_pid_reuse(self):
         process = GameProcess(
             pid=4242, binary="skyrimse.exe", start_time=100,
@@ -217,7 +248,8 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
-            window.mo2_state = {"metadata": {"game_path": window.game_state["game_dir"]}}
+            window.mo2_state = {"installed": True, "managed": True, "metadata": {"game_path": window.game_state["game_dir"]}}
+            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"S:\\steamapps\\common\\Skyrim Special Edition"}
             window.start_skyrim()
         self.assertEqual(window.launch_session.wrapper_pid, 501)
         self.assertEqual(window.launch_session.wrapper_start_time, 123)
@@ -243,7 +275,8 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
-            window.mo2_state = {"metadata": {"game_path": window.game_state["game_dir"]}}
+            window.mo2_state = {"installed": True, "managed": True, "metadata": {"game_path": window.game_state["game_dir"]}}
+            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"S:\\steamapps\\common\\Skyrim Special Edition"}
             window.start_skyrim()
         self.assertFalse(launch.call_args.kwargs["xaudio2_compat"])
         window.close()
