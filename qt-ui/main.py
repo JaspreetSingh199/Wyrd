@@ -82,6 +82,16 @@ QMainWindow, QScrollArea, QTabWidget::pane { background: #11191f; }
 QLabel { background: transparent; border: none; }
 QFrame#panel { background: #19252d; border: 1px solid #40515c; border-radius: 6px; }
 QFrame#runtimePanel { background: #1b2a34; border: 1px solid #4b6270; border-radius: 6px; }
+QFrame#statusPanel { background: #18252c; border: 1px solid #344b57; border-radius: 8px; }
+QFrame#launchPanel { background: #1c2d36; border: 1px solid #587586; border-radius: 8px; }
+QFrame#panel { border-radius: 8px; }
+QFrame#runtimePanel { border-radius: 8px; }
+QPushButton { border-radius: 6px; padding: 9px 14px; }
+QPushButton#primaryAction { background: #527f93; border: 1px solid #8db8ca; border-radius: 7px; padding: 11px 18px; font-size: 14px; }
+QPushButton#primaryAction:hover { background: #6394a9; }
+QPushButton#secondaryAction { border-radius: 6px; }
+QTabBar::tab { border-radius: 5px 5px 0 0; padding: 11px 20px; }
+
 QPushButton { background: #263640; color: #dce5e9; border: 1px solid #526875; border-radius: 3px; padding: 9px 15px; min-height: 20px; }
 QPushButton:hover { background: #334955; color: #f0f6f8; border-color: #8eafbf; }
 QPushButton:pressed { background: #1a2931; }
@@ -173,7 +183,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
         self.resize(1100, 820)
-        self.setMinimumSize(820, 640)
+        self.setMinimumSize(760, 600)
         self.worker: QThread | None = None
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
