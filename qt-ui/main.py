@@ -729,8 +729,7 @@ class MainWindow(QMainWindow):
             self.install_button.setText("Install MO2")
             self.install_button.show()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
-                self.launch_button.hide()
-            self.launch_game_button.setEnabled(False)
+                self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
         self._refresh_audio_status()
@@ -873,14 +872,6 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget.preferred_instance_id = self.selected_mo2_instance_id
         self.mo2_library_widget._refresh_connected()
         self._restore_registered_instance()
-
-    def _launch_embedded_mo2_instance(self, record: dict) -> None:
-        result = self._launch_registered_instance(record)
-        self._log(result.get("message", "MO2 launch did not start."))
-        if result.get("ok"):
-            self.progress_label.setText("Selected MO2 instance started.")
-        else:
-            QMessageBox.warning(self, "MO2 launch refused", result.get("message", "Could not launch selected instance."))
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
@@ -1124,7 +1115,6 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(self._on_install_progress)
         self.worker.completed.connect(self._on_install_completed)
         self.install_button.setEnabled(False)
-        self.launch_button.setEnabled(False)
         self.refresh_button.setEnabled(False)
         self.proton_combo.setEnabled(False)
         self.progress.setValue(0)
@@ -1160,7 +1150,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, "Wyrd setup complete",
                 result.get("message", "MO2 is ready.") +
-                "\n\nPress Launch MO2. On first launch, create a Skyrim Special Edition instance in MO2."
+                "\n\nConnect or create a Skyrim Special Edition instance, then use Launch Modded Skyrim."
             )
         else:
             self.progress_label.setText("Setup stopped. Review the log for details.")
@@ -1174,149 +1164,6 @@ class MainWindow(QMainWindow):
             return {"ok": False, "instances": [], "skyrim_instances": [],
                     "message": "Skyrim Special Edition was not detected."}
         return inspect_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
-
-    def _launch_registered_instance(self, record: dict) -> dict:
-        """Open the registered MO2 instance with its exact install and Proton association."""
-        import subprocess
-        from wyrd_mo2 import inspect_proton_build, _runtime_environment
-        from wyrd_mo2_registry_service import RegistryService
-
-        registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
-        installations = {item["id"]: item for item in registry["installations"]}
-        games = {item["id"]: item for item in registry["games"]}
-        runtimes = {item["id"]: item for item in registry["runtimes"]}
-        # Resolve the canonical current registry record; never trust a stale dialog copy.
-        record = next((item for item in registry["instances"] if item.get("id") == record.get("id")), None)
-        if record is None:
-            return {"ok": False, "message": "The selected MO2 instance is no longer registered."}
-        installation = installations.get(record.get("installation_id"))
-        game = games.get(record.get("game_id"))
-        runtime = runtimes.get(record.get("runtime_id"))
-        if not installation or not game or not runtime:
-            return {"ok": False, "message": "This instance needs an installation, game and Proton runtime association."}
-
-        executable = Path(installation.get("executable", "")).expanduser()
-        instance_path = Path(record.get("instance_path", "")).expanduser()
-        config = Path(record.get("config", "")).expanduser()
-        game_path = Path(game.get("path", "")).expanduser()
-        # The Environment selector is the user's active Proton choice for
-        # every launch action. Keep the registered runtime association as
-        # metadata only; do not silently launch with a different runtime.
-        selected_proton = self.proton_combo.currentData()
-        if not selected_proton:
-            return {"ok": False, "message": "No Proton runtime is selected. Choose a runtime before launching MO2."}
-        proton = Path(str(selected_proton)).expanduser()
-        prefix_value = record.get("prefix_path") or game.get("prefix_path") or installation.get("prefix_path")
-        if not prefix_value:
-            return {"ok": False, "message": "This instance has no Proton prefix association. Edit its game/runtime association first."}
-        prefix = Path(prefix_value).expanduser()
-
-        if installation.get("owner") not in ("wyrd", "external"):
-            return {"ok": False, "message": "Installation ownership is not classified; launch refused."}
-        checked_paths = (executable, instance_path, config, game_path, proton, prefix)
-        if any(path.is_symlink() for path in checked_paths):
-            return {"ok": False, "message": "A registered launch path is symlinked; launch refused."}
-        if not executable.is_file() or not instance_path.is_dir() or not config.is_file() or not game_path.is_dir():
-            return {"ok": False, "message": "Registered MO2 executable, instance, INI or game directory is missing."}
-        if record.get("instance_type") == "portable" and instance_path.resolve() != executable.parent.resolve():
-            return {"ok": False, "message": "Portable MO2 instance must be the registered installation root."}
-        if not (prefix / "pfx/drive_c/users").is_dir():
-            return {"ok": False, "message": "The associated Proton prefix is not initialized."}
-        validation = inspect_proton_build(proton)
-        if not validation.get("ok"):
-            return {"ok": False, "message": validation.get("message", "The associated Proton runtime is unavailable.")}
-
-        try:
-            executable.resolve(strict=True).relative_to(executable.parent.resolve(strict=True))
-            config.resolve(strict=True).relative_to(instance_path.resolve(strict=True))
-            import configparser
-            parser = configparser.ConfigParser(interpolation=None)
-            with config.open("r", encoding="utf-8-sig") as stream:
-                parser.read_file(stream)
-            general = parser["General"] if parser.has_section("General") else {}
-            configured_name = general.get("gameName", "").strip()
-            if configured_name and game.get("name"):
-                expected = str(game["name"]).casefold()
-                actual = configured_name.casefold()
-                # Keep the game-name association explicit, but tolerate common
-                # display-name variants and edition suffixes.
-                if expected not in actual and actual not in expected:
-                    return {"ok": False, "message": f"MO2 reports game '{configured_name}', but Wyrd associates this instance with '{game['name']}'."}
-            live_inventory = __import__("wyrd_mo2").inspect_mo2_instances(
-                prefix, executable.parent, require_managed=False
-            )
-            if not live_inventory.get("ok"):
-                return {"ok": False, "message": live_inventory.get("message", "Could not re-inspect the registered Proton prefix.")}
-            live = next(
-                (item for item in live_inventory.get("instances", [])
-                 if Path(item.get("path", "")).resolve() == instance_path.resolve()),
-                None,
-            )
-            if not live or Path(live.get("config", "")).resolve() != config.resolve():
-                return {"ok": False, "message": "The registered MO2 instance is no longer present in the selected prefix."}
-            if record.get("instance_type") == "portable" and instance_path.resolve() != executable.parent.resolve():
-                return {"ok": False, "message": "Portable instance root does not match the registered installation."}
-        except (OSError, ValueError, RuntimeError) as error:
-            return {"ok": False, "message": f"Registered instance validation failed safely: {error}"}
-
-        steam_root_value = game.get("steam_root")
-        if steam_root_value:
-            steam_root = Path(steam_root_value).expanduser()
-        else:
-            candidates = (
-                Path.home() / ".steam/steam",
-                Path.home() / ".local/share/Steam",
-                Path.home() / ".steam/root",
-            )
-            steam_root = next((candidate for candidate in candidates if candidate.is_dir()), Path(""))
-        if not steam_root.is_dir():
-            return {"ok": False, "message": "Steam client root required by Proton could not be found."}
-
-        env = _runtime_environment(proton, steam_root, prefix)
-        app_id = str(game.get("app_id") or "").strip()
-        if app_id:
-            env.update({"SteamAppId": app_id, "SteamGameId": app_id, "STEAM_COMPAT_APP_ID": app_id})
-        else:
-            for key in ("SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"):
-                env.pop(key, None)
-        env["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())
-        if self.xaudio_override_checkbox.isChecked() and app_id == "489830":
-            current = env.get("WINEDLLOVERRIDES", "")
-            overrides = [item for item in current.split(";") if item and not item.lower().startswith("xaudio2_7=")]
-            overrides.append("xaudio2_7=n,b")
-            env["WINEDLLOVERRIDES"] = ";".join(overrides)
-
-        # MO2 expects --instance to identify a global instance by its registered
-        # instance name. Portable instances launch from their own install root.
-        command = [str(proton / "proton"), "run", str(executable)]
-        if record.get("instance_type") == "portable":
-            if instance_path.resolve() != executable.parent.resolve():
-                return {"ok": False, "message": "Portable instance root does not match its MO2 installation root."}
-            # MO2 selects a portable instance when the explicit instance name
-            # is empty. Keep the empty value in the same argv token: Proton's
-            # launcher can discard a standalone empty argv element, causing MO2
-            # to fall back to GlobalSettings.currentInstance() instead.
-            # Boost.Program_options accepts --instance= as an explicit empty
-            # value, which survives Proton's shell wrapper.
-            command.append("--instance=")
-            cwd = str(instance_path)
-        else:
-            command.extend(["--instance", instance_path.name])
-            cwd = str(executable.parent)
-        try:
-            process = subprocess.Popen(
-                command, cwd=cwd, env=env, start_new_session=True,
-                stdin=subprocess.DEVNULL,
-            )
-        except OSError as error:
-            return {"ok": False, "message": f"Could not launch registered MO2 instance: {error}"}
-        return {
-            "ok": True, "pid": process.pid, "instance": instance_path.name,
-            "game": game.get("name"), "runtime": runtime.get("name"),
-            "installation_owner": installation.get("owner"),
-            "message": f"Opened MO2 instance '{record.get('display_name') or instance_path.name}' for {game.get('name')} using {self.proton_combo.currentText()}.",
-        }
-
 
     def use_existing_mo2(self) -> None:
         """Open the Environment instance picker for an existing MO2 installation."""
