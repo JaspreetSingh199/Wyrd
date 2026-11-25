@@ -22,7 +22,7 @@ from wyrd_mo2 import (
     discover_proton_builds, inspect_wyrd_installation,
     install_mo2_environment, launch_mo2, managed_paths,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
-    inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
+    inspect_skyrim_launch_targets,
     launch_process_status, detect_skyrim_processes, _proc_start_time,
     _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
     inspect_audio_compatibility, reset_mo2_compatdata, reset_wyrd_settings,
@@ -31,7 +31,8 @@ from steamcompat import (
     install_mo2_into_skyrim_prefix, inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_external_mo2_in_skyrim_prefix,
-    launch_mo2_in_skyrim_prefix, steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
+    launch_mo2_in_skyrim_prefix, launch_skyrim_via_mo2_in_skyrim_prefix,
+    steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
     reset_wyrd_mo2,
 )
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
@@ -1654,11 +1655,12 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         audio_mode = "xaudio2_compat" if self.xaudio_override_checkbox.isChecked() else "default"
-        result = launch_skyrim_via_mo2(
-            selected, instance_name, expected_binary=selected_target["binary"],
-            audio_mode=audio_mode, proton_path=proton, game_path=game_path,
-            prefix_root=prefix, install_root=install_root,
-            require_managed=require_managed, steam_root_path=steam_root,
+        result = launch_skyrim_via_mo2_in_skyrim_prefix(
+            proton, game_path, instance_name, selected,
+            expected_binary=selected_target["binary"],
+            prefix_path=prefix, install_root=install_root,
+            steam_root_path=steam_root,
+            xaudio2_compat=(audio_mode == "xaudio2_compat"),
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
