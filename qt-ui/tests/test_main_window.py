@@ -62,11 +62,16 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "ok": True, "instances": [], "skyrim_instances": [],
                 "message": "No MO2 instances were found in the known prefix locations."
             }),
+            patch("main.QTimer.singleShot"),
         ]
         for item in patches:
             item.start()
             self.addCleanup(item.stop)
-        return MainWindow()
+        window = MainWindow()
+        # Keep offscreen tests deterministic: run startup detection synchronously
+        # instead of relying on the GUI event loop to deliver delayed callbacks.
+        window.refresh_all()
+        return window
 
 
 
