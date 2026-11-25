@@ -770,6 +770,7 @@ class MainWindow(QMainWindow):
         self.launch_game_button.setEnabled(False)
         self._reset_precheck()
         selected = self.proton_combo.currentData()
+        self.proton_combo.blockSignals(True)
         # Suppress currentIndexChanged while rebuilding the combo. Otherwise
         # clearing it can save an empty/default selection before we restore
         # the persisted runtime, overwriting the user's choice.
@@ -982,8 +983,8 @@ class MainWindow(QMainWindow):
             and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
-        self.proton_combo.blockSignals(False)
         self._restore_saved_selection()
+        self.proton_combo.blockSignals(False)
         # Resume persistence only after a valid runtime is selected. An unavailable
         # saved path must not be replaced with a guessed/default Proton build.
         self._restoring_selection = not bool(self.proton_combo.currentData())
