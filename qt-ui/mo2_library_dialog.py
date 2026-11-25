@@ -281,7 +281,7 @@ class Mo2LibraryDialog(QWidget):
         self.selection_changed = True
         if callable(self.on_registry_changed):
             self.on_registry_changed(self.selected_instance_record, True)
-        self.setup_status.setText("MO2 is connected to Wyrd. You can launch it from the main window.")
+        self.setup_status.setText("MO2 is connected to Wyrd. Use Launch Modded Skyrim on the Environment page to start your game through MO2.")
         self.register_button.hide()
         self._refresh_connected()
 
