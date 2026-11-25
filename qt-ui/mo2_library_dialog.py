@@ -8,7 +8,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
@@ -61,12 +62,16 @@ class Mo2LibraryDialog(QWidget):
         layout.addWidget(self.connected_instances)
 
         environment_actions = QHBoxLayout()
+        self.open_environment_folder_button = QPushButton("Open folder")
+        self.open_environment_folder_button.clicked.connect(self.open_selected_environment_folder)
+        self.open_environment_folder_button.setEnabled(False)
         self.rename_environment_button = QPushButton("Rename")
         self.rename_environment_button.clicked.connect(self.rename_selected_environment)
         self.rename_environment_button.setEnabled(False)
         self.disconnect_environment_button = QPushButton("Disconnect")
         self.disconnect_environment_button.clicked.connect(self.disconnect_selected_environment)
         self.disconnect_environment_button.setEnabled(False)
+        environment_actions.addWidget(self.open_environment_folder_button)
         environment_actions.addWidget(self.rename_environment_button)
         environment_actions.addWidget(self.disconnect_environment_button)
         environment_actions.addStretch(1)
@@ -132,6 +137,7 @@ class Mo2LibraryDialog(QWidget):
             self.connected_instances.addItem(row)
         self.connected_instances.blockSignals(False)
         self.connected_instances.setVisible(bool(self.connected_records))
+        self.open_environment_folder_button.setEnabled(False)
         self.rename_environment_button.setEnabled(False)
         self.disconnect_environment_button.setEnabled(False)
         if record:
@@ -148,6 +154,12 @@ class Mo2LibraryDialog(QWidget):
                     self.connected_instances.blockSignals(True)
                     self.connected_instances.setCurrentRow(row_index)
                     self.connected_instances.blockSignals(False)
+                    instance_path = Path(record.get("instance_path", "")).expanduser()
+                    folder_available = (
+                        not instance_path.is_symlink()
+                        and instance_path.is_dir()
+                    )
+                    self.open_environment_folder_button.setEnabled(folder_available)
                     self.rename_environment_button.setEnabled(True)
                     self.disconnect_environment_button.setEnabled(True)
                     break
@@ -167,12 +179,17 @@ class Mo2LibraryDialog(QWidget):
         record = item.data(Qt.ItemDataRole.UserRole) if item else None
         if not isinstance(record, dict):
             self.selected_instance_record = None
+            self.open_environment_folder_button.setEnabled(False)
             self.rename_environment_button.setEnabled(False)
             self.disconnect_environment_button.setEnabled(False)
             return
         self.selected_instance_record = dict(record)
         self.selection_changed = True
         self.preferred_instance_id = record.get("id", "")
+        instance_path = Path(record.get("instance_path", "")).expanduser()
+        self.open_environment_folder_button.setEnabled(
+            not instance_path.is_symlink() and instance_path.is_dir()
+        )
         self.rename_environment_button.setEnabled(True)
         self.disconnect_environment_button.setEnabled(True)
         if callable(self.on_registry_changed):
@@ -180,6 +197,23 @@ class Mo2LibraryDialog(QWidget):
         self._refresh_connected()
         self.rename_environment_button.setEnabled(True)
         self.disconnect_environment_button.setEnabled(True)
+
+    def open_selected_environment_folder(self):
+        """Open the selected MO2 instance directory without changing its contents."""
+        record = self.selected_instance_record
+        if not record:
+            return
+        instance_path = Path(record.get("instance_path", "")).expanduser()
+        try:
+            if instance_path.is_symlink() or not instance_path.is_dir():
+                raise ValueError("The registered MO2 instance folder is missing or is a symlink.")
+            resolved_path = instance_path.resolve(strict=True)
+            if not resolved_path.is_dir():
+                raise ValueError("The registered MO2 instance location is not a directory.")
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved_path))):
+                raise RuntimeError("The system file manager could not open this folder.")
+        except Exception as error:
+            QMessageBox.warning(self, "Open MO2 folder", str(error))
 
     def rename_selected_environment(self):
         record = self.selected_instance_record
