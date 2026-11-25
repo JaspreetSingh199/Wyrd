@@ -203,34 +203,9 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "executable": "/test/MO2/ModOrganizer.exe",
                 "prefix": "/test/compatdata/489830", "install": "/test/MO2",
             })
-            self.assertFalse(window.launch_button.isVisible())
-            self.assertFalse(window.launch_button.isEnabled())
             self.assertFalse(window.launch_game_button.isEnabled())
             self.assertFalse(window.install_button.isVisible())
             window.close()
-
-    def test_start_mo2_without_active_instance_opens_existing_picker(self):
-        window = self._window()
-        with patch.object(window, "_restore_registered_instance", return_value=None), patch.object(
-            window, "use_existing_mo2"
-        ) as use_existing, patch("main.QMessageBox.information") as info, patch.object(
-            window, "_launch_embedded_mo2_instance"
-        ) as launch:
-            window.start_mo2()
-        use_existing.assert_called_once()
-        info.assert_not_called()
-        launch.assert_not_called()
-        window.close()
-
-    def test_primary_launch_mo2_uses_the_registered_instance_launcher(self):
-        window = self._window()
-        record = {"id": "instance-1", "instance_type": "portable"}
-        with patch.object(window, "_restore_registered_instance", return_value=record), patch.object(
-            window, "_launch_embedded_mo2_instance"
-        ) as launch:
-            window.start_mo2()
-        launch.assert_called_once_with(record)
-        window.close()
 
     def test_game_process_identity_rejects_pid_reuse(self):
         process = GameProcess(
@@ -608,7 +583,6 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertEqual(window.proton_combo.count(), 1)
         self.assertEqual(window.install_button.text(), "Install MO2")
         self.assertEqual(window.launch_game_button.text(), "Launch Modded Skyrim")
-        self.assertFalse(window.launch_button.isEnabled())
         self.assertFalse(hasattr(window, "nav"))
         window.close()
 
@@ -620,7 +594,6 @@ class MainWindowSmokeTests(unittest.TestCase):
             "message": "Verified Wyrd-managed MO2 installation.",
         })
         self.assertFalse(window.install_button.isEnabled())
-        self.assertFalse(window.launch_button.isEnabled())
         self.assertTrue(window.use_existing_mo2_button.isHidden())
         window.close()
 
@@ -725,7 +698,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("MO2 setup skipped", window.progress_label.text())
         window.close()
 
-    def test_first_launch_offers_to_launch_already_installed_mo2(self):
+    def test_first_launch_does_not_offer_a_standalone_mo2_launch(self):
         window = self._window(steam_mo2={
             "installed": True, "managed": True,
             "executable": "/steam/compatdata/489830/pfx/drive_c/Modding/MO2/ModOrganizer.exe",
@@ -733,11 +706,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         })
         with patch("main.mark_first_run_completed"), patch(
             "main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)
-        ), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch.object(
-            window, "start_mo2"
+        ), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes) as question, patch.object(
+            window, "start_active_game"
         ) as launch:
             window._run_first_launch_setup()
-        launch.assert_called_once()
+        launch.assert_not_called()
+        self.assertEqual(question.call_count, 1)
         window.close()
 
     def test_first_launch_prompt_is_not_repeated_after_completion(self):
@@ -802,16 +776,6 @@ class MainWindowSmokeTests(unittest.TestCase):
             window.use_existing_mo2_button.click()
         self.assertEqual(window.tabs.currentIndex(), 0)
         discover.assert_called_once()
-        window.close()
-
-    def test_start_mo2_without_active_instance_opens_picker_instead_of_dead_end_message(self):
-        window = self._window()
-        with patch.object(window, "_restore_registered_instance", return_value=None), patch.object(
-            window, "use_existing_mo2"
-        ) as use_existing, patch("main.QMessageBox.information") as info:
-            window.start_mo2()
-        use_existing.assert_called_once()
-        info.assert_not_called()
         window.close()
 
     def test_legacy_isolated_prefix_actions_are_not_created(self):
@@ -940,23 +904,7 @@ if __name__ == "__main__":
             window = self._window()
         self.assertFalse(window.install_button.isEnabled())
         self.assertEqual(window.install_button.text(), "Use Existing MO2")
-        self.assertTrue(window.launch_button.isEnabled())
         self.assertTrue(window.launch_game_button.isEnabled())
         self.assertIn("External (read-only)", window.mo2_panel.detail_label.text())
         self.assertIn("Default", window.mo2_panel.detail_label.text())
-        window.close()
-
-    def test_start_mo2_routes_external_install_to_external_launcher(self):
-        window = self._window()
-        window.mo2_state = {"installed": True, "managed": False}
-        inventory = {
-            "ok": True, "managed": False,
-            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
-        }
-        with patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory), \
-             patch("main.QInputDialog.getItem", return_value=("Skyrim Special Edition", True)), \
-             patch("main.launch_external_mo2_in_skyrim_prefix", return_value={"ok": True, "message": "started"} ) as launch, \
-             patch("main.QMessageBox.information"):
-            window.start_mo2()
-        launch.assert_called_once()
         window.close()
