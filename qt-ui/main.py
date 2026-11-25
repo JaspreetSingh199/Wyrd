@@ -1007,7 +1007,7 @@ class MainWindow(QMainWindow):
 
 
     def reset_wyrd_preferences(self) -> None:
-        """Restore Wyrd preferences to defaults without replaying onboarding."""
+        """Restore defaults now and leave first-run onboarding for the next app launch."""
         if self.worker and self.worker.isRunning():
             QMessageBox.warning(self, "Reset Wyrd Settings", "Wait for the current task to finish first.")
             return
@@ -1015,7 +1015,7 @@ class MainWindow(QMainWindow):
             self, "Reset Wyrd Settings",
             "Reset Wyrd's preferences to their defaults?\n\n"
             "This does NOT uninstall Wyrd or remove MO2, its registrations, Skyrim, "
-            "Steam compatdata, game files or saves. First-launch setup will not run again.",
+            "Steam compatdata, game files or saves. First-launch setup will appear next time you start Wyrd.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -1031,7 +1031,7 @@ class MainWindow(QMainWindow):
         active_instance_id = self.selected_mo2_instance_id or self._saved_settings.get("selected_mo2_instance_id", "")
         self._saved_settings = {
             "selected_mo2_instance_id": active_instance_id,
-            "first_run_completed": True,
+            "first_run_completed": False,
         } if active_instance_id else {"first_run_completed": True}
         self._saved_game_path = None
         self.selected_mo2_instance_id = active_instance_id
@@ -1044,10 +1044,9 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget._refresh_connected()
         if active_instance_id:
             self._set_active_instance({"id": active_instance_id})
-        # Persist onboarding as dismissed so the startup timer cannot reopen it
-        # on the next launch after the settings file has been cleared.
-        mark_first_run_completed()
-        self._saved_settings["first_run_completed"] = True
+        # Do not schedule onboarding in this session. Leave the completion flag
+        # clear so normal startup offers setup on the next app launch.
+        self._saved_settings["first_run_completed"] = False
         self._log(result.get("message", "Wyrd preferences reset to defaults."))
         self.refresh_all()
         self._restoring_selection = False
