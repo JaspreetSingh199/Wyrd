@@ -2,7 +2,7 @@ name: Wyrd tests and release bundle
 
 on:
   push:
-    branches: [main, v1/mo2, v1/Please-god]
+    branches: [main, v1/mo2, v1/Please-god, feature/mo2-environments]
   pull_request:
     branches: [main]
 
