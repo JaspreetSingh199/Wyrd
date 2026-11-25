@@ -79,18 +79,22 @@ STYLE = """
 QWidget { background: #17191b; color: #e7dfc8; font-size: 14px; }
 QMainWindow, QScrollArea, QTabWidget::pane { background: #17191b; }
 QLabel { background: transparent; border: none; }
-QFrame#panel { background: #202326; border: 1px solid #665b43; border-radius: 5px; }
+QFrame#panel { background: #202326; border: 1px solid #514d42; border-radius: 10px; }
+QFrame#runtimePanel { background: #20262a; border: 1px solid #5e604f; border-radius: 12px; }
+QPushButton { background: #292f33; color: #e7dfc8; border: 1px solid #625d4e; border-radius: 7px; padding: 10px 16px; min-height: 20px; }
+QPushButton#primaryAction { background: #806b42; color: #fff4d5; border: 1px solid #b49a62; font-weight: 600; }
+QPushButton#primaryAction:hover { background: #967d4e; }
+QPushButton#secondaryAction { background: #252d31; border-color: #647078; }
 QLabel#heading { color: #e9dfc3; font-family: Georgia, serif; font-size: 31px; font-weight: 600; letter-spacing: 2px; padding: 3px 0; }
 QLabel#section { color: #d9c28b; font-family: Georgia, serif; font-size: 17px; font-weight: 600; }
 QLabel#muted { color: #aaa18d; }
-QPushButton { background: #292d30; color: #e7dfc8; border: 1px solid #756746; border-radius: 3px; padding: 10px 16px; min-height: 20px; }
 QPushButton:hover { background: #39434a; color: #fff3cf; border-color: #c2a76b; }
 QPushButton:pressed { background: #202629; }
 QPushButton:disabled { color: #716d62; background: #242627; border-color: #454239; }
-QComboBox { background: #24282a; color: #e7dfc8; border: 1px solid #756746; border-radius: 3px; padding: 8px 10px; min-height: 20px; }
+QComboBox { background: #202629; color: #e7dfc8; border: 1px solid #626b6d; border-radius: 7px; padding: 9px 12px; min-height: 22px; }
 QComboBox QAbstractItemView { background: #202326; color: #e7dfc8; selection-background-color: #43515a; }
 QTabWidget::pane { border: 1px solid #665b43; top: -1px; }
-QTabBar::tab { background: #202326; color: #aaa18d; border: 1px solid #514a3a; padding: 10px 22px; margin-right: 4px; }
+QTabBar::tab { background: #202326; color: #aaa18d; border: 1px solid #514a3a; border-top-left-radius: 7px; border-top-right-radius: 7px; padding: 11px 24px; margin-right: 5px; }
 QTabBar::tab:selected { background: #343a3b; color: #e9dfc3; border-bottom: 2px solid #c2a76b; }
 QTabBar::tab:hover { color: #fff3cf; }
 QProgressBar { background: #24282a; border: 1px solid #665b43; border-radius: 3px; height: 13px; text-align: center; color: #e7dfc8; }
@@ -223,7 +227,7 @@ class MainWindow(QMainWindow):
         setup_layout.addWidget(self.game_panel)
 
         runtime_panel = QFrame()
-        runtime_panel.setObjectName("panel")
+        runtime_panel.setObjectName("runtimePanel")
         runtime_layout = QVBoxLayout(runtime_panel)
         runtime_layout.setContentsMargins(17, 15, 17, 15)
         runtime_heading = QLabel("PROTON RUNTIME")
@@ -245,6 +249,7 @@ class MainWindow(QMainWindow):
         runtime_layout.addLayout(runtime_row)
         runtime_actions = QHBoxLayout()
         self.test_proton_button = QPushButton("Test selected Proton")
+        self.test_proton_button.setObjectName("secondaryAction")
         self.test_proton_button.clicked.connect(self.test_selected_proton)
         runtime_actions.addWidget(self.test_proton_button)
         runtime_actions.addStretch(1)
@@ -281,6 +286,7 @@ class MainWindow(QMainWindow):
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self.install_button = QPushButton("Install MO2")
+        self.install_button.setObjectName("primaryAction")
         self.install_button.clicked.connect(self.install_mo2)
         self.launch_button = QPushButton("Launch MO2")
         self.launch_button.clicked.connect(self.start_mo2)
@@ -462,8 +468,9 @@ class MainWindow(QMainWindow):
         mark_first_run_completed()
         self._saved_settings["first_run_completed"] = True
         selected_index = choices.index(chosen)
+        self.proton_combo.blockSignals(True)
         self.proton_combo.setCurrentIndex(selected_index)
-        self._save_selection(selected_index)
+        self.proton_combo.blockSignals(False)
 
         answer = QMessageBox.question(
             self, "Welcome to Wyrd",
@@ -477,6 +484,7 @@ class MainWindow(QMainWindow):
             self.progress_label.setText("Environment setup skipped. You can configure it later.")
             return
 
+        self._save_selection(selected_index)
         self.manage_mo2_library()
         self.progress_label.setText("Wyrd environment configured.")
         self._log(
