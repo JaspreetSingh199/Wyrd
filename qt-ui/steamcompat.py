@@ -483,18 +483,18 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
-            log.write("\\n=== Wyrd SteamCompat Skyrim launch ===\\n")
-            log.write(f"instance: {instance_name}\\nexecutable: {executable_title}\\n")
-            log.write(f"binary: {wanted}\\naudio_mode: {'xaudio2_compat' if xaudio2_compat else 'default'}\\n")
-            log.write("command: " + json.dumps(command) + "\\n")
-            log.write("SteamAppId: 489830\\n")
+            log.write("\n=== Wyrd SteamCompat Skyrim launch ===\n")
+            log.write(f"instance: {instance_name}\nexecutable: {executable_title}\n")
+            log.write(f"binary: {wanted}\naudio_mode: {'xaudio2_compat' if xaudio2_compat else 'default'}\n")
+            log.write("command: " + json.dumps(command) + "\n")
+            log.write("SteamAppId: 489830\n")
             log.flush()
             process = subprocess.Popen(
                 command, cwd=str(install), env=env,
                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.write(f"wrapper_pid: {process.pid}\n")
             log.flush()
     except OSError as error:
         return {"ok": False, "message": f"Could not start MO2 through SteamCompat: {error}"}
