@@ -617,7 +617,8 @@ class MainWindowSmokeTests(unittest.TestCase):
             "message": "Verified Wyrd-managed MO2 installation.",
         })
         self.assertFalse(window.install_button.isEnabled())
-        self.assertTrue(window.launch_button.isEnabled())
+        self.assertFalse(window.launch_button.isEnabled())
+        self.assertTrue(window.use_existing_mo2_button.isVisible())
         window.close()
 
     def test_install_completion_rejects_failed_post_install_verification(self):
@@ -752,20 +753,45 @@ class MainWindowSmokeTests(unittest.TestCase):
         self.assertIn("No compatible Proton", window.runtime_status.text())
         window.close()
 
-    def test_reset_wyrd_settings_button_replays_first_launch_without_resetting_mo2(self):
-        window = self._window()
+    def test_reset_wyrd_settings_preserves_active_mo2_connection_and_replays_setup(self):
+        active_id = "instance-existing-123"
+        window = self._window(settings={
+            "selected_mo2_instance_id": active_id,
+            "proton": "/steam/Proton - Experimental",
+            "first_run_completed": True,
+        })
         self.assertEqual(window.reset_settings_button.text(), "Reset Wyrd Settings")
         with patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
             "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
-        ) as reset, patch.object(window, "refresh_all") as refresh, patch(
-            "main.QTimer.singleShot"
-        ) as schedule:
+        ) as reset, patch.object(window, "_set_active_instance") as set_active, patch.object(
+            window, "refresh_all"
+        ) as refresh, patch("main.QTimer.singleShot") as schedule:
             window.reset_wyrd_preferences()
         reset.assert_called_once_with()
+        set_active.assert_called_once_with({"id": active_id})
         refresh.assert_called_once()
         schedule.assert_called_once()
-        self.assertEqual(window._saved_settings, {})
+        self.assertEqual(window.selected_mo2_instance_id, active_id)
+        self.assertEqual(window._saved_settings.get("selected_mo2_instance_id"), active_id)
         self.assertFalse(window._saved_settings.get("first_run_completed", False))
+        window.close()
+
+    def test_use_existing_mo2_button_opens_environment_discovery(self):
+        window = self._window()
+        with patch.object(window.mo2_library_widget, "discover") as discover:
+            window.use_existing_mo2_button.click()
+        self.assertEqual(window.tabs.currentIndex(), 0)
+        discover.assert_called_once()
+        window.close()
+
+    def test_start_mo2_without_active_instance_opens_picker_instead_of_dead_end_message(self):
+        window = self._window()
+        with patch.object(window, "_restore_registered_instance", return_value=None), patch.object(
+            window, "use_existing_mo2"
+        ) as use_existing, patch("main.QMessageBox.information") as info:
+            window.start_mo2()
+        use_existing.assert_called_once()
+        info.assert_not_called()
         window.close()
 
     def test_legacy_isolated_prefix_actions_are_not_created(self):
