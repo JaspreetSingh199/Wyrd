@@ -148,6 +148,36 @@ def panel(title: str, description: str) -> QFrame:
     return frame
 
 
+class RequirementsInstallWorker(QThread):
+    """Install Wyrd's Python dependencies into its own virtual environment."""
+
+    completed = Signal(dict)
+
+    def __init__(self):
+        super().__init__()
+        self.script = Path(__file__).resolve().parent / "install-requirements.sh"
+
+    def run(self) -> None:
+        try:
+            if not self.script.is_file():
+                raise FileNotFoundError(f"Requirements script not found: {self.script}")
+            result = subprocess.run(
+                ["bash", str(self.script)],
+                cwd=str(self.script.parent),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.completed.emit({
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            })
+        except Exception as error:
+            self.completed.emit({"ok": False, "message": str(error)})
+
+
 class SteamPrefixInstallWorker(QThread):
     progress = Signal(int, str)
     completed = Signal(dict)
@@ -373,6 +403,21 @@ class MainWindow(QMainWindow):
         mo2_advanced_help.setWordWrap(True)
         advanced_layout.addWidget(mo2_advanced_help)
         advanced_layout.addWidget(self.mo2_advanced_widget)
+
+        requirements_panel = panel(
+            "WYRD PYTHON REQUIREMENTS",
+            "Install or repair Wyrd's Python packages in its local .venv. This is separate from the MO2 files inside Skyrim's Proton prefix."
+        )
+        requirements_row = QHBoxLayout()
+        self.install_requirements_button = QPushButton("Install requirements")
+        self.install_requirements_button.clicked.connect(self.install_requirements)
+        self.requirements_status = QLabel("Requirements are checked automatically when Wyrd starts.")
+        self.requirements_status.setObjectName("muted")
+        self.requirements_status.setWordWrap(True)
+        requirements_row.addWidget(self.install_requirements_button)
+        requirements_row.addWidget(self.requirements_status, 1)
+        requirements_panel.layout().addLayout(requirements_row)
+        advanced_layout.addWidget(requirements_panel)
 
         maintenance_panel = panel(
             "MO2 MAINTENANCE",
