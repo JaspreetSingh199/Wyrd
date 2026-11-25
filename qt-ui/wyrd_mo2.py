@@ -702,6 +702,52 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
     return roots
 
 
+def _same_mo2_game_path(raw_game_path: str, prefix_root: Path) -> bool:
+    """Recognize Skyrim SE only when MO2's configured gamePath resolves to it.
+
+    MO2 writes Windows paths into ModOrganizer.ini. Accept the canonical Steam
+    game directory (or SkyrimSE.exe) through the prefix's Z: mapping, and the
+    known S: Steam-library mapping. Do not classify an instance by free-form
+    gameName or executable labels alone.
+    """
+    raw = (raw_game_path or "").strip().strip('"')
+    if not raw:
+        return False
+    normalized = raw.replace("/", "\\\\")
+    if normalized.casefold().startswith("s:\\\\"):
+        relative = normalized[3:].replace("\\\\", "/")
+        candidates = []
+        for root in (Path.home() / ".local/share/Steam", Path.home() / ".steam/steam", Path.home() / ".steam/root"):
+            candidates.append(root / "steamapps" / relative)
+        # S: is a Wyrd-created mapping and must resolve within the same prefix.
+        drive_s = Path(prefix_root) / "pfx/drive_c/dosdevices/s:"
+        if drive_s.is_symlink():
+            try:
+                target = drive_s.resolve(strict=True)
+                candidates.append(target / relative.replace("steamapps/common/", "", 1))
+            except (OSError, RuntimeError):
+                pass
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve(strict=True)
+                if resolved.is_file() and resolved.name.casefold() == "skyrimse.exe":
+                    resolved = resolved.parent
+                if resolved.is_dir() and (resolved / "SkyrimSE.exe").is_file():
+                    return True
+            except (OSError, RuntimeError):
+                continue
+        return False
+    resolved = _resolve_windows_path(raw, prefix_root, None)
+    if resolved is None:
+        return False
+    try:
+        if resolved.is_file() and resolved.name.casefold() == "skyrimse.exe":
+            resolved = resolved.parent
+        return resolved.is_dir() and (resolved / "SkyrimSE.exe").is_file()
+    except OSError:
+        return False
+
+
 def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                           require_managed: bool = True) -> dict:
     """Read-only inventory of MO2 instances in a known Proton prefix.
@@ -874,11 +920,10 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                 if executable["title"] or executable["binary"]:
                     executables.append(executable)
 
-            skyrim_markers = ("skyrim special edition", "skyrimse.exe", "skyrim se")
-            searchable = " ".join([game_name, game_path] + [
-                value for entry in executables for value in entry.values()
-            ]).casefold()
-            is_skyrim = any(marker in searchable for marker in skyrim_markers)
+            # The configured gamePath is authoritative. Loose matching on
+            # profile labels or executable names can classify stale instances
+            # as Skyrim even when MO2 points at a different installation.
+            is_skyrim = _same_mo2_game_path(game_path, prefix_root)
             discovered.append({
                 "name": directory.name,
                 "path": str(directory),
