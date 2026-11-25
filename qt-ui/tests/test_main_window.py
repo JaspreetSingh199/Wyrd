@@ -256,7 +256,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ), patch("main.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
-        ), patch("main.launch_skyrim_via_mo2", return_value={
+        ), patch("main.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
             "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log",
             "message": "handoff",
         }), patch("main._proc_start_time", return_value=123), patch(
@@ -283,7 +283,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ), patch("main.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
-        ), patch("main.launch_skyrim_via_mo2", return_value={
+        ), patch("main.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
             "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log", "message": "handoff"
         }) as launch, patch("main._proc_start_time", return_value=123), patch(
             "main.QMessageBox.information"
