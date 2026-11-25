@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
         self.resize(1100, 820)
-        self.setMinimumSize(900, 680)
+        self.setMinimumSize(820, 640)
         self.worker: QThread | None = None
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
