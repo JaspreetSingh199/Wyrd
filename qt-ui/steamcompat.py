@@ -50,91 +50,6 @@ def _reject_symlinked_path_components(path: Path, label: str) -> Path:
     return candidate
 
 
-def configure_steam_library_drive(prefix_root: Path, game_path: Path, steam_root: Path) -> dict:
-    """Make S: inside Skyrim's AppID prefix resolve to the detected game library.
-
-    Only the S: dosdevices symlink is changed. The game, Steam manifests,
-    saves, and other prefix entries are never modified.
-    """
-    try:
-        prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
-        game = _reject_symlinked_path_components(Path(game_path), "Skyrim game")
-        steam = _reject_symlinked_path_components(Path(steam_root), "Steam client root")
-        resolved_prefix = prefix.resolve(strict=True)
-        resolved_steam = steam.resolve(strict=True)
-        expected_prefix = steam_compat_prefix(resolved_steam).resolve(strict=True)
-        if resolved_prefix != expected_prefix:
-            raise RuntimeError("The selected prefix is not this game's Steam AppID 489830 compatdata prefix.")
-
-        resolved_game = game.resolve(strict=True)
-        if (not resolved_game.is_dir()
-                or resolved_game.parent.name.casefold() != "common"
-                or resolved_game.parent.parent.name.casefold() != "steamapps"):
-            raise RuntimeError("The detected Skyrim directory is not inside a Steam library's steamapps/common directory.")
-        library_steamapps = resolved_game.parent.parent
-        library_root = library_steamapps.parent.resolve(strict=True)
-        registered_libraries = [item.resolve(strict=True) for item in steam_libraries(resolved_steam)]
-        if library_steamapps.resolve(strict=True) not in registered_libraries:
-            raise RuntimeError("The detected Skyrim directory is not in a library registered by this Steam client.")
-
-        manifest = library_steamapps / f"appmanifest_{APP_ID}.acf"
-        if manifest.is_symlink() or not manifest.is_file():
-            raise RuntimeError("The detected Steam library has no safe Skyrim AppID manifest.")
-        manifest_text = manifest.read_text(encoding="utf-8", errors="replace")
-        app_id_match = re.search(r'"appid"\s+"([^"]+)"', manifest_text)
-        install_dir_match = re.search(r'"installdir"\s+"([^"]+)"', manifest_text)
-        if (not app_id_match or app_id_match.group(1) != APP_ID
-                or not install_dir_match or install_dir_match.group(1) != resolved_game.name):
-            raise RuntimeError("The Steam AppID manifest does not identify the detected Skyrim directory.")
-
-        pfx = resolved_prefix / "pfx"
-        drive_c = pfx / "drive_c"
-        dosdevices = pfx / "dosdevices"
-        drive_link = dosdevices / "s:"
-        if (pfx.is_symlink() or drive_c.is_symlink() or dosdevices.is_symlink()
-                or not drive_c.is_dir() or not dosdevices.is_dir()):
-            raise RuntimeError("The Skyrim Proton dosdevices path is missing or unsafe.")
-        if drive_link.exists() and not drive_link.is_symlink():
-            raise RuntimeError("The S: entry is not a symlink; it was left untouched.")
-
-        current_target = None
-        if drive_link.is_symlink():
-            try:
-                current_target = drive_link.resolve(strict=True)
-            except (OSError, RuntimeError):
-                current_target = None
-        changed = current_target != library_root
-        if changed:
-            temporary_link = dosdevices / f".wyrd-s-drive-{os.getpid()}"
-            if temporary_link.exists() or temporary_link.is_symlink():
-                raise RuntimeError("A previous S: mapping transaction artifact exists; manual inspection is required.")
-            temporary_link.symlink_to(library_root, target_is_directory=True)
-            try:
-                os.replace(temporary_link, drive_link)
-            finally:
-                temporary_link.unlink(missing_ok=True)
-
-        verified_target = drive_link.resolve(strict=True)
-        verified_game = (verified_target / "steamapps" / "common" / resolved_game.name).resolve(strict=True)
-        if verified_target != library_root or verified_game != resolved_game or not verified_game.is_dir():
-            raise RuntimeError("S: mapping verification failed after configuration.")
-        return {
-            "ok": True, "changed": changed, "drive": "S:",
-            "library_root": str(library_root),
-            "windows_game_path": "S:\\steamapps\\common\\" + resolved_game.name,
-            "resolved_game_path": str(verified_game),
-            "message": ("Corrected" if changed else "Verified") + " MO2 S: Steam-library mapping.",
-        }
-    except (OSError, ValueError, RuntimeError) as error:
-        return {
-            "ok": False, "changed": False, "drive": "S:",
-            "library_root": None, "windows_game_path": None,
-            "resolved_game_path": None, "message": str(error),
-        }
-
-
-
-
 def synchronize_mo2_instance_game_paths(
     prefix_root: Path, game_path: Path, windows_game_path: str,
 ) -> dict:
@@ -410,19 +325,12 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
         if proton.is_symlink() or not (proton / "proton").is_file():
             raise RuntimeError("Selected Proton runtime is missing or unsafe.")
 
-        if windows_game_path:
-            mapped = _resolve_windows_path(windows_game_path, resolved_prefix)
-            if mapped != resolved_game:
-                raise RuntimeError("Generated Wine game path does not resolve to the detected Skyrim directory.")
-            windows_path = windows_game_path
-        else:
-            # Backwards-compatible path for older callers; startup now supplies
-            # the dynamically derived path from discover_wine_game_path().
-            drive = resolved_prefix / "pfx/dosdevices/s:"
-            if not drive.is_symlink() or drive.resolve(strict=True) != resolved_game.parent.parent.parent.resolve(strict=True):
-                raise RuntimeError("Verified S: Steam-library mapping is missing or does not point to Skyrim's library.")
-            library_root = resolved_game.parent.parent.parent
-            windows_path = "S:" + str(resolved_game.relative_to(library_root)).replace("/", "\\")
+        if not windows_game_path:
+            raise RuntimeError("A dynamically discovered Proton game path is required; no drive letter is assumed.")
+        mapped = _resolve_windows_path(windows_game_path, resolved_prefix)
+        if mapped != resolved_game:
+            raise RuntimeError("Generated Wine game path does not resolve to the detected Skyrim directory.")
+        windows_path = windows_game_path
         registry_path = windows_path.rstrip("\\").replace("\\", "\\\\") + "\\\\"
         reg_text = (
             "Windows Registry Editor Version 5.00\n\n"
