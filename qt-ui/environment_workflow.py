@@ -4,10 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from skyrim_detection import detect_skyrim
-from proton_runtime import discover_proton_builds, _steam_root_for_game
-from steam_drive_mapping import discover_wine_game_path, verify_wine_game_path
-from steam_game_registry import configure_skyrim_se_registry
-from mo2_registry import synchronize_mo2_instance_game_paths
+from proton_runtime import discover_proton_builds
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
