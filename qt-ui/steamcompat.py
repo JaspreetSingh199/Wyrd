@@ -288,9 +288,9 @@ def verify_wine_game_path(proton_path: Path, prefix_root: Path,
             )
         return {
             "ok": True,
-            "windows_executable": windows_game_path.rstrip("\\\\") + "\\\\SkyrimSE.exe",
+            "windows_executable": windows_game_path.rstrip("\\") + "\\SkyrimSE.exe",
             "resolved_executable": str(mapped / "SkyrimSE.exe"),
-            "message": f"Filesystem mapping verified {windows_game_path}\\\\SkyrimSE.exe; no Windows command shell was launched.",
+            "message": f"Filesystem mapping verified {windows_game_path}\\SkyrimSE.exe; no Windows command shell was launched.",
         }
     except (OSError, ValueError, RuntimeError) as error:
         return {"ok": False, "message": str(error)}
