@@ -111,7 +111,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "audio_module_mappings": {"xaudio2_7.dll": "/prefix/xaudio2_7.dll", "faudio.dll": None},
             "audio_runtime_environment": {"WINEDLLOVERRIDES": None, "PULSE_LATENCY_MSEC": "90"},
         }
-        with patch("main.detect_skyrim_processes", return_value={
+        with patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [process], "wyrd_processes": [process],
             "message": "Detected 1 Skyrim/SKSE process(es) associated with Wyrd's managed prefix."
         }), patch("main.QMessageBox.information"):
@@ -126,8 +126,8 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_check_launch_status_scans_detected_skyrim_steam_prefix(self):
         window = self._window()
         expected_steam_root = Path(window.game_state["game_dir"]).parents[2]
-        with patch("main.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
-             patch("main.detect_skyrim_processes", return_value={
+        with patch("launch_workflow.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
+             patch("launch_workflow.detect_skyrim_processes", return_value={
                  "ok": True, "processes": [], "message": "No Skyrim processes detected."
              }), patch("main.QMessageBox.information"):
             window.check_launch_status()
@@ -137,7 +137,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_idle_launch_status_explains_manual_mo2_and_exited_game(self):
         window = self._window()
-        with patch("main.detect_skyrim_processes", return_value={
+        with patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "message": "No Skyrim/SKSE process was detected."
         }), patch("main.QMessageBox.information") as message:
             window.check_launch_status()
@@ -241,7 +241,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             detection_source="launch_process_tree",
             attribution_confidence="confirmed",
         )
-        with patch("process_monitor._proc_identity", return_value={"start_time": 101}):
+        with patch("launch_models._proc_identity", return_value={"start_time": 101}):
             self.assertFalse(process.matches_current_process())
 
     def test_game_process_identity_accepts_matching_start_time(self):
@@ -250,7 +250,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             detection_source="managed_prefix",
             attribution_confidence="prefix",
         )
-        with patch("process_monitor._proc_identity", return_value={"start_time": 100}):
+        with patch("launch_models._proc_identity", return_value={"start_time": 100}):
             self.assertTrue(process.matches_current_process())
 
     def test_game_process_identity_rejects_missing_pid(self):
@@ -259,7 +259,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             detection_source="launch_process_tree",
             attribution_confidence="confirmed",
         )
-        with patch("process_monitor._proc_identity", return_value={}):
+        with patch("launch_models._proc_identity", return_value={}):
             self.assertFalse(process.matches_current_process())
 
     def test_launch_session_model_has_safe_idle_defaults(self):
@@ -281,13 +281,13 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
                 "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
             }
-        ), patch("main.inspect_skyrim_launch_targets", return_value={
+        ), patch("launch_workflow.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
-        ), patch("main.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
+        ), patch("launch_workflow.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
             "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log",
             "message": "handoff",
-        }), patch("main._proc_start_time", return_value=123), patch(
+        }), patch("launch_workflow._proc_start_time", return_value=123), patch(
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
@@ -309,12 +309,12 @@ class MainWindowSmokeTests(unittest.TestCase):
                 "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
                 "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
             }
-        ), patch("main.inspect_skyrim_launch_targets", return_value={
+        ), patch("launch_workflow.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "Skyrim", "binary": "/game/SkyrimSE.exe"}]
             }
-        ), patch("main.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
+        ), patch("launch_workflow.launch_skyrim_via_mo2_in_skyrim_prefix", return_value={
             "ok": True, "pid": 501, "log_path": "/tmp/wyrd-launch.log", "message": "handoff"
-        }) as launch, patch("main._proc_start_time", return_value=123), patch(
+        }) as launch, patch("launch_workflow._proc_start_time", return_value=123), patch(
             "main.QMessageBox.information"
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
@@ -330,15 +330,15 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.launch_session.wrapper_pid = 500
         window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
-            "main.launch_process_status", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+            "launch_workflow.launch_process_status", return_value={
                 "state": "exited", "message": "original wrapper was replaced"
             }
-        ), patch("main.detect_skyrim_processes", return_value={
+        ), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True,
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "wyrd_processes": [],
-        }), patch("main._is_descendant_process") as ancestry:
+        }), patch("launch_workflow._is_descendant_process") as ancestry:
             window._poll_launch_status()
         ancestry.assert_not_called()
         self.assertFalse(window._launch_monitor.isActive())
@@ -349,12 +349,12 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         window.launch_session.wrapper_pid = 500
         window.launch_session.log_path = "/tmp/wyrd-launch.log"
-        with patch("main.launch_process_status", return_value={
+        with patch("launch_workflow.launch_process_status", return_value={
             "state": "exited", "message": "wrapper exited"
-        }), patch("main.detect_skyrim_processes", return_value={
+        }), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
-        }), patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
-            "main.read_launch_diagnostics", return_value={
+        }), patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "launch_workflow.read_launch_diagnostics", return_value={
                 "ok": True, "content": "MO2 could not resolve executable title",
             }
         ):
@@ -376,10 +376,10 @@ class MainWindowSmokeTests(unittest.TestCase):
             ],
             "wyrd_processes": [],
         }
-        with patch("main._proc_identity", return_value={"ppid": 500, "start_time": 900}), patch(
-            "main.launch_process_status", return_value={"state": "running", "message": "running"}
-        ), patch("main.detect_skyrim_processes", return_value=scan), patch(
-            "main._is_descendant_process", side_effect=lambda pid, ancestor: True
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 500, "start_time": 900}), patch(
+            "launch_workflow.launch_process_status", return_value={"state": "running", "message": "running"}
+        ), patch("launch_workflow.detect_skyrim_processes", return_value=scan), patch(
+            "launch_workflow._is_descendant_process", side_effect=lambda pid, ancestor: True
         ):
             window._poll_launch_status()
         self.assertEqual(
@@ -397,11 +397,11 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         window.launch_session.wrapper_pid = 500
         window.launch_session.log_path = "/tmp/wyrd-launch.log"
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
-            "main.launch_process_status", return_value={"state": "exited", "message": "wrapper exited"}
-        ), patch("main.detect_skyrim_processes", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "launch_workflow.launch_process_status", return_value={"state": "exited", "message": "wrapper exited"}
+        ), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
-        }), patch("main.read_launch_diagnostics", return_value={
+        }), patch("launch_workflow.read_launch_diagnostics", return_value={
             "ok": True, "content": "USVFS hook failed to inject"
         }):
             window._poll_launch_status()
@@ -419,12 +419,12 @@ class MainWindowSmokeTests(unittest.TestCase):
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "wyrd_processes": [],
         }
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
-            "main.launch_process_status", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "launch_workflow.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
-        ), patch("main.detect_skyrim_processes", return_value=scan), patch(
-            "main._is_descendant_process", return_value=True
+        ), patch("launch_workflow.detect_skyrim_processes", return_value=scan), patch(
+            "launch_workflow._is_descendant_process", return_value=True
         ):
             window._poll_launch_status()
         self.assertFalse(window._launch_monitor.isActive())
@@ -459,14 +459,14 @@ class MainWindowSmokeTests(unittest.TestCase):
             "pid": 700, "binary": "skyrimse.exe",
             "prefix_attributed": True, "attributed_to_wyrd": False,
         }
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
-            "main.launch_process_status", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "launch_workflow.launch_process_status", return_value={
                 "state": "running", "message": "wrapper still running"
             }
-        ), patch("main.detect_skyrim_processes", return_value={
+        ), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [ordinary_steam_process],
             "wyrd_processes": [],
-        }), patch("main._is_descendant_process", return_value=False):
+        }), patch("launch_workflow._is_descendant_process", return_value=False):
             window._poll_launch_status()
         self.assertEqual(window.launch_session.state, "waiting")
         self.assertEqual(window.launch_session.game_processes, [])
@@ -479,9 +479,9 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.launch_session.wrapper_pid = 500
         window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
-        with patch("main.launch_process_status", return_value={
+        with patch("launch_workflow.launch_process_status", return_value={
             "state": "exited", "message": "wrapper exited"
-        }), patch("main.detect_skyrim_processes", return_value={
+        }), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
         }):
             window._poll_launch_status()
@@ -493,9 +493,9 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         window.launch_session.wrapper_pid = 500
         window.launch_session.poll_count = window._launch_poll_limit
-        with patch("main.launch_process_status", return_value={
+        with patch("launch_workflow.launch_process_status", return_value={
             "state": "running", "message": "wrapper alive"
-        }), patch("main.detect_skyrim_processes", return_value={
+        }), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
         }):
             window._poll_launch_status()
@@ -520,12 +520,12 @@ class MainWindowSmokeTests(unittest.TestCase):
             ],
             "message": "Detected Skyrim processes in Wyrd prefix.",
         }
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
-            "main.launch_process_status", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+            "launch_workflow.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
-        ), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
-            "main._is_descendant_process", side_effect=lambda pid, ancestor: pid == 701
+        ), patch("launch_workflow.detect_skyrim_processes", return_value=process_scan), patch(
+            "launch_workflow._is_descendant_process", side_effect=lambda pid, ancestor: pid == 701
         ), patch("main.QMessageBox.information") as info:
             window.check_launch_status()
         self.assertIn("this Wyrd launch process tree", window.progress_label.text())
@@ -544,12 +544,12 @@ class MainWindowSmokeTests(unittest.TestCase):
             "wyrd_processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "message": "Detected Skyrim in Wyrd prefix.",
         }
-        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
-            "main.launch_process_status", return_value={
+        with patch("launch_workflow._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+            "launch_workflow.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
-        ), patch("main.detect_skyrim_processes", return_value=process_scan), patch(
-            "main._is_descendant_process", return_value=False
+        ), patch("launch_workflow.detect_skyrim_processes", return_value=process_scan), patch(
+            "launch_workflow._is_descendant_process", return_value=False
         ), patch("main.QMessageBox.information"):
             window.check_launch_status()
         self.assertIn("ancestry is unconfirmed", window.progress_label.text())
@@ -569,10 +569,10 @@ class MainWindowSmokeTests(unittest.TestCase):
         with patch.object(
             window.launch_session.game_processes[0],
             "matches_current_process", return_value=True
-        ), patch("main.detect_skyrim_processes", return_value={
+        ), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": [],
             "message": "No new process scan matches.",
-        }), patch("main.launch_process_status", return_value={
+        }), patch("launch_workflow.launch_process_status", return_value={
             "state": "exited", "message": "Proton wrapper has exited."
         }), patch("main.QMessageBox.information") as info:
             window.check_launch_status()
@@ -594,10 +594,10 @@ class MainWindowSmokeTests(unittest.TestCase):
         with patch.object(
             window.launch_session.game_processes[0],
             "matches_current_process", return_value=False
-        ), patch("main.detect_skyrim_processes", return_value={
+        ), patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": [],
             "message": "No Skyrim processes found.",
-        }), patch("main.launch_process_status", return_value={
+        }), patch("launch_workflow.launch_process_status", return_value={
             "state": "exited", "message": "Wrapper exited."
         }), patch("main.QMessageBox.information") as info:
             window.check_launch_status()
@@ -645,7 +645,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ), patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}), patch.object(
             window, "manage_mo2_library"
         ), patch("main.inspect_audio_compatibility", return_value={"ok": True, "dlls": {}}), patch(
-            "main.read_launch_diagnostics", return_value={}
+            "launch_workflow.read_launch_diagnostics", return_value={}
         ), patch("main.write_settings") as save:
             window.refresh_all()
             self.assertEqual(window.proton_combo.currentData(), str(preferred))
@@ -779,7 +779,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_check_launch_status_handles_unexpected_shallow_game_path(self):
         window = self._window()
         window.game_state["game_dir"] = "/games/Skyrim"
-        with patch("main.detect_skyrim_processes", return_value={
+        with patch("launch_workflow.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "message": "No Skyrim processes detected."
         }), patch("main.QMessageBox.information"):
             window.check_launch_status()
@@ -976,9 +976,9 @@ if __name__ == "__main__":
                     "install": str(install), "executable": str(executable),
                 }
             }
-            with patch("main._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
+            with patch("launch_workflow._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
                 "main._steam_root_for_game", return_value=Path(tmp)
-            ), patch("main._runtime_environment", return_value={}), patch(
+            ), patch("launch_workflow._runtime_environment", return_value={}), patch(
                 "main.subprocess.Popen"
             ) as popen, patch("main.QMessageBox.warning") as warning:
                 window.launch_mo2_gui()
