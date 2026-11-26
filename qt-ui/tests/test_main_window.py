@@ -926,12 +926,18 @@ if __name__ == "__main__":
 
     def test_launch_mo2_gui_uses_verified_external_inventory_install(self):
         window = self._window()
-        game = Path(window.game_state["game_dir"])
         with tempfile.TemporaryDirectory() as tmp:
             install = Path(tmp) / "MO2"
             install.mkdir()
             executable = install / "ModOrganizer.exe"
             executable.write_bytes(b"MZ")
+            proton = Path(tmp) / "Proton"
+            proton.mkdir()
+            wrapper = proton / "proton"
+            wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
+            wrapper.chmod(0o755)
+            window.proton_combo.setItemData(0, str(proton))
+            window.proton_combo.setCurrentIndex(0)
             window.mo2_state = {"installed": False, "managed": False}
             window.instance_state = {
                 "installation": {
