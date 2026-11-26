@@ -56,7 +56,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.No),
             patch("main.QInputDialog.getItem", return_value=("", False)),
             patch("main.QInputDialog.getText", return_value=("", False)),
-            patch("launch_workflow.inspect_mo2_instances", return_value={
+            patch("launch_preflight_workflow.inspect_mo2_instances", return_value={
                 "ok": True, "instances": [], "skyrim_instances": [],
                 "message": "No MO2 instances were found in the known prefix locations."
             }),
@@ -124,7 +124,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_check_launch_status_scans_detected_skyrim_steam_prefix(self):
         window = self._window()
         expected_steam_root = Path(window.game_state["game_dir"]).parents[2]
-        with patch("launch_workflow.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
+        with patch("ui_path_helpers.steam_compat_prefix", return_value=Path("/steam/steamapps/compatdata/489830")) as prefix, \
              patch("process_workflow.detect_skyrim_processes", return_value={
                  "ok": True, "processes": [], "message": "No Skyrim processes detected."
              }), patch("main.QMessageBox.information"):
