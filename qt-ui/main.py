@@ -25,6 +25,7 @@ from environment_workflow import EnvironmentWorkflowMixin
 from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
 from setup_workflow import SetupWorkflowMixin
+from ui_path_helpers import _same_filesystem_path
 
 
 class MainWindow(
