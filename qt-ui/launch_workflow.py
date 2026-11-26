@@ -12,7 +12,6 @@ import subprocess
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QMessageBox
 
 from proton_runtime import managed_paths, _runtime_environment
