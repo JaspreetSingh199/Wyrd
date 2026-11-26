@@ -43,8 +43,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         patches = [
             patch("main.detect_skyrim", return_value=game),
             patch("main.discover_proton_builds", return_value=builds),
-            patch("main.inspect_wyrd_installation", return_value=state),
-            patch("main.inspect_skyrim_prefix_mo2_installation", return_value=steam_mo2 or {"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
+                        patch("main.inspect_skyrim_prefix_mo2_installation", return_value=steam_mo2 or {"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
             patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "managed": False, "message": "No external MO2 installation was found in Skyrim's Steam prefix."}),
             patch("main.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory or {"ok": False, "instances": [], "skyrim_instances": [], "message": "No MO2 instance was found."}),
@@ -58,7 +57,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.No),
             patch("main.QInputDialog.getItem", return_value=("", False)),
             patch("main.QInputDialog.getText", return_value=("", False)),
-            patch("main.inspect_mo2_instances", return_value={
+            patch("launch_workflow.inspect_mo2_instances", return_value={
                 "ok": True, "instances": [], "skyrim_instances": [],
                 "message": "No MO2 instances were found in the known prefix locations."
             }),
@@ -976,9 +975,9 @@ if __name__ == "__main__":
                     "install": str(install), "executable": str(executable),
                 }
             }
-            with patch("launch_workflow._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
+            with patch("main._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
                 "main._steam_root_for_game", return_value=Path(tmp)
-            ), patch("launch_workflow._runtime_environment", return_value={}), patch(
+            ), patch("main._runtime_environment", return_value={}), patch(
                 "main.subprocess.Popen"
             ) as popen, patch("main.QMessageBox.warning") as warning:
                 window.launch_mo2_gui()
