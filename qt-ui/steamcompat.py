@@ -184,7 +184,7 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
     """Derive the Windows path from the detected Linux game and existing Wine drives.
 
     No drive letter is assumed and no dosdevices entry is created or changed.
-    When multiple mappings contain the game, the most specific mapping wins.
+    A discovered filesystem-root mapping is preferred; otherwise the most specific mapping wins.
     """
     try:
         prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
