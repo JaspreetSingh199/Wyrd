@@ -20,7 +20,7 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
             (proton / "proton").write_text("#!/bin/sh\\n")
             (proton / "proton").chmod(0o755)
             (proton / "files/bin/wine").write_bytes(b"")
-            with patch("steamcompat.inspect_proton_build", return_value={"ok": True}), patch(
+            with patch("proton_runtime.inspect_proton_build", return_value={"ok": True}), patch(
                 "steamcompat._steam_root_for_game", return_value=steam
             ):
                 with self.assertRaisesRegex(RuntimeError, "prefix is missing or unsafe"):
@@ -39,7 +39,7 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
             prefix = compatdata / "489830"
             prefix.symlink_to(outside, target_is_directory=True)
             proton = home / "Proton"
-            with patch("steamcompat.inspect_proton_build", return_value={"ok": True}), patch(
+            with patch("proton_runtime.inspect_proton_build", return_value={"ok": True}), patch(
                 "steamcompat._steam_root_for_game", return_value=steam
             ):
                 with self.assertRaisesRegex(RuntimeError, "prefix is missing or unsafe"):
@@ -58,7 +58,7 @@ class SkyrimPrefixMO2InstallerTests(unittest.TestCase):
             (prefix / "pfx/drive_c/users").mkdir(parents=True)
             (install / "ModOrganizer.exe").write_bytes(b"existing")
             proton = home / "Proton"
-            with patch("steamcompat.inspect_proton_build", return_value={"ok": True}), patch(
+            with patch("proton_runtime.inspect_proton_build", return_value={"ok": True}), patch(
                 "steamcompat._steam_root_for_game", return_value=steam
             ):
                 result = install_mo2_into_skyrim_prefix(proton, game, home)
