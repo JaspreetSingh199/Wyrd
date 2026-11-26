@@ -1068,9 +1068,18 @@ class MainWindow(QMainWindow):
     def _update_active_instance_from_scan(self) -> None:
         """Derive launch readiness exclusively from current Steam/MO2 filesystem scans."""
         instances = self.instance_state.get("skyrim_instances", [])
+        installation = self.instance_state.get("installation", {}) or {}
+        discovered_executable = (
+            installation.get("executable")
+            if installation.get("installed") else None
+        )
+        launch_executable_verified = bool(
+            self.mo2_state.get("installed") and self.mo2_state.get("executable")
+            or discovered_executable
+        )
         if not self.game_state.get("found"):
             detail = "Skyrim Special Edition has not been detected."
-        elif not self.mo2_state.get("installed"):
+        elif not launch_executable_verified:
             if instances:
                 names = ", ".join(item.get("name", "Unnamed instance") for item in instances)
                 detail = (
@@ -1095,8 +1104,7 @@ class MainWindow(QMainWindow):
         ready = bool(
             self.startup_checks_complete
             and self.game_state.get("found")
-            and self.mo2_state.get("installed")
-            and bool(self.mo2_state.get("executable"))
+            and launch_executable_verified
             and instances
             and proton
             and mapping_ok
