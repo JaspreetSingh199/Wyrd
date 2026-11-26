@@ -12,7 +12,6 @@ from process_monitor import (
     launch_process_status, detect_skyrim_processes, _proc_identity,
     _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
 )
-from wyrd_mo2 import detect_game_processes
 
 
 class ProcessMonitorWorkflowMixin:
