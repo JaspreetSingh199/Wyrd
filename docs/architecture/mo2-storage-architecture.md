@@ -1,180 +1,52 @@
-# Wyrd MO2 storage and installation architecture
+# MO2 discovery and storage boundaries
 
-Status: architecture decision record (ADR), design only. No migration or path rewriting is implemented by this document.
+## V1 decision
 
-## Goals
+Wyrd is a read-only discovery and launch orchestrator for existing Mod Organizer 2 setups. It does not maintain a registry of installations or instances, register/adopt external installations, rename instances, assign storage policies, or manage shared storage.
 
-Wyrd will manage multiple independent MO2 installations and instances while keeping game runtimes separate. A user should be able to register an existing installation, associate an MO2 instance with a game explicitly, and inspect current storage paths without changing them. Future storage pooling must be explicit, reversible, and MO2-compatible.
+The live filesystem inventory is the source of truth. Wyrd inspects only known MO2 roots and configured instance INIs; it does not recursively search arbitrary disks. An instance is available to the picker when its files and configuration are found and validated. No Wyrd metadata record is required.
 
-## MO2 behavior this design relies on
+## What Wyrd reads
 
-MO2 distinguishes global instances from portable instances. Global instances are discovered under the global instances root (commonly `%LOCALAPPDATA%/ModOrganizer/<instance-name>`) and one MO2 installation can manage several of them. A portable instance uses the installation directory for its instance INI and related critical files. Both layouts retain an instance configuration file.
+For each discovered instance, Wyrd may inspect:
 
-`ModOrganizer.ini` path settings are instance-scoped. The documented Paths settings include Base Directory, Downloads, Mods, Caches, Profiles, and Overwrite. `%BASE_DIR%` is a substitution variable for those settings, not a storage root that MO2 itself owns. These configured directories may be on separate volumes. Changing an entry changes the configured path; it does not relocate the data.
+- Instance name and instance path
+- ModOrganizer.ini and configured game/profile information
+- Base, Mods, Downloads, Cache, Profiles and Overwrite paths
+- Whether configured paths are present, missing, aliased or unsafe
+- Skyrim SE launch targets configured by that instance
 
-Consequences:
-- Never infer sharing from equal display names or from `%BASE_DIR%`.
-- Never point two live instances at a shared Overwrite directory.
-- Profiles and each profile's enabled-mod list/load order remain instance/profile state. Do not share a Profiles directory by default.
-- A shared Mods pool is a deliberate shared repository. Verify compatibility with MO2's mod metadata, profile references, and deployment/USVFS behavior before enabling it.
-- Downloads may be shared as a cache/repository when deliberately configured. Their contents and metadata must be preserved.
-- Categories are not simply a single universal text file in every version/layout. Treat category definitions and Nexus/category mappings as versioned metadata. Inspect the actual installation/version before deciding whether a given categories.dat (or replacement format) is global or instance-scoped.
-- MO2's global-instance discovery root and its installation-specific binaries/plugins are distinct. A registered installation must point to an executable and runtime context; an instance must separately point to its INI/data path.
+The inventory is refreshed from disk. It is not persisted as a second source of truth.
 
-## Proposed Wyrd-owned layout
+## What Wyrd changes
 
-```text
-$XDG_DATA_HOME/Wyrd/mo2/
-  installations/
-    <installation-id>/
-      installation.json       # Wyrd metadata only; MO2 binaries remain in their own root
-  shared/
-    mods/                     # optional shared mod repository; only by explicit choice
-    downloads/                # optional shared download cache/repository
-    metadata/
-      categories/              # versioned metadata snapshots/imports, not blindly injected
-  instances/
-    <instance-id>/
-      instance.json           # Wyrd association and storage policy
-  backups/
-    <operation-id>/            # future migration snapshots/manifests
-$XDG_CONFIG_HOME/Wyrd/mo2/
-  registry.json                # installations, instances, game/runtime associations
-```
+V1 changes only the configuration required to make the detected Skyrim installation discoverable and launchable through the selected Proton runtime. Any INI synchronization must remain narrowly scoped, validated, and backed by the existing explicit launch/setup workflow.
 
-The user's proposed `global/profiles` is intentionally not a shared global profiles directory. Each MO2 global instance should retain its own Profiles path unless a future MO2-source audit proves a supported and safe sharing mechanism. Each instance also has its own Overwrite path. A storage-pool concept may share Mods and Downloads independently.
+Wyrd does not edit MO2 storage paths, move/copy/merge mods or downloads, create shared storage, migrate profiles, or claim ownership of existing MO2 instances.
 
-Existing MO2 paths, including external installs, are authoritative until the user explicitly changes them. Wyrd's new registry starts empty and never auto-adopts or rewrites existing INIs.
+## Installation and removal boundary
 
-## Registry model (illustrative)
+The optional MO2 installer may create the dedicated Wyrd installation directory and its ownership marker. That marker authorizes removal of the verified Wyrd-installed **program directory only**.
 
-Installation record:
-- stable Wyrd installation ID
-- canonical and lexical executable/install paths
-- owner: `wyrd` or `external` (external installations remain read-only to Wyrd unless a later, explicit feature authorizes a particular action)
-- MO2 version/build and architecture
-- Proton/runtime association and prefix path, if applicable
-- discovered instance IDs
+Removing that program directory must preserve:
 
-Instance record:
-- stable Wyrd instance ID
-- installation ID
-- instance type: `global` or `portable`
-- instance directory and INI path
-- game ID and resolved game path (explicit association)
-- runtime ID / Proton prefix association (per game/runtime)
-- observed storage paths and status for base, mods, downloads, caches, profiles, overwrite
-- intended storage policy: local/shared per supported directory
-- last inspection timestamp and source
+- Global and portable MO2 instances
+- Profiles, mods, downloads, overwrite data and custom storage
+- Skyrim's Steam compatdata/489830 prefix
+- Skyrim game files and saves
+- External MO2 installations
 
-Game/runtime record:
-- game ID, Steam AppID where applicable, canonical game path
-- runtime ID and Proton build path
-- Proton prefix path
-- never shared across different game AppIDs merely because they use one MO2 installation
+No registry metadata is consulted to expand the deletion boundary. If the program directory or its ownership marker cannot be verified, removal fails closed.
 
-No path in this registry grants ownership. Ownership comes from validated Wyrd markers and a known Wyrd-created resource record; external remains external.
+## Deferred work
 
-## Registration and discovery
+The following are explicitly out of V1:
 
-1. Discover only bounded, known MO2 installation and instance locations. For global instances, enumerate direct child directories of known Wine `AppData/Local/ModOrganizer` and `AppData/Roaming/ModOrganizer` roots. For portable instances, inspect a supplied installation directory for its INI.
-2. Parse INI files read-only, with interpolation disabled and robust Qt/QSettings value normalization.
-3. Resolve `%BASE_DIR%`, relative paths, and Windows drive mappings without traversing arbitrary disks. Record unresolved, missing, symlinked, outside-prefix, and ambiguous paths distinctly.
-4. Inspect all five path settings: `mod_directory`, `download_directory`, `cache_directory`, `profiles_directory`, and `overwrite_directory`, plus `base_directory`. Existing Wyrd inspection currently records only base, profiles, mods and downloads; cache and overwrite are a known gap.
-5. Associate a game only when MO2's game name/path and validated executable evidence agree with a user-selected/detected game. A game name alone is insufficient.
-6. Register each installation separately. One installation may own/manage multiple global instances; different installations may point to the same game only when the user deliberately configures it.
-7. Registration is metadata-only and does not create or update the MO2 INI.
+- Multiple-installation registration and adoption
+- Wyrd-owned instance records or instance renaming
+- Game/runtime association databases
+- Storage policy editing or shared storage
+- Storage migration, relocation, cleanup or deduplication
+- General-purpose MO2 library management
 
-## Storage policy
-
-- Profiles: instance-local by default. Contains profile lists, enabled mods/order, plugin order, profile INIs, saves configuration and other profile-level state.
-- Mods: instance-local by default; optional shared pool only after testing MO2's exact shared-mod behavior and data ownership. Avoid simultaneous destructive writes from multiple MO2 processes.
-- Downloads: instance-local by default; optional shared cache/pool. Do not deduplicate, rename or clean files during registration.
-- Categories/metadata: keep per-install/per-version snapshots and compatibility metadata. Any synchronization is a separate reviewed action with backups and merge semantics.
-- Overwrite: always instance-local. It contains generated output that must not bleed between profiles/instances.
-- Caches/logs/crash dumps: installation or instance local as MO2 requires; not treated as user mod storage.
-- MO2 binaries/plugins: installation-specific. Do not share or symlink executable/plugin trees between installations.
-- Proton prefix: per game/runtime (Steam AppID 489830 remains Skyrim's prefix). Never move an MO2 instance across prefixes without an explicit plan and test; a prefix may contain unrelated Steam/Wine state.
-
-## Read-only inspection and migration preview
-
-The first implementation phase may add a read-only storage inventory and preview UI only. It must:
-- report the exact INI and each configured storage path;
-- report effective resolved paths and resolution method;
-- show missing/unreadable/symlink/external paths as warnings, not silently normalize them;
-- calculate file counts and byte totals only after explicit scan scope approval, without following symlinks;
-- identify overlap/shared paths between instances;
-- identify installation ownership and game/runtime associations separately;
-- show a proposed target layout and estimated copy size without writing anything;
-- leave INI bytes, directories, permissions, timestamps and files unchanged.
-
-## Future migration contract (not part of this ADR implementation)
-
-Migration is opt-in per instance and per storage category. Require a preview and a second explicit confirmation. Before execution:
-- close the corresponding MO2 processes and verify no game/tool process uses the instance;
-- create a durable, verifiable backup/manifest;
-- copy (never move as first operation), verify hashes/counts/sizes, then stage the intended INI change;
-- preserve the original INI and original files until user confirms the migrated instance works;
-- provide rollback that restores the original INI and storage paths;
-- never clean up source data automatically;
-- refuse ambiguous paths, symlink traversal, cross-instance collisions, insufficient space, or external targets without an explicit ownership decision.
-
-## Current Wyrd implementation gaps
-
-- Registry for multiple installations/instances does not exist.
-- Storage inspection currently exposes base, profiles, mods and downloads; cache and overwrite are omitted.
-- INI inspection is read-only, but containment verification currently treats profiles under the install/prefix as verified; global external storage roots need a distinct safe classification.
-- Instance roots are bounded to known Wine user directories and a supplied install root, which is a good discovery baseline.
-- The Wyrd single-install managed path and isolated legacy prefix must remain unchanged while the new registry is introduced.
-- External MO2 discovery/launch must remain explicitly external and must not be relabeled Wyrd-owned.
-
-## Acceptance criteria for the first implementation
-
-1. New ADR committed before any path/registry implementation.
-2. Unit tests for global and portable instances, multiple installations, multiple games, QSettings byte-array values, relative/absolute/Windows paths, missing paths, symlinks, shared-path collisions and external ownership.
-3. A read-only inventory command/API returning every relevant storage category and explicit verification status.
-4. Registry load/save validation tests, atomic writes, schema versioning, duplicate-ID/path detection and no implicit adoption.
-5. Qt GUI inventory/preview tests under PySide6; GUI tests must execute (not skip) in the CI environment.
-6. No data migration, directory creation, INI rewrite, or prefix change in this phase.
-
-
-## Read-only inventory API refinement
-
-The first implementation exposes \`inspect_mo2_storage()\`, a read-only view over known instance INIs. It reports Base, Mods, Downloads, Cache, Profiles, and Overwrite independently; distinguishes Wine C: paths outside the supplied prefix, symlinks, missing directories, and external paths; and identifies directory aliases referenced by multiple instances. It does not walk storage trees, calculate sizes, create directories, change INI values, or change ownership. Migration preview UI remains future work.
-
-
-## Registry implementation contract
-
-The metadata-only registry is implemented in \`qt-ui/wyrd_mo2_registry.py\`. Its schema is version 1 and separates installations, instances, games, and runtimes. Installations have an explicit \`wyrd\` or \`external\` owner label; instance records refer to an installation, a game, and optionally a runtime. Duplicate installation executable paths, duplicate instance paths, unknown references, invalid storage policies, malformed JSON, and unsupported schema versions are rejected.
-
-\`load_registry()\` treats a missing registry as an empty in-memory registry and does not create a file or parent directory. \`save_registry()\` is an explicit persistence operation: it validates before writing, uses a same-directory temporary file and atomic replace, and writes mode 0600. No discovery or adoption occurs in either function. This module is not yet wired into the GUI; registration must remain a deliberate user action after read-only inspection.
-
-
-## Registry discovery service
-
-`qt-ui/wyrd_mo2_registry_service.py` provides a bounded service layer over
-`inspect_mo2_storage()`. Discovery accepts one explicitly selected Proton
-prefix and one MO2 installation root; it does not crawl arbitrary disks or
-follow custom storage paths. It refuses symlinked roots, requires a regular
-`ModOrganizer.exe`, and validates any existing Wyrd ownership marker rather
-than silently treating a malformed marker as an external installation.
-
-An installation is labelled Wyrd-owned only when its own
-`.wyrd-managed.json` marker validates. Otherwise it remains external.
-A Wyrd prefix marker is separately validated before the managed-prefix
-inspection mode is used. Instance proposals distinguish portable instances
-(the INI is at the selected MO2 installation root) from global instances.
-All six storage categories and shared-path observations are returned as
-metadata; no storage tree is traversed.
-
-Discovery does not write the registry. The separate `register()` operation
-requires an explicit game association, validates installation ownership and
-proposal linkage, rejects duplicate registrations, and persists only the
-Wyrd registry through the existing atomic writer. A selected Proton runtime
-is optional but, when supplied, must satisfy registry referential integrity.
-No MO2 INI, profile, mod, download, save, or Proton prefix is modified.
-
-The Qt management surface is intentionally not wired to this service yet.
-The next step is a GUI integration that consumes these tested contracts and
-requires a visible preview plus a default-No confirmation before calling
-`register()`.
+These features should be reconsidered only when Wyrd has a concrete ownership model and a user-facing requirement. Until then, live filesystem discovery remains the only inventory authority.
