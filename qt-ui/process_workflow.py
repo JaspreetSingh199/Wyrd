@@ -7,8 +7,10 @@ from launch_models import GameProcess
 from ui_path_helpers import _steam_prefix_for_game_path
 from process_monitor import (
     launch_process_status, detect_skyrim_processes, _proc_identity,
-    _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
+    _is_descendant_process,
 )
+from launch_log_diagnostics import read_launch_diagnostics, classify_launch_diagnostics
+
 
 
 class ProcessMonitorWorkflowMixin:
