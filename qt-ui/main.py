@@ -124,8 +124,8 @@ QTabWidget::pane { background: #141f26; border: 1px solid #40515c; top: -1px; }
 QTabBar::tab { background: #17232b; color: #9eafb8; border: 1px solid #344650; padding: 10px 22px; margin-right: 3px; }
 QTabBar::tab:selected { background: #243640; color: #e5edf0; border-bottom: 2px solid #8fb4c6; }
 QTabBar::tab:hover { color: #e5edf0; }
-QProgressBar { background: #17232b; border: 1px solid #40515c; border-radius: 2px; height: 12px; text-align: center; color: #dce5e9; }
-QProgressBar::chunk { background: #63899c; }
+QProgressBar { background: #0d171d; border: 1px solid #63899c; border-radius: 6px; height: 24px; min-height: 24px; text-align: center; color: #f0f6f8; font-weight: 700; }
+QProgressBar::chunk { background: #527f93; border-radius: 5px; }
 QPlainTextEdit { background: #0d151a; color: #c7d4da; border: 1px solid #40515c; border-radius: 3px; padding: 7px; }
 QScrollArea { border: none; background: transparent; }
 QScrollBar:vertical { background: #11191f; width: 11px; margin: 0; }
@@ -303,6 +303,24 @@ class MainWindow(QMainWindow):
         # centered text was unreadable and visually collided with the checks.
         self.precheck_progress.hide()
         setup_layout.addWidget(self.precheck_panel)
+        progress_panel = QFrame()
+        progress_panel.setObjectName("runtimePanel")
+        progress_layout = QVBoxLayout(progress_panel)
+        progress_layout.setContentsMargins(16, 12, 16, 14)
+        progress_layout.setSpacing(9)
+        progress_header = QHBoxLayout()
+        self.progress_label = QLabel("Ready")
+        self.progress_label.setObjectName("section")
+        progress_header.addWidget(self.progress_label, 1)
+        progress_header.addWidget(self.check_mo2_button)
+        progress_layout.addLayout(progress_header)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setMinimumHeight(30)
+        self.progress.setMinimumWidth(260)
+        progress_layout.addWidget(self.progress)
+        setup_layout.addWidget(progress_panel)
 
         configuration_grid = QGridLayout()
         configuration_grid.setHorizontalSpacing(12)
@@ -395,8 +413,6 @@ class MainWindow(QMainWindow):
         launch_actions.addWidget(self.launch_game_button, 2)
         launch_actions.addWidget(self.launch_direct_button, 1)
         launch_layout.addLayout(launch_actions)
-        setup_layout.addWidget(launch_panel)
-
         self.launch_mo2_button = QPushButton("Launch MO2")
         self.launch_mo2_button.setObjectName("secondaryAction")
         self.launch_mo2_button.clicked.connect(self.launch_mo2_gui)
@@ -406,24 +422,8 @@ class MainWindow(QMainWindow):
         utility_actions.addStretch(1)
         setup_layout.addLayout(utility_actions)
 
-        progress_panel = QFrame()
-        progress_panel.setObjectName("runtimePanel")
-        progress_layout = QVBoxLayout(progress_panel)
-        progress_layout.setContentsMargins(12, 9, 12, 10)
-        progress_layout.setSpacing(6)
-        progress_header = QHBoxLayout()
-        self.progress_label = QLabel("Ready")
-        self.progress_label.setObjectName("muted")
-        progress_header.addWidget(self.progress_label, 1)
-        progress_header.addWidget(self.check_mo2_button)
-        progress_layout.addLayout(progress_header)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        self.progress.setMinimumHeight(22)
-        self.progress.setMinimumWidth(260)
-        progress_layout.addWidget(self.progress)
-        setup_layout.addWidget(progress_panel)
+        setup_layout.addWidget(launch_panel)
+
         setup_layout.addStretch(1)
         setup_scroll = QScrollArea()
         setup_scroll.setWidgetResizable(True)
@@ -754,6 +754,13 @@ class MainWindow(QMainWindow):
         self.precheck_status.setText("Checking Skyrim, Proton, MO2 and registered environments…")
         QCoreApplication.processEvents()
 
+    def _set_scan_progress(self, value: int, message: str) -> None:
+        """Update the shared, prominent progress bar during environment discovery."""
+        self.progress.setRange(0, 100)
+        self.progress.setValue(max(0, min(100, int(value))))
+        self.progress_label.setText(message)
+        QCoreApplication.processEvents()
+
     def _update_precheck(self, index: int, label: str, passed: bool | None, detail: str) -> None:
         """Update the visible startup checklist as each read-only check completes."""
         if index < 0 or index >= len(self.precheck_rows):
@@ -769,6 +776,7 @@ class MainWindow(QMainWindow):
 
     def refresh_all(self) -> None:
         self.startup_checks_complete = False
+        self._set_scan_progress(2, "Starting environment scan…")
         self.launch_game_button.setEnabled(False)
         self._reset_precheck()
         selected = self.proton_combo.currentData()
@@ -777,6 +785,7 @@ class MainWindow(QMainWindow):
         # the persisted runtime, overwriting the user's choice.
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
+        self._set_scan_progress(12, "Scanning Steam libraries for Skyrim Special Edition…")
         self.game_state = detect_skyrim()
         saved_game = self._saved_settings.get("game_path")
         if saved_game and Path(saved_game).is_dir():
@@ -806,6 +815,7 @@ class MainWindow(QMainWindow):
             )
             self._log("Skyrim SE not detected.")
 
+        self._set_scan_progress(28, "Discovering compatible Proton runtimes…")
         self.proton_builds = discover_proton_builds()
         self._update_precheck(
             1, "Compatible Proton runtime", bool(self.proton_builds),
@@ -842,6 +852,7 @@ class MainWindow(QMainWindow):
             )
             self._log("No compatible Proton builds found.")
 
+        self._set_scan_progress(43, "Locating MO2 in Skyrim’s Proton environment…")
         self.mo2_state = inspect_skyrim_prefix_mo2_installation(
             Path(self.game_state["game_dir"])
         ) if self.game_state.get("found") else {
@@ -852,6 +863,7 @@ class MainWindow(QMainWindow):
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
+        self._set_scan_progress(58, "Verifying Proton drive mappings and synchronizing MO2 game paths…")
         self.mo2_discovery_state = None
         if self.mo2_state.get("installed") and self.game_state.get("found"):
             try:
@@ -941,6 +953,7 @@ class MainWindow(QMainWindow):
         self.reset_mo2_button.setEnabled(bool(
             self.mo2_state.get("installed") and self.mo2_state.get("managed", True)
         ))
+        self._set_scan_progress(78, "Scanning MO2 installations and validating instance configurations…")
         if self.mo2_state.get("installed"):
             self.instance_state = inspect_any_skyrim_prefix_mo2_instances(
                 Path(self.game_state["game_dir"])
@@ -1016,6 +1029,7 @@ class MainWindow(QMainWindow):
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
+        self._set_scan_progress(92, "Finalizing environment readiness…")
         self._refresh_audio_status()
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(
@@ -1043,6 +1057,7 @@ class MainWindow(QMainWindow):
             self.active_instance_label.text(),
         )
         self.precheck_progress.setFormat("")
+        self._set_scan_progress(100, "Environment scan complete.")
         self.precheck_status.setText(
             "Startup checks complete. " +
             ("A detected MO2 instance is ready for launch." if active_ready
