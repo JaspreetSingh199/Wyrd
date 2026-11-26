@@ -7,7 +7,6 @@ from PySide6.QtWidgets import QMessageBox
 
 from launch_models import GameProcess
 from ui_path_helpers import _steam_prefix_for_game_path
-from proton_runtime import managed_paths
 from process_monitor import (
     launch_process_status, detect_skyrim_processes, _proc_identity,
     _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
@@ -379,12 +378,3 @@ class ProcessMonitorWorkflowMixin:
             detail = result["message"] + "\\n\\n" + process_scan.get("message", "")
         QMessageBox.information(self, "Launch process status", detail)
 
-
-    def show_launch_diagnostics(self) -> None:
-        path = managed_paths()["root"] / "logs" / "skyrim-launch.log"
-        result = read_launch_diagnostics(path)
-        if not result.get("ok"):
-            QMessageBox.information(self, "Launch diagnostics", result.get("message", "No diagnostics available."))
-            return
-        self._log("Launch diagnostics opened: " + result["path"])
-        QMessageBox.information(self, "Launch diagnostics", result["content"][-5000:])
