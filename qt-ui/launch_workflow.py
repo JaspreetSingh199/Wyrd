@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from process_monitor import _proc_start_time
-from mo2_launch import inspect_skyrim_launch_targets
+from mo2_targets import inspect_skyrim_launch_targets
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
