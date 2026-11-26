@@ -1351,12 +1351,24 @@ class MainWindow(QMainWindow):
     def launch_mo2_gui(self) -> None:
         """Open MO2's native instance picker in Skyrim's existing Proton prefix."""
         try:
-            executable = Path(self.mo2_state.get("executable", "")).expanduser()
+            installation = self.instance_state.get("installation", {}) or {}
+            executable_value = (
+                self.mo2_state.get("executable")
+                or installation.get("executable")
+            )
+            executable = Path(executable_value or "").expanduser()
             game_path = Path(self.game_state.get("game_dir", "")).expanduser()
             prefix = _steam_prefix_for_game_path(str(game_path)) if game_path else None
             proton_value = self.proton_combo.currentData()
-            if not executable.is_file() or executable.is_symlink():
-                raise RuntimeError("The detected ModOrganizer.exe is missing or unsafe.")
+            if not executable_value or executable.is_symlink() or not executable.is_file():
+                raise RuntimeError("No verified ModOrganizer.exe was found. Instances can be inspected, but MO2 cannot be launched.")
+            if installation.get("installed") and not self.mo2_state.get("installed"):
+                try:
+                    executable.resolve(strict=True).relative_to(
+                        Path(installation.get("install", "")).resolve(strict=True)
+                    )
+                except (OSError, ValueError, RuntimeError):
+                    raise RuntimeError("The discovered external MO2 executable is outside its verified installation directory.")
             if not game_path.is_dir() or game_path.is_symlink() or prefix is None:
                 raise RuntimeError("Skyrim's existing Steam compatdata prefix could not be resolved.")
             if not proton_value:
