@@ -275,83 +275,14 @@ class EnvironmentWorkflowMixin:
     def _verify_mo2_game_mapping(
         self, game_path: Path, proton_value: str | None
     ) -> dict:
-        """Verify the existing Steam drive mapping before syncing MO2 metadata."""
-        try:
-            steam_root = _steam_root_for_game(game_path, Path.home())
-            state = discover_wine_game_path(
-                Path(self.mo2_state["prefix"]), game_path, steam_root
-            )
-            if state.get("ok"):
-                if proton_value:
-                    wine_path_state = verify_wine_game_path(
-                        Path(proton_value), Path(self.mo2_state["prefix"]),
-                        steam_root, state["windows_game_path"],
-                    )
-                else:
-                    wine_path_state = {
-                        "ok": False, "message": "No Proton runtime is selected."
-                    }
-                state["proton_path_verification"] = wine_path_state
-                if not wine_path_state.get("ok"):
-                    state["ok"] = False
-                    self._log(
-                        "Proton game-path verification failed closed: "
-                        + wine_path_state.get("message", "unknown error")
-                    )
-                sync_state = (
-                    synchronize_mo2_instance_game_paths(
-                        Path(self.mo2_state["prefix"]), game_path,
-                        state["windows_game_path"],
-                    )
-                    if wine_path_state.get("ok") else
-                    {"ok": False, "message": wine_path_state.get("message", "Proton path verification failed.")}
-                )
-                state["instance_sync"] = sync_state
-                if sync_state.get("ok"):
-                    changed = sync_state.get("updated", [])
-                    unchanged = sync_state.get("unchanged", [])
-                    self._log(
-                        "MO2 gamePath synchronization: "
-                        f"{len(changed)} updated, {len(unchanged)} already current; "
-                        + state["windows_game_path"]
-                    )
-                else:
-                    state["ok"] = False
-                    self._log(
-                        "MO2 gamePath synchronization failed closed: "
-                        + sync_state.get("message", "unknown error")
-                    )
-                if proton_value and state.get("ok"):
-                    registry_state = configure_skyrim_se_registry(
-                        Path(self.mo2_state["prefix"]), game_path, steam_root,
-                        Path(proton_value), state["windows_game_path"],
-                    )
-                    state["registry"] = registry_state
-                    if registry_state.get("ok"):
-                        self._log("MO2 Bethesda registry: " + registry_state["windows_path"])
-                    else:
-                        state["ok"] = False
-                        self._log(
-                            "MO2 Bethesda registry provisioning failed closed: "
-                            + registry_state.get("message", "unknown error")
-                        )
-                elif not proton_value:
-                    state["registry"] = {
-                        "ok": False, "message": "No Proton runtime is selected."
-                    }
-        except (OSError, RuntimeError, ValueError) as error:
-            state = {"ok": False, "message": str(error)}
+        """Delegate Steam/MO2 path verification to the environment service."""
+        from mo2_game_mapping import verify_mo2_game_mapping
 
-        if state.get("ok"):
-            self._log(
-                "MO2 Steam discovery: " + state["windows_game_path"]
-                + " resolves to " + state["resolved_game_path"]
-            )
-        else:
-            self._log(
-                "MO2 Steam discovery verification failed closed: "
-                + state.get("message", "unknown mapping error")
-            )
+        state, messages = verify_mo2_game_mapping(
+            game_path, Path(self.mo2_state["prefix"]), proton_value
+        )
+        for message in messages:
+            self._log(message)
         return state
 
     def _update_active_instance_from_scan(self) -> None:
