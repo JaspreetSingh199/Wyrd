@@ -31,6 +31,10 @@ class Mo2LibraryDialog(QFrame):
         proton_path="", selected_instance_id="",
     ):
         super().__init__(parent)
+        # Qt reparents widgets to the page that owns their layout. Keep an
+        # explicit reference to MainWindow; QWidget.parent() is not stable
+        # after the widget is inserted into the setup-page layout.
+        self._owner_window = parent
         self.setObjectName("mo2InstancePicker")
         self.prefix_path = str(prefix_path or "")
         self.install_path = str(install_path or "")
@@ -75,13 +79,13 @@ class Mo2LibraryDialog(QFrame):
         self._show_inventory()
 
     def discover(self):
-        refresh = getattr(self.parent(), "refresh_all", None)
+        refresh = getattr(self._owner_window, "refresh_all", None)
         if callable(refresh):
             refresh()
         self._show_inventory()
 
     def _show_inventory(self):
-        inventory = getattr(self.parent(), "instance_state", {}) or {}
+        inventory = getattr(self._owner_window, "instance_state", {}) or {}
         instances = inventory.get("instances", [])
         selected_path = (
             self.selected_instance_record.get("path")
@@ -134,6 +138,7 @@ class Mo2AdvancedSettings(QWidget):
 
     def __init__(self, parent=None, *, selected_instance_id=""):
         super().__init__(parent)
+        self._owner_window = parent
         self.setObjectName("mo2AdvancedSettings")
         self.preferred_instance_id = selected_instance_id
         self.selected_instance_record: dict | None = None
@@ -196,7 +201,7 @@ class Mo2AdvancedSettings(QWidget):
     def _refresh_registered(self, _index: int = -1) -> None:
         """Compatibility name retained for the caller; refreshes live inventory only."""
         self.detected_instances.clear()
-        inventory = getattr(self.parent(), "instance_state", {}) or {}
+        inventory = getattr(self._owner_window, "instance_state", {}) or {}
         instances = inventory.get("instances", [])
         for instance in instances:
             item = QListWidgetItem(_instance_label(instance))
@@ -215,7 +220,7 @@ class Mo2AdvancedSettings(QWidget):
             )
 
     def _refresh_parent_mo2_scan(self) -> None:
-        refresh = getattr(self.parent(), "refresh_all", None)
+        refresh = getattr(self._owner_window, "refresh_all", None)
         if callable(refresh):
             refresh()
         self._refresh_registered()
