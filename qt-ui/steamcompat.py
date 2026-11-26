@@ -666,6 +666,9 @@ def inspect_any_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None =
             if installation.get("installed") and installation.get("install")
             else None
         )
+        # If the installation is not at the conventional path, continue to
+        # discover known instances in the validated Wine user tree. Do not
+        # follow MO2 storage/base_directory paths as instance-discovery roots.
         inventory = inspect_mo2_instances(
             prefix, install_root, require_managed=False,
             detected_game_path=game,
