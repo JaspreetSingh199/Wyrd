@@ -861,3 +861,42 @@ if __name__ == "__main__":
         self.assertEqual(window.tabs.tabText(2), "MAINTENANCE")
         self.assertEqual(window.audio_check_button.text(), "Inspect audio libraries")
         window.close()
+
+
+
+    def test_discovered_instance_without_verified_mo2_executable_is_visible_but_not_launchable(self):
+        window = self._window()
+        window.instance_state = {
+            "ok": True,
+            "instances": [{"name": "Skyrim Special Edition"}],
+            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+            "message": "Found one Skyrim instance.",
+        }
+        window.mo2_state = {"installed": False, "managed": False}
+        window.mo2_discovery_state = {"ok": True}
+        window.startup_checks_complete = True
+        window._update_active_instance_from_scan()
+        self.assertFalse(window.launch_game_button.isEnabled())
+        self.assertIn("executable is not verified", window.active_instance_label.text())
+        window.close()
+
+
+    def test_instance_with_verified_executable_requires_mapping_before_launch(self):
+        window = self._window()
+        window.instance_state = {
+            "ok": True,
+            "instances": [{"name": "Skyrim Special Edition"}],
+            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+        }
+        window.mo2_state = {
+            "installed": True, "managed": False,
+            "executable": "/known/MO2/ModOrganizer.exe",
+        }
+        window.mo2_discovery_state = {"ok": False, "message": "Mapping unverified"}
+        window.startup_checks_complete = True
+        window._update_active_instance_from_scan()
+        self.assertFalse(window.launch_game_button.isEnabled())
+        window.mo2_discovery_state = {"ok": True}
+        window._update_active_instance_from_scan()
+        self.assertTrue(window.launch_game_button.isEnabled())
+        window.close()
