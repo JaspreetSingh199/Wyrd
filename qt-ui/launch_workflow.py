@@ -15,14 +15,8 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QMessageBox
 
-from launch_models import GameProcess
-from ui_path_helpers import _steam_prefix_for_game_path
 from proton_runtime import managed_paths, _runtime_environment
-from process_monitor import (
-    launch_process_status, detect_skyrim_processes, _proc_start_time,
-    _proc_identity, _is_descendant_process, read_launch_diagnostics,
-    classify_launch_diagnostics,
-)
+from process_monitor import _proc_start_time
 from mo2_instances import inspect_mo2_instances
 from mo2_launch import inspect_skyrim_launch_targets
 from steam_mo2_discovery import (

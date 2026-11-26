@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QInputDialog, QWidget, QTabWidget,
 )
 
-from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     read_settings, write_settings, reset_wyrd_settings,
 )
@@ -24,6 +23,8 @@ from environment_workflow import EnvironmentWorkflowMixin
 from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
 from setup_workflow import SetupWorkflowMixin
+
+
 class MainWindow(
     LaunchWorkflowMixin,
     ProcessMonitorWorkflowMixin,
