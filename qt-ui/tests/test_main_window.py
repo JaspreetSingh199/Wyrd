@@ -889,17 +889,20 @@ if __name__ == "__main__":
             "instances": [{"name": "Skyrim Special Edition"}],
             "skyrim_instances": [{"name": "Skyrim Special Edition"}],
         }
-        window.mo2_state = {
-            "installed": True, "managed": False,
-            "executable": "/known/MO2/ModOrganizer.exe",
-        }
-        window.mo2_discovery_state = {"ok": False, "message": "Mapping unverified"}
-        window.startup_checks_complete = True
-        window._update_active_instance_from_scan()
-        self.assertFalse(window.launch_game_button.isEnabled())
-        window.mo2_discovery_state = {"ok": True}
-        window._update_active_instance_from_scan()
-        self.assertTrue(window.launch_game_button.isEnabled())
+        with tempfile.TemporaryDirectory() as tmp:
+            executable = Path(tmp) / "ModOrganizer.exe"
+            executable.write_bytes(b"MZ")
+            window.mo2_state = {
+                "installed": True, "managed": False,
+                "executable": str(executable),
+            }
+            window.mo2_discovery_state = {"ok": False, "message": "Mapping unverified"}
+            window.startup_checks_complete = True
+            window._update_active_instance_from_scan()
+            self.assertFalse(window.launch_game_button.isEnabled())
+            window.mo2_discovery_state = {"ok": True}
+            window._update_active_instance_from_scan()
+            self.assertTrue(window.launch_game_button.isEnabled())
         window.close()
 
 
