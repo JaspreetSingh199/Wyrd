@@ -16,3 +16,14 @@ def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
         return steam_compat_prefix(steam_root)
     except (OSError, RuntimeError, ValueError):
         return None
+
+
+def _same_filesystem_path(left: str | os.PathLike | None,
+                         right: str | os.PathLike | None) -> bool:
+    """Compare discovered and persisted paths after normalizing aliases."""
+    if not left or not right:
+        return False
+    try:
+        return Path(left).expanduser().resolve(strict=False) == Path(right).expanduser().resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        return os.path.normpath(os.path.expanduser(str(left))) == os.path.normpath(os.path.expanduser(str(right)))
