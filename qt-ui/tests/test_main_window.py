@@ -175,18 +175,14 @@ class MainWindowSmokeTests(unittest.TestCase):
             "metadata": {"version": "v2.5.2", "game_path": "/home/test/.steam/steam/steamapps/common/Skyrim Special Edition"},
             "external_installations": [],
         }
-        with patch("main.inspect_mo2_instances", return_value={
-            "ok": False, "instances": [], "skyrim_instances": [],
-            "message": "No MO2 instances found."
-        }):
-            window = self._window(steam_mo2={
-                "installed": True, "managed": True,
-                "executable": "/test/MO2/ModOrganizer.exe",
-                "prefix": "/test/compatdata/489830", "install": "/test/MO2",
-            })
-            self.assertFalse(window.launch_game_button.isEnabled())
-            self.assertFalse(window.install_button.isVisible())
-            window.close()
+        window = self._window(steam_mo2={
+            "installed": True, "managed": True,
+            "executable": "/test/MO2/ModOrganizer.exe",
+            "prefix": "/test/compatdata/489830", "install": "/test/MO2",
+        })
+        self.assertFalse(window.launch_game_button.isEnabled())
+        self.assertFalse(window.install_button.isVisible())
+        window.close()
 
     def test_missing_legacy_registration_does_not_disable_discovered_mo2(self):
         window = self._window()
@@ -639,7 +635,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ]
         with patch("main.detect_skyrim", return_value={"found": False, "steam_roots": []}), patch(
             "main.discover_proton_builds", return_value=builds
-        ), patch("main.inspect_wyrd_installation", return_value={"installed": False}), patch(
+        ), patch(
             "main.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}
         ), patch("main.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}), patch.object(
             window, "manage_mo2_library"
