@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
-from wyrd_mo2 import mark_first_run_completed
+from wyrd_settings import mark_first_run_completed
 from ui_path_helpers import _same_filesystem_path
 
 
