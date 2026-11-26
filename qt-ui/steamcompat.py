@@ -598,7 +598,9 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
         executable.resolve(strict=True).relative_to(install.resolve(strict=True))
     except (OSError, ValueError, RuntimeError):
         return {"ok": False, "message": "External MO2 executable resolves outside its installation directory; launch was refused."}
-    inventory = inspect_mo2_instances(prefix, install, require_managed=False)
+    inventory = inspect_mo2_instances(
+        prefix, install, require_managed=False, detected_game_path=game,
+    )
     if not inventory.get("ok"):
         return {"ok": False, "message": inventory.get("message", "Could not inspect external MO2 instances.")}
     candidates = inventory.get("skyrim_instances", [])
@@ -679,7 +681,7 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     prefix = Path(state["prefix"])
     install = Path(state["install"])
     executable = Path(state["executable"])
-    inventory = inspect_mo2_instances(prefix, install)
+    inventory = inspect_mo2_instances(prefix, install, detected_game_path=game)
     if not inventory.get("ok"):
         return {"ok": False, "message": inventory.get("message", "Could not inspect MO2 instances in Skyrim's prefix.")}
     candidates = inventory.get("skyrim_instances", [])
