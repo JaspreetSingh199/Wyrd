@@ -508,6 +508,7 @@ class WyrdMO2Tests(unittest.TestCase):
             instance.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
             dosdevices = prefix / "pfx/dosdevices"
             dosdevices.mkdir(parents=True)
             (dosdevices / "z:").symlink_to("/", target_is_directory=True)
@@ -522,7 +523,6 @@ class WyrdMO2Tests(unittest.TestCase):
                 "1\\title=Skyrim\n"
                 f"1\\binary={binary_win}\n",
                 encoding="utf-8",
-            )
             )
             result = inspect_skyrim_launch_targets(
                 prefix, game, instance_name="Skyrim Special Edition"
