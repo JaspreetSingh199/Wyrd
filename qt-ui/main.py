@@ -17,24 +17,29 @@ from PySide6.QtWidgets import (
 )
 
 from skyrim_detection import detect_skyrim
-from wyrd_mo2 import (
-    discover_proton_builds,
-    managed_paths, _steam_root_for_game, _runtime_environment,
-    read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
-    inspect_skyrim_launch_targets,
+from proton_runtime import discover_proton_builds, managed_paths, _steam_root_for_game, _runtime_environment
+from process_monitor import (
     launch_process_status, detect_skyrim_processes, _proc_start_time,
-    _proc_identity, _is_descendant_process, read_launch_diagnostics, classify_launch_diagnostics,
-    inspect_audio_compatibility, reset_wyrd_settings,
+    _proc_identity, _is_descendant_process, read_launch_diagnostics,
+    classify_launch_diagnostics,
+)
+from mo2_instances import inspect_mo2_instances
+from wyrd_mo2 import (
+    read_settings, write_settings, mark_first_run_completed,
+    inspect_skyrim_launch_targets, inspect_audio_compatibility, reset_wyrd_settings,
 )
 from steamcompat import (
-    install_mo2_into_skyrim_prefix, discover_wine_game_path, configure_skyrim_se_registry,
+    discover_wine_game_path, configure_skyrim_se_registry,
     synchronize_mo2_instance_game_paths, verify_wine_game_path,
+)
+from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
-    inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
-    steam_compat_prefix,
-    reset_wyrd_mo2,
+    inspect_any_skyrim_prefix_mo2_instances,
 )
+from steam_mo2_launch import launch_skyrim_via_mo2_in_skyrim_prefix
+from steam_prefix import steam_compat_prefix
+from steam_mo2_management import reset_wyrd_mo2
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 from launch_models import LaunchSession, GameProcess
 from ui_components import add_info_button, panel

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from steamcompat import install_mo2_into_skyrim_prefix
+from steam_mo2_management import install_mo2_into_skyrim_prefix
 
 
 class SteamPrefixInstallWorker(QThread):

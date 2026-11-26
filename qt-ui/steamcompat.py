@@ -6,20 +6,14 @@ discovery metadata may be provisioned for MO2 compatibility.
 """
 from __future__ import annotations
 
-import json
-import os
 import re
-import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 from skyrim_detection import steam_libraries
-from wyrd_mo2 import (
-    inspect_proton_build, _runtime_environment, inspect_mo2_instances,
-    _steam_root_for_game, managed_paths, _resolve_windows_path,
-)
+from proton_runtime import _runtime_environment
+from mo2_instances import _resolve_windows_path
 
 from mo2_registry import (
     _reject_symlinked_path_components, synchronize_mo2_instance_game_paths,
