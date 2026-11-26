@@ -11,9 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget, QTabWidget,
 )
 
-from wyrd_mo2 import (
-    read_settings, write_settings, reset_wyrd_settings,
-)
+from wyrd_settings import read_settings, write_settings, reset_wyrd_settings
 from launch_models import LaunchSession
 from ui_styles import APP_STYLE as STYLE
 from ui_pages import MainWindowPagesMixin
