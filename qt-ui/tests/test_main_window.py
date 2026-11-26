@@ -272,7 +272,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         with patch("main.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True)
         ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
-            "environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
+            "launch_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
                 "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
             }
@@ -300,7 +300,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         with patch("main.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True)
         ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
-            "environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
+            "launch_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "managed": True, "prefix": "/test/compatdata/489830",
                 "install": "/test/MO2", "executable": "/test/MO2/ModOrganizer.exe"
             }
@@ -606,7 +606,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_install_completion_rejects_failed_post_install_verification(self):
         window = self._window()
         window.game_state = {"found": True, "game_dir": "/games/Skyrim Special Edition"}
-        with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
             "installed": False, "message": "Ownership marker is missing."
         }), patch("main.QMessageBox.information") as success, patch(
             "main.QMessageBox.warning"
@@ -782,7 +782,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_reset_mo2_refuses_external_installation(self):
         window = self._window()
-        with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
             "installed": True, "managed": False, "install": "/external/MO2",
         }), patch("main.QMessageBox.information") as info, patch(
             "main.reset_wyrd_mo2"
@@ -795,7 +795,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_reset_mo2_cancel_never_calls_reset_service(self):
         window = self._window()
         window.selected_mo2_instance_id = "wyrd-instance"
-        with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
+        with patch("main.inspect_skyrim_prefix_mo2_installation", return_value={
             "installed": True, "managed": True, "install": "/managed/MO2",
         }), patch("main.QMessageBox.warning", return_value=QMessageBox.StandardButton.Cancel), patch(
             "main.reset_wyrd_mo2"
@@ -829,7 +829,7 @@ if __name__ == "__main__":
         }
         with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \
              patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \
-             patch("environment_workflow._steam_root_for_game", return_value=Path("/steam")), \
+             patch("main._steam_root_for_game", return_value=Path("/steam")), \
              patch("environment_workflow.discover_wine_game_path", return_value={
                  "ok": True, "drive": "T:",
                  "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition",

@@ -1,6 +1,7 @@
 """Steam-prefix path helpers used by the Qt interface."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from proton_runtime import _steam_root_for_game

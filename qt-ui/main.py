@@ -19,13 +19,9 @@ from wyrd_mo2 import (
     read_settings, write_settings, mark_first_run_completed,
     inspect_audio_compatibility, reset_wyrd_settings,
 )
-from steam_drive_mapping import discover_wine_game_path, verify_wine_game_path
-from steam_game_registry import configure_skyrim_se_registry
-from mo2_registry import synchronize_mo2_instance_game_paths
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
-    inspect_any_skyrim_prefix_mo2_instances,
 )
 from steam_prefix import steam_compat_prefix
 from steam_mo2_management import reset_wyrd_mo2
@@ -36,7 +32,7 @@ from steam_workers import SteamPrefixInstallWorker
 from ui_styles import APP_STYLE as STYLE
 from launch_workflow import LaunchWorkflowMixin
 from environment_workflow import EnvironmentWorkflowMixin
-from ui_path_helpers import _steam_prefix_for_game_path
+from ui_path_helpers import _steam_prefix_for_game_path, _same_filesystem_path
 class MainWindow(LaunchWorkflowMixin, EnvironmentWorkflowMixin, QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -801,7 +797,7 @@ class MainWindow(LaunchWorkflowMixin, EnvironmentWorkflowMixin, QMainWindow):
                 lines.append(f"ModOrganizer.exe: {'EXISTS' if executable.is_file() and not executable.is_symlink() else 'MISSING'}")
                 lines.append(f"Wyrd ownership marker: {'EXISTS' if marker.is_file() and not marker.is_symlink() else 'MISSING'}")
                 try:
-                    from steamcompat import inspect_any_skyrim_prefix_mo2_instances
+                    from steam_mo2_discovery import inspect_any_skyrim_prefix_mo2_instances
                     inventory = inspect_any_skyrim_prefix_mo2_instances(game)
                     instances = inventory.get("instances", []) if inventory.get("ok") else []
                     skyrim_instances = inventory.get("skyrim_instances", []) if inventory.get("ok") else []
