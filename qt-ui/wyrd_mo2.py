@@ -701,17 +701,32 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
                     continue
                 roots.append(candidate)
 
-    # Restrict portable discovery to the explicitly supplied Wyrd-owned install
-    # root. The root itself may be the active portable instance; instances/
-    # is also supported for named portable instances. No arbitrary paths are read.
+    # MO2 exposes its portable instance through InstanceManager::portablePath().
+    # Discover it only from verified executable installations supplied by the
+    # caller. Also retain the instance-manager "instances/" layout used by
+    # existing Wyrd installs. Global instances are always rooted at LocalAppData.
     if install_root is not None:
         install = Path(install_root).expanduser()
         if install.is_dir() and not install.is_symlink():
-            roots.append(install)
+            try:
+                install.resolve(strict=True).relative_to(prefix_root.resolve(strict=True))
+                roots.append(install)
+            except (OSError, ValueError, RuntimeError):
+                pass
             portable_instances = install / "instances"
             if portable_instances.is_dir() and not portable_instances.is_symlink():
-                roots.append(portable_instances)
-    return roots
+                try:
+                    portable_instances.resolve(strict=True).relative_to(
+                        prefix_root.resolve(strict=True)
+                    )
+                    roots.append(portable_instances)
+                except (OSError, ValueError, RuntimeError):
+                    pass
+    # Deduplicate overlapping LocalAppData roots and preserve deterministic order.
+    unique: dict[str, Path] = {}
+    for root in roots:
+        unique.setdefault(os.path.normcase(str(root.resolve(strict=True))), root)
+    return list(unique.values())
 
 
 def _same_mo2_game_path(raw_game_path: str, prefix_root: Path,
