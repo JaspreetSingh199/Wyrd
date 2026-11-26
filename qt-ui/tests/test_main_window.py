@@ -44,7 +44,6 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("environment_workflow.detect_skyrim", return_value=game),
             patch("environment_workflow.discover_proton_builds", return_value=builds),
                         patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value=steam_mo2 or {"installed": False, "message": "No Wyrd-managed MO2 installation was found."}),
-            patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "managed": False, "message": "No external MO2 installation was found in Skyrim's Steam prefix."}),
             patch("environment_workflow.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory or {"ok": False, "instances": [], "skyrim_instances": [], "message": "No MO2 instance was found."}),
             patch("audio_workflow.inspect_audio_compatibility", return_value={"ok": False, "safe": False, "message": "Legacy audio prefix is unavailable."}),

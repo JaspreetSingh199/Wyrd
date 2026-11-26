@@ -13,21 +13,13 @@ from PySide6.QtWidgets import (
 )
 
 from skyrim_detection import detect_skyrim
-from proton_runtime import _steam_root_for_game, _runtime_environment
 from wyrd_mo2 import (
     read_settings, write_settings, mark_first_run_completed,
     reset_wyrd_settings,
 )
-from steam_mo2_discovery import (
-    inspect_skyrim_prefix_mo2_installation,
-    inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
-)
-from steam_prefix import steam_compat_prefix
-from steam_mo2_management import reset_wyrd_mo2
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 from launch_models import LaunchSession, GameProcess
 from ui_components import add_info_button, panel
-from steam_workers import SteamPrefixInstallWorker
 from ui_styles import APP_STYLE as STYLE
 from launch_workflow import LaunchWorkflowMixin
 from environment_workflow import EnvironmentWorkflowMixin
