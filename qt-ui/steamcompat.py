@@ -285,7 +285,7 @@ def verify_wine_game_path(proton_path: Path, prefix_root: Path,
             "STEAM_COMPAT_APP_ID": APP_ID,
             "STEAM_COMPAT_DATA_PATH": str(resolved_prefix),
         })
-        windows_exe = windows_game_path.rstrip("\\") + r"\\SkyrimSE.exe"
+        windows_exe = windows_game_path.rstrip("\\") + "\\SkyrimSE.exe"
         command = f'if exist "{windows_exe}" (exit /b 0) else (exit /b 1)'
         result = subprocess.run(
             [str(proton / "proton"), "run", "cmd", "/c", command],
