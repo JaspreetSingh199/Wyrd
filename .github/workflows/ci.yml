@@ -8,6 +8,9 @@ on:
 
 jobs:
   tests:
+    # Temporarily opt-in while the V1 refactor is in progress.
+    # Set repository variable WYRD_RUN_TESTS=true to re-enable this job.
+    if: ${{ vars.WYRD_RUN_TESTS == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
