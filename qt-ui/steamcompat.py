@@ -181,17 +181,17 @@ def synchronize_mo2_instance_game_paths(
                     continue
 
                 general_match = re.search(
-                    r"(?ims)^\\[General\\][ \\t]*\\r?\\n(.*?)(?=^\\[|\\Z)",
+                    r"(?ims)^\[General\][ \t]*\r?\n(.*?)(?=^\[|\Z)",
                     original,
                 )
                 if not general_match:
                     continue
                 general = general_match.group(1)
-                game_name = re.search(r"(?im)^\\s*gameName\\s*=\\s*(.*?)\\s*$", general)
+                game_name = re.search(r"(?im)^\s*gameName\s*=\s*(.*?)\s*$", general)
                 if not game_name or game_name.group(1).strip().strip('"').casefold() != "skyrim special edition":
                     continue
 
-                game_path_match = re.search(r"(?im)^([ \\t]*gamePath[ \\t]*=[ \\t]*)(.*?)(\\r?)$", general)
+                game_path_match = re.search(r"(?im)^([ \t]*gamePath[ \t]*=[ \t]*)(.*?)(\r?)$", general)
                 if not game_path_match:
                     skipped.append(str(ini))
                     continue
@@ -229,11 +229,11 @@ def synchronize_mo2_instance_game_paths(
 
                 verified = ini.read_text(encoding="utf-8-sig")
                 verify_general = re.search(
-                    r"(?ims)^\\[General\\][ \\t]*\\r?\\n(.*?)(?=^\\[|\\Z)",
+                    r"(?ims)^\[General\][ \t]*\r?\n(.*?)(?=^\[|\Z)",
                     verified,
                 )
                 verify_path = re.search(
-                    r"(?im)^\\s*gamePath\\s*=\\s*(.*?)\\s*$",
+                    r"(?im)^\s*gamePath\s*=\s*(.*?)\s*$",
                     verify_general.group(1) if verify_general else "",
                 )
                 if not verify_path or verify_path.group(1).strip() != encoded:
@@ -496,7 +496,10 @@ def inspect_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = Non
     if not state.get("installed"):
         return {"ok": False, "instances": [], "skyrim_instances": [],
                 "message": state.get("message", "Wyrd-managed MO2 is not installed.")}
-    return inspect_mo2_instances(Path(state["prefix"]), Path(state["install"]))
+    return inspect_mo2_instances(
+        Path(state["prefix"]), Path(state["install"]),
+        detected_game_path=Path(game_path).expanduser(),
+    )
 
 
 
@@ -565,6 +568,7 @@ def inspect_any_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None =
                 "message": state.get("message", "MO2 installation was not found.")}
     inventory = inspect_mo2_instances(
         Path(state["prefix"]), Path(state["install"]), require_managed=False,
+        detected_game_path=Path(game_path).expanduser(),
     )
     inventory["managed"] = bool(state.get("managed", managed.get("installed", False)))
     inventory["installation"] = state
