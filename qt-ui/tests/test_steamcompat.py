@@ -198,7 +198,7 @@ def _external_game_layout(tmp_path):
 def test_external_mo2_discovery_is_read_only_and_not_managed(monkeypatch, tmp_path):
     root, game, prefix, exe = _external_game_layout(tmp_path)
     before = {p.relative_to(prefix): p.read_bytes() for p in exe.parent.rglob("*") if p.is_file()}
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
     assert state["installed"] is True
     assert state["managed"] is False
@@ -214,7 +214,7 @@ def test_external_mo2_refuses_symlinked_executable(monkeypatch, tmp_path):
     outside.write_bytes(b"MZ-external")
     exe.unlink()
     exe.symlink_to(outside)
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
     assert not state["installed"]
 
@@ -229,7 +229,7 @@ def test_external_mo2_refuses_symlinked_install_path(monkeypatch, tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     (drive / "Modding").symlink_to(outside, target_is_directory=True)
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
     assert not state["installed"]
     assert "symlink" in state["message"].lower()
@@ -238,7 +238,7 @@ def test_external_mo2_refuses_symlinked_install_path(monkeypatch, tmp_path):
 def test_external_mo2_refuses_invalid_ownership_marker(monkeypatch, tmp_path):
     root, game, prefix, exe = _external_game_layout(tmp_path)
     (exe.parent / ".wyrd-managed.json").write_text('{"managed_by":"SomeoneElse"}', encoding="utf-8")
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     state = steamcompat.inspect_external_skyrim_prefix_mo2_installation(game, tmp_path)
     assert not state["installed"]
     assert "marker" in state["message"].lower() or "ownership" in state["message"].lower()

@@ -34,10 +34,6 @@ from steam_mo2_discovery import (
 
 
 
-def steam_compat_prefix(steam_root: Path) -> Path:
-    return Path(steam_root).expanduser() / "steamapps/compatdata" / APP_ID
-
-
 def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path) -> dict:
     """Derive the Windows path from the detected Linux game and existing Wine drives.
 
