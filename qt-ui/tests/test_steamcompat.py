@@ -408,3 +408,42 @@ def test_registry_requires_a_dynamically_discovered_path(tmp_path):
     )
     assert not result["ok"]
     assert "dynamically discovered Proton game path is required" in result["message"]
+
+
+
+def test_instance_discovery_does_not_require_conventional_mo2_install(monkeypatch, tmp_path):
+    root = tmp_path / "Steam"
+    game = root / "steamapps/common/Skyrim Special Edition"
+    game.mkdir(parents=True)
+    prefix = root / "steamapps/compatdata/489830"
+    users = prefix / "pfx/drive_c/users/steamuser"
+    users.mkdir(parents=True)
+    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(
+        steamcompat, "inspect_skyrim_prefix_mo2_installation",
+        lambda game, home: {"installed": False, "managed": False},
+    )
+    monkeypatch.setattr(
+        steamcompat, "inspect_external_skyrim_prefix_mo2_installation",
+        lambda game, home: {"installed": False, "managed": False,
+                            "message": "No conventional executable found."},
+    )
+    captured = {}
+
+    def fake_inventory(prefix_root, install_root=None, require_managed=True,
+                       detected_game_path=None):
+        captured.update(prefix=prefix_root, install=install_root,
+                        require_managed=require_managed, game=detected_game_path)
+        return {"ok": True, "instances": [{"name": "Portable"}],
+                "skyrim_instances": [], "message": "Found one instance."}
+
+    monkeypatch.setattr(steamcompat, "inspect_mo2_instances", fake_inventory)
+    result = steamcompat.inspect_any_skyrim_prefix_mo2_instances(game, tmp_path)
+
+    assert result["ok"]
+    assert result["instances"][0]["name"] == "Portable"
+    assert captured["prefix"] == prefix
+    assert captured["install"] is None
+    assert captured["require_managed"] is False
+    assert captured["game"] == game
+    assert result["installation_message"] == "No conventional executable found."
