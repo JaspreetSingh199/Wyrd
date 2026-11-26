@@ -28,72 +28,8 @@ class EnvironmentWorkflowMixin:
         # the persisted runtime, overwriting the user's choice.
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
-        self._set_scan_progress(12, "Scanning Steam libraries for Skyrim Special Edition…")
-        self.game_state = detect_skyrim()
-        saved_game = self._saved_settings.get("game_path")
-        if saved_game and Path(saved_game).is_dir():
-            detected_game = self.game_state.get("game_dir")
-            if not self.game_state.get("found") or detected_game != saved_game:
-                self.game_state = {
-                    **self.game_state, "found": True,
-                    "game_dir": saved_game, "library": "saved Wyrd selection",
-                }
-        self._update_precheck(
-            0, "Skyrim installation", bool(self.game_state.get("found")),
-            self.game_state.get("game_dir", "Skyrim Special Edition was not detected."),
-        )
-        if self.game_state.get("found"):
-            game_path = self.game_state["game_dir"]
-            self.game_panel.detail_label.setText(
-                "Detected:\n" + game_path +
-                "\nSteam library: " + self.game_state.get("library", "detected")
-            )
-            self._log("Skyrim SE detected: " + game_path)
-        else:
-            roots = self.game_state.get("steam_roots", [])
-            self.game_panel.detail_label.setText(
-                "Skyrim Special Edition (AppID 489830) was not found. "
-                "Install it through Steam and refresh detection.\nSteam roots checked: " +
-                (", ".join(roots) if roots else "No Steam library detected.")
-            )
-            self._log("Skyrim SE not detected.")
-
-        self._set_scan_progress(28, "Discovering compatible Proton runtimes…")
-        self.proton_builds = discover_proton_builds()
-        self._update_precheck(
-            1, "Compatible Proton runtime", bool(self.proton_builds),
-            f"{len(self.proton_builds)} compatible Proton runtime(s) found."
-            if self.proton_builds else "No compatible Proton runtime was found.",
-        )
-        self.proton_combo.clear()
-        selected_index = -1
-        for build in self.proton_builds:
-            label = f'{build["name"]} ({build["architecture"]})'
-            self.proton_combo.addItem(label, build["path"])
-            self.proton_combo.setItemData(self.proton_combo.count() - 1, build["path"], 3)
-            if selected and _same_filesystem_path(selected, build["path"]):
-                selected_index = self.proton_combo.count() - 1
-        saved_proton = self._saved_settings.get("proton")
-        preferred_proton = selected or saved_proton
-        if preferred_proton:
-            selected_index = next(
-                (index for index, build in enumerate(self.proton_builds)
-                 if _same_filesystem_path(build["path"], preferred_proton)),
-                -1,
-            )
-        if selected_index >= 0:
-            self.proton_combo.setCurrentIndex(selected_index)
-        if self.proton_builds:
-            self.runtime_status.setText(
-                f'{len(self.proton_builds)} compatible Proton build(s) found. '
-                "The selected runtime will be saved with this Wyrd installation."
-            )
-            self._log("Proton discovery: " + ", ".join(item["name"] for item in self.proton_builds))
-        else:
-            self.runtime_status.setText(
-                "No compatible Proton build found. Install a current x86_64 Proton build through Steam or ProtonUp-Qt, then refresh."
-            )
-            self._log("No compatible Proton builds found.")
+        self._discover_game_installation()
+        self._populate_proton_runtimes(selected)
 
         self._set_scan_progress(43, "Locating MO2 in Skyrim’s Proton environment…")
         self.mo2_state = inspect_skyrim_prefix_mo2_installation(
@@ -239,6 +175,77 @@ class EnvironmentWorkflowMixin:
             ("A detected MO2 instance is ready for launch." if active_ready
              else "Some setup is still needed. Review the unchecked items above.")
         )
+
+    def _discover_game_installation(self) -> None:
+        """Discover Skyrim and update the installation checklist and summary."""
+        self._set_scan_progress(12, "Scanning Steam libraries for Skyrim Special Edition…")
+        self.game_state = detect_skyrim()
+        saved_game = self._saved_settings.get("game_path")
+        if saved_game and Path(saved_game).is_dir():
+            detected_game = self.game_state.get("game_dir")
+            if not self.game_state.get("found") or detected_game != saved_game:
+                self.game_state = {
+                    **self.game_state, "found": True,
+                    "game_dir": saved_game, "library": "saved Wyrd selection",
+                }
+        self._update_precheck(
+            0, "Skyrim installation", bool(self.game_state.get("found")),
+            self.game_state.get("game_dir", "Skyrim Special Edition was not detected."),
+        )
+        if self.game_state.get("found"):
+            game_path = self.game_state["game_dir"]
+            self.game_panel.detail_label.setText(
+                "Detected:\n" + game_path +
+                "\nSteam library: " + self.game_state.get("library", "detected")
+            )
+            self._log("Skyrim SE detected: " + game_path)
+        else:
+            roots = self.game_state.get("steam_roots", [])
+            self.game_panel.detail_label.setText(
+                "Skyrim Special Edition (AppID 489830) was not found. "
+                "Install it through Steam and refresh detection.\nSteam roots checked: " +
+                (", ".join(roots) if roots else "No Steam library detected.")
+            )
+            self._log("Skyrim SE not detected.")
+
+    def _populate_proton_runtimes(self, selected: str | None) -> None:
+        """Discover Proton builds and restore the preferred existing selection."""
+        self._set_scan_progress(28, "Discovering compatible Proton runtimes…")
+        self.proton_builds = discover_proton_builds()
+        self._update_precheck(
+            1, "Compatible Proton runtime", bool(self.proton_builds),
+            f"{len(self.proton_builds)} compatible Proton runtime(s) found."
+            if self.proton_builds else "No compatible Proton runtime was found.",
+        )
+        self.proton_combo.clear()
+        selected_index = -1
+        for build in self.proton_builds:
+            label = f'{build["name"]} ({build["architecture"]})'
+            self.proton_combo.addItem(label, build["path"])
+            self.proton_combo.setItemData(self.proton_combo.count() - 1, build["path"], 3)
+            if selected and _same_filesystem_path(selected, build["path"]):
+                selected_index = self.proton_combo.count() - 1
+        saved_proton = self._saved_settings.get("proton")
+        preferred_proton = selected or saved_proton
+        if preferred_proton:
+            selected_index = next(
+                (index for index, build in enumerate(self.proton_builds)
+                 if _same_filesystem_path(build["path"], preferred_proton)),
+                -1,
+            )
+        if selected_index >= 0:
+            self.proton_combo.setCurrentIndex(selected_index)
+        if self.proton_builds:
+            self.runtime_status.setText(
+                f'{len(self.proton_builds)} compatible Proton build(s) found. '
+                "The selected runtime will be saved with this Wyrd installation."
+            )
+            self._log("Proton discovery: " + ", ".join(item["name"] for item in self.proton_builds))
+        else:
+            self.runtime_status.setText(
+                "No compatible Proton build found. Install a current x86_64 Proton build through Steam or ProtonUp-Qt, then refresh."
+            )
+            self._log("No compatible Proton builds found.")
 
     def _verify_mo2_game_mapping(
         self, game_path: Path, proton_value: str | None
