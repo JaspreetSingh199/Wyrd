@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 
 import steamcompat
+import steam_mo2_launch
 import steam_mo2_discovery
 from wyrd_mo2 import inspect_mo2_instances, copy_mo2_instance_to_prefix, _steam_root_for_game
 
@@ -30,8 +31,8 @@ def test_launch_refuses_missing_skyrim_prefix(monkeypatch, tmp_path):
     monkeypatch.setattr(steamcompat, "inspect_wyrd_installation", lambda home: {
         "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"
     )})
-    monkeypatch.setattr(steamcompat, "inspect_proton_build", lambda path: {"ok": True})
-    monkeypatch.setattr(steamcompat, "_runtime_environment", lambda proton, root, prefix: {})
+    monkeypatch.setattr(steam_mo2_launch, "inspect_proton_build", lambda path: {"ok": True})
+    monkeypatch.setattr(steam_mo2_launch, "_runtime_environment", lambda proton, root, prefix: {})
     result = steamcompat.launch_mo2_in_skyrim_prefix(tmp_path)
     assert not result["ok"]
     assert "not initialized" in result["message"].lower()
@@ -53,8 +54,8 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     monkeypatch.setattr(steamcompat, "inspect_wyrd_installation", lambda home: {
         "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"
     )})
-    monkeypatch.setattr(steamcompat, "inspect_proton_build", lambda path: {"ok": True})
-    monkeypatch.setattr(steamcompat, "_runtime_environment", lambda proton, root, prefix: {})
+    monkeypatch.setattr(steam_mo2_launch, "inspect_proton_build", lambda path: {"ok": True})
+    monkeypatch.setattr(steam_mo2_launch, "_runtime_environment", lambda proton, root, prefix: {})
     class Proc:
         pid = 1234
     calls = {}
@@ -264,9 +265,9 @@ def test_external_launch_uses_skyrim_prefix_and_does_not_write_marker(monkeypatc
         encoding="utf-8",
     )
     (instance / "profiles/Default").mkdir(parents=True)
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
-    monkeypatch.setattr(steamcompat, "inspect_proton_build", lambda path: {"ok": True})
-    monkeypatch.setattr(steamcompat, "_runtime_environment", lambda proton, steam, prefix: {})
+    monkeypatch.setattr(steam_mo2_launch, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_launch, "inspect_proton_build", lambda path: {"ok": True})
+    monkeypatch.setattr(steam_mo2_launch, "_runtime_environment", lambda proton, steam, prefix: {})
     class Process:
         pid = 876
     captured = {}
@@ -300,7 +301,7 @@ def test_external_prefix_inventory_uses_validated_install_and_is_read_only(monke
     )
     (instance / "profiles/Default").mkdir(parents=True)
     before = config.read_bytes()
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     result = steamcompat.inspect_any_skyrim_prefix_mo2_instances(game, tmp_path)
     assert result["ok"]
     assert result["managed"] is False
