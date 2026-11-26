@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -69,7 +68,6 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
         if not selected_instances:
             return {"ok": False, "targets": [], "message": "The selected Skyrim MO2 instance was not found."}
     for instance in selected_instances:
-        candidates = []
         # MO2 gamePath may be stored as either the game directory or
         # SkyrimSE.exe itself. The registered path is authoritative only
         # after it resolves beneath the detected Steam game directory.
@@ -99,7 +97,6 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
                 warnings.append(f"{instance['name']}: MO2 gamePath could not be resolved safely.")
         # A detected game binary is not automatically a configured MO2 executable.
         # MO2 run --executable resolves the title from customExecutables.
-        targets.extend(candidates)
         for entry in instance.get("executables", []):
             title = entry.get("title", "").strip()
             binary = _resolve_windows_path(entry.get("binary", ""), prefix_root, game_path)
@@ -190,7 +187,6 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
             return {"ok": False, "message": "The selected compatdata prefix is outside its expected Steam compatdata directory."}
         if install.is_symlink() or not install.is_dir() or not (install / "ModOrganizer.exe").is_file():
             return {"ok": False, "message": "The selected MO2 install directory is missing or unsafe."}
-        state_ok = True
         if steam_root_path is not None:
             steam_root = Path(steam_root_path).expanduser()
         elif prefix.parent.name == "compatdata" and prefix.parent.parent.name == "steamapps":
@@ -263,7 +259,6 @@ def launch_skyrim_via_mo2(executable_title: str, instance_name: str,
     env = _runtime_environment(proton, steam_root, prefix)
     # Prefix identity alone is not Wyrd attribution: Steam-launched Skyrim
     # shares this AppID prefix. This marker is inherited by the MO2 handoff.
-    import uuid
     launch_token = uuid.uuid4().hex
     env["WYRD_LAUNCHED"] = "1"
     env["WYRD_LAUNCH_ID"] = launch_token
