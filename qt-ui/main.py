@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
-    discover_proton_builds, inspect_wyrd_installation,
+    discover_proton_builds,
     managed_paths, _steam_root_for_game, _runtime_environment,
     read_settings, write_settings, mark_first_run_completed, inspect_mo2_instances,
     inspect_skyrim_launch_targets,
@@ -33,7 +33,7 @@ from steamcompat import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
-    steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
+    steam_compat_prefix,
     reset_wyrd_mo2,
 )
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
@@ -229,7 +229,6 @@ class MainWindow(QMainWindow):
         self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
-        self.selected_mo2_instance_id = self._saved_settings.get("selected_mo2_instance_id", "")
         # Startup restoration is asynchronous: keep persistence suppressed until
         # refresh_all has populated the runtime list and restored the saved choice.
         self._restoring_selection = True
@@ -373,11 +372,10 @@ class MainWindow(QMainWindow):
             self, prefix_path=str(detected_prefix) if detected_prefix else "",
             install_path=detected_install, game_path=detected_game,
             proton_path=self._saved_settings.get("proton", ""),
-            selected_instance_id=self.selected_mo2_instance_id,
         )
         setup_layout.addWidget(self.mo2_library_widget)
         self.mo2_advanced_widget = Mo2AdvancedSettings(
-            self, selected_instance_id=self.selected_mo2_instance_id
+            self
         )
 
         self.install_button = QPushButton("Install MO2")
@@ -539,18 +537,18 @@ class MainWindow(QMainWindow):
         maintenance_row = QHBoxLayout()
         self.reset_mo2_button = QPushButton("Remove MO2")
         self.reset_mo2_button.setToolTip(
-            "Removes a verified Wyrd-managed MO2 installation and its registered instances. Skyrim and its Steam prefix are preserved."
+            "Removes only the verified Wyrd-installed MO2 program directory. Existing instances and Skyrim data are preserved."
         )
         self.reset_mo2_button.clicked.connect(self.reset_managed_mo2)
         maintenance_row.addWidget(self.reset_mo2_button)
-        add_info_button(maintenance_row, self, "Remove MO2", "Removes only a verified Wyrd-managed MO2 installation and its registered instances after confirmation. It does not remove Skyrim, Skyrim saves, Steam files, or the Skyrim Steam compatdata prefix. External/unmanaged MO2 installations are not deleted.")
+        add_info_button(maintenance_row, self, "Remove MO2", "Removes only the verified Wyrd-installed MO2 program directory. Existing MO2 instances, profiles, mods, downloads, custom storage, Skyrim saves and the Steam prefix are preserved.")
         self.reset_settings_button = QPushButton("Reset Wyrd Settings")
         self.reset_settings_button.setToolTip(
-            "Resets Wyrd preferences. Existing MO2 registrations and the active environment are preserved; first-launch setup appears on the next application launch."
+            "Resets Wyrd preferences; MO2 files and existing instances are left untouched. First-launch setup appears on the next application launch."
         )
         self.reset_settings_button.clicked.connect(self.reset_wyrd_preferences)
         maintenance_row.addWidget(self.reset_settings_button)
-        add_info_button(maintenance_row, self, "Reset Wyrd Settings", "Resets Wyrd preferences. It preserves existing MO2 registrations and the active environment. It does not launch the first-time setup immediately; setup is offered on the next application launch.")
+        add_info_button(maintenance_row, self, "Reset Wyrd Settings", "Resets Wyrd preferences without changing MO2 files or instances. It does not launch first-time setup immediately; setup is offered on the next application launch.")
         maintenance_row.addStretch(1)
         recovery_panel.layout().addLayout(maintenance_row)
         maintenance_layout.addWidget(recovery_panel)
@@ -749,7 +747,7 @@ class MainWindow(QMainWindow):
         for checkbox, label in zip(self.precheck_rows, labels):
             checkbox.setChecked(False)
             checkbox.setText(f"{label} — PENDING")
-        self.precheck_status.setText("Checking Skyrim, Proton, MO2 and registered environments…")
+        self.precheck_status.setText("Checking Skyrim, Proton and MO2 instances…")
         QCoreApplication.processEvents()
 
     def _set_scan_progress(self, value: int, message: str) -> None:
@@ -1222,7 +1220,6 @@ class MainWindow(QMainWindow):
 
         # Reset preferences, but keep the user's existing MO2 connection intact.
         self._saved_settings = {"first_run_completed": False}
-        self.selected_mo2_instance_id = ""
         self._saved_game_path = None
         self.selected_mo2_instance_id = ""
         self._restoring_selection = True
@@ -1272,7 +1269,6 @@ class MainWindow(QMainWindow):
         result = reset_wyrd_mo2(game_path=Path(self.game_state["game_dir"]))
         self._log(result.get("message", "MO2 removal attempted."))
         if result.get("ok"):
-            self.selected_mo2_instance_id = ""
             self.progress_label.setText("Wyrd-managed MO2 removed.")
             QMessageBox.information(self, "MO2 removed", result["message"])
         else:
@@ -1455,56 +1451,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Wyrd setup failed", result.get("message", "MO2 setup failed."))
         self.refresh_button.setEnabled(True)
         self.refresh_all()
-
-    def copy_instance_to_skyrim_prefix(self) -> None:
-        """Offer a non-destructive copy of an existing Wyrd Skyrim instance."""
-        state = inspect_wyrd_installation()
-        if not state.get("installed") or not state.get("prefix_ready"):
-            QMessageBox.warning(self, "MO2 instance copy", "Wyrd's managed MO2 prefix is not ready.")
-            return
-        source = inspect_mo2_instances(
-            Path(state["paths"]["prefix"]), Path(state["executable"]).parent,
-            detected_game_path=Path(state.get("metadata", {}).get("game_path", "")),
-        )
-        if not source.get("ok"):
-            QMessageBox.warning(self, "MO2 instance copy", source.get("message", "Could not inspect Wyrd MO2."))
-            return
-        candidates = source.get("skyrim_instances", [])
-        if not candidates:
-            QMessageBox.information(self, "MO2 instance copy", "No Skyrim Special Edition instance was found in Wyrd's MO2 prefix.")
-            return
-        names = [item["name"] for item in candidates]
-        name, accepted = QInputDialog.getItem(
-            self, "Copy Skyrim MO2 instance", "Choose the original Wyrd instance to copy:",
-            names, 0, False,
-        )
-        if not accepted or not name:
-            return
-        item = next(candidate for candidate in candidates if candidate["name"] == name)
-        storage = item.get("storage", {})
-        explanation = (
-            f"Original instance: {item['path']}\n"
-            f"Profile: {item.get('selected_profile_candidate') or 'not selected'}\n"
-            f"Profiles: {storage.get('profiles', {}).get('path', 'unknown')}\n"
-            f"Mods: {storage.get('mods', {}).get('path', 'unknown')}\n"
-            f"Downloads: {storage.get('downloads', {}).get('path', 'unknown')}\n\n"
-            "Wyrd will copy the instance into Skyrim's Proton prefix. The source remains untouched. "
-            "For safety, copies with external storage roots or symlinks are refused. Continue?"
-        )
-        answer = QMessageBox.warning(
-            self, "Confirm non-destructive instance copy", explanation,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        result = copy_wyrd_instance_to_skyrim_prefix(name)
-        self._log(result.get("message", "MO2 instance copy failed."))
-        if result.get("ok"):
-            self.progress_label.setText("MO2 instance copied; original Wyrd instance preserved.")
-            QMessageBox.information(self, "MO2 instance copy", result["message"])
-        else:
-            QMessageBox.warning(self, "MO2 instance copy refused", result.get("message", "Copy failed safely."))
 
     def start_skyrim_direct(self) -> None:
         """Launch Skyrim through Steam's own AppID path, independent of MO2 instances."""
