@@ -1524,6 +1524,22 @@ class WyrdMO2Tests(unittest.TestCase):
             self.assertNotIn(outside, roots)
             self.assertTrue(all(not item.is_symlink() for item in roots))
 
+    def test_mo2_instance_roots_only_accept_portable_install_inside_prefix(self):
+        from wyrd_mo2 import _instance_roots
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "compatdata/489830"
+            users = prefix / "pfx/drive_c/users"
+            users.mkdir(parents=True)
+            portable = prefix / "pfx/drive_c/Modding/MO2"
+            portable.mkdir(parents=True)
+            outside = root / "external/MO2"
+            outside.mkdir(parents=True)
+            safe_roots = _instance_roots(prefix, portable)
+            unsafe_roots = _instance_roots(prefix, outside)
+            self.assertIn(portable, safe_roots)
+            self.assertNotIn(outside, unsafe_roots)
+
 
 if __name__ == "__main__":
     unittest.main()
