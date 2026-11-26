@@ -508,18 +508,21 @@ class WyrdMO2Tests(unittest.TestCase):
             instance.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
-            )
-            stale_win = "Z:" + str(stale_game).replace("/", "\\\\")
-            binary_win = stale_win + "\\\\SkyrimSE.exe"
+            dosdevices = prefix / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
+            stale_win = "Z:" + str(stale_game).replace("/", chr(92))
+            binary_win = stale_win + chr(92) + "SkyrimSE.exe"
             (instance / "ModOrganizer.ini").write_text(
-                "[General]\\n"
-                "gameName=Skyrim Special Edition\\n"
-                f"gamePath={stale_win}\\n"
-                "[customExecutables]\\n"
-                "size=1\\n"
-                "1\\\\title=Skyrim\\n"
-                f"1\\\\binary={binary_win}\\n",
+                "[General]\n"
+                "gameName=Skyrim Special Edition\n"
+                f"gamePath={stale_win}\n"
+                "[customExecutables]\n"
+                "size=1\n"
+                "1\\title=Skyrim\n"
+                f"1\\binary={binary_win}\n",
                 encoding="utf-8",
+            )
             )
             result = inspect_skyrim_launch_targets(
                 prefix, game, instance_name="Skyrim Special Edition"
