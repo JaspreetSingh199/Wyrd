@@ -107,59 +107,61 @@ def _same_mo2_game_path(raw_game_path: str, prefix_root: Path,
         return False
 
 
-def _read_custom_executables(parser: configparser.ConfigParser,
-                             ini: Path, errors: list[str]) -> list[dict]:
+def _read_custom_executables(
+    parser: configparser.ConfigParser, ini: Path, errors: list[str]
+) -> list[dict]:
     """Decode MO2's QSettings custom-executable array from its INI variants."""
-        # MO2 persists this as a QSettings array. Depending on QSettings
-        # serialization, entries appear as customExecutables\\1\\title
-        # keys in the array section, or as customExecutables\\1 subsections.
-        array_size = 0
-        if parser.has_section("customExecutables"):
-            array_section = parser["customExecutables"]
-            try:
-                array_size = int(array_section.get("size", "0"))
-            except ValueError:
-                errors.append(f"{ini}: invalid customExecutables array size")
-                array_size = 0
-        nested_sections = {}
-        for section_name in parser.sections():
-            normalized = section_name.replace("\\\\", "/").casefold()
-            prefix = "customexecutables/"
-            if normalized.startswith(prefix):
-                index = normalized[len(prefix):]
-                if index.isdigit():
-                    nested_sections[index] = parser[section_name]
-        if array_size <= 0 and nested_sections:
-            array_size = max(map(int, nested_sections))
-        if array_size < 0 or array_size > 512:
-            errors.append(f"{ini}: invalid customExecutables array size {array_size}")
+    # MO2 persists this as a QSettings array. Depending on QSettings
+    # serialization, entries appear as customExecutables\\1\\title
+    # keys in the array section, or as customExecutables\\1 subsections.
+    array_size = 0
+    if parser.has_section("customExecutables"):
+        array_section = parser["customExecutables"]
+        try:
+            array_size = int(array_section.get("size", "0"))
+        except ValueError:
+            errors.append(f"{ini}: invalid customExecutables array size")
             array_size = 0
+    nested_sections = {}
+    for section_name in parser.sections():
+        normalized = section_name.replace("\\\\", "/").casefold()
+        prefix = "customexecutables/"
+        if normalized.startswith(prefix):
+            index = normalized[len(prefix):]
+            if index.isdigit():
+                nested_sections[index] = parser[section_name]
+    if array_size <= 0 and nested_sections:
+        array_size = max(map(int, nested_sections))
+    if array_size < 0 or array_size > 512:
+        errors.append(f"{ini}: invalid customExecutables array size {array_size}")
+        array_size = 0
 
-        def array_value(index: int, key: str) -> str:
-            if parser.has_section("customExecutables"):
-                section = parser["customExecutables"]
-                for candidate_key in (
-                    f"{index}\\{key}", f"{index}\\\\{key}", f"{index}/{key}",
-                    f"\\{index}\\{key}", f"\\\\{index}\\\\{key}",
-                    f"/{index}/{key}",
-                ):
-                    value = section.get(candidate_key)
-                    if value is not None:
-                        return value.strip()
-            nested = nested_sections.get(str(index))
-            if nested is not None:
-                return nested.get(key, "").strip()
-            return ""
+    def array_value(index: int, key: str) -> str:
+        if parser.has_section("customExecutables"):
+            section = parser["customExecutables"]
+            for candidate_key in (
+                f"{index}\\{key}", f"{index}\\\\{key}", f"{index}/{key}",
+                f"\\{index}\\{key}", f"\\\\{index}\\\\{key}",
+                f"/{index}/{key}",
+            ):
+                value = section.get(candidate_key)
+                if value is not None:
+                    return value.strip()
+        nested = nested_sections.get(str(index))
+        if nested is not None:
+            return nested.get(key, "").strip()
+        return ""
 
-        for index in range(1, array_size + 1):
-            executable = {
-                "title": array_value(index, "title"),
-                "binary": array_value(index, "binary"),
-                "arguments": array_value(index, "arguments"),
-                "working_directory": array_value(index, "workingDirectory"),
-            }
-            if executable["title"] or executable["binary"]:
-                executables.append(executable)
+    executables = []
+    for index in range(1, array_size + 1):
+        executable = {
+            "title": array_value(index, "title"),
+            "binary": array_value(index, "binary"),
+            "arguments": array_value(index, "arguments"),
+            "working_directory": array_value(index, "workingDirectory"),
+        }
+        if executable["title"] or executable["binary"]:
+            executables.append(executable)
     return executables
 
 
