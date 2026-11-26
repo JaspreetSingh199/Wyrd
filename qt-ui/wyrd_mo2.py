@@ -664,60 +664,42 @@ def mark_first_run_completed(home: Path | None = None) -> None:
 
 
 def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list[Path]:
-    """Discover MO2 instance containers within the validated Proton prefix.
+    """Return known MO2 instance locations inside Wyrd's managed environment.
 
-    MO2 permits custom global/portable locations. Search only the selected
-    prefix's Windows user tree and the already-identified MO2 installation;
-    never walk arbitrary host disks or follow symlinks. Return containers
-    whose direct child directories may be instances, plus portable roots.
+    MO2 portable mode stores ModOrganizer.ini beside ModOrganizer.exe;
+    instance-manager layouts may also keep named instances under instances/.
     """
-    prefix = Path(prefix_root).expanduser()
-    search_roots: list[Path] = []
-    users = prefix / "pfx/drive_c/users"
-    if users.is_dir() and not users.is_symlink():
-        search_roots.append(users)
+    users = prefix_root / "pfx/drive_c/users"
+    roots: list[Path] = []
+    if users.is_dir():
+        try:
+            user_dirs = [entry for entry in users.iterdir() if entry.is_dir()]
+        except OSError:
+            user_dirs = []
+        for user_dir in user_dirs:
+            candidates = (
+                # MO2 global instances are direct children of ModOrganizer.
+                user_dir / "AppData/Local/ModOrganizer",
+                user_dir / "AppData/Roaming/ModOrganizer",
+                user_dir / "Documents/Modding/ModOrganizer",
+                # Legacy/alternate nested layouts remain inventory-only.
+                user_dir / "AppData/Local/ModOrganizer/instances",
+                user_dir / "AppData/Roaming/ModOrganizer/instances",
+                user_dir / "Documents/Modding/ModOrganizer/instances",
+            )
+            roots.extend(path for path in candidates if path.is_dir())
+
+    # Restrict portable discovery to the explicitly supplied Wyrd-owned install
+    # root. The root itself may be the active portable instance; instances/
+    # is also supported for named portable instances. No arbitrary paths are read.
     if install_root is not None:
         install = Path(install_root).expanduser()
-        if install.is_dir() and not install.is_symlink():
-            search_roots.append(install)
-
-    containers: set[Path] = set()
-    visited_files = 0
-    max_ini_files = 5000
-    max_depth = 12
-    for search_root in search_roots:
-        base_depth = len(search_root.parts)
-        for current, directories, files in os.walk(search_root, topdown=True, followlinks=False):
-            current_path = Path(current)
-            depth = len(current_path.parts) - base_depth
-            directories[:] = [
-                name for name in directories
-                if not (current_path / name).is_symlink()
-                and name.casefold() not in {
-                    "mods", "downloads", "overwrite", "webcache", "cache",
-                    "logs", "crashdumps", "plugins", "tools",
-                }
-            ]
-            if depth >= max_depth:
-                directories[:] = []
-            if "ModOrganizer.ini" not in files:
-                continue
-            ini = current_path / "ModOrganizer.ini"
-            if ini.is_symlink() or not ini.is_file():
-                continue
-            visited_files += 1
-            if visited_files > max_ini_files:
-                break
-            # Portable instances keep their INI beside ModOrganizer.exe.
-            # Global instances are children of a shared instances container.
-            if (current_path / "ModOrganizer.exe").is_file():
-                containers.add(current_path)
-            else:
-                containers.add(current_path.parent)
-        if visited_files > max_ini_files:
-            break
-
-    return sorted(containers, key=lambda item: str(item).casefold())
+        if install.is_dir():
+            roots.append(install)
+            portable_instances = install / "instances"
+            if portable_instances.is_dir():
+                roots.append(portable_instances)
+    return roots
 
 
 def _same_mo2_game_path(raw_game_path: str, prefix_root: Path,
