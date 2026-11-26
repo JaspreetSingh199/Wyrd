@@ -1,12 +1,3 @@
-from mo2_launch import (
-    launch_mo2, inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
-)
-
-from audio_compatibility import (
-    _validated_wyrd_audio_prefix, _sha256_file, _resolve_xact_dlls,
-    inspect_audio_compatibility, repair_audio_compatibility,
-)
-
 """Wyrd-owned MO2 installation and launch through a discovered Steam Proton build.
 
 All paths are user-local. Existing MO2 installs and unknown prefixes are never
@@ -40,6 +31,13 @@ from proton_runtime import (
     _runtime_environment, _run_proton, _prefix_ready, _initialize_prefix,
 )
 from steam_prefix import APP_ID
+from audio_compatibility import (
+    _validated_wyrd_audio_prefix, _sha256_file, _resolve_xact_dlls,
+    inspect_audio_compatibility, repair_audio_compatibility,
+)
+from mo2_launch import (
+    launch_mo2, inspect_skyrim_launch_targets, launch_skyrim_via_mo2,
+)
 
 
 def write_settings(home: Path | None, proton_path: Path, game_path: Path,
