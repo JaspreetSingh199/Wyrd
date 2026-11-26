@@ -934,7 +934,18 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
             # The configured gamePath is authoritative. Loose matching on
             # profile labels or executable names can classify stale instances
             # as Skyrim even when MO2 points at a different installation.
-            is_skyrim = _same_mo2_game_path(game_path, prefix_root, detected_game_path)
+            game_path_matches = _same_mo2_game_path(
+                game_path, prefix_root, detected_game_path
+            )
+            # MO2's instance manager identifies an instance by its configured
+            # gameName. Keep that named instance discoverable even when its
+            # stored gamePath is stale (for example, after moving a Steam
+            # library). Launch remains gated by verifying each executable
+            # against the currently detected Skyrim directory below.
+            is_skyrim = (
+                game_name.strip().casefold() == "skyrim special edition"
+                or game_path_matches
+            )
             discovered.append({
                 "name": directory.name,
                 "path": str(directory),
@@ -954,6 +965,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                     "overwrite": configured_path("overwrite_directory", "%BASE_DIR%/overwrite"),
                 },
                 "is_skyrim_se": is_skyrim,
+                "game_path_matches": game_path_matches,
                 "executables": executables,
             })
 
@@ -1304,6 +1316,16 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
             title = entry.get("title", "").strip()
             binary = _resolve_windows_path(entry.get("binary", ""), prefix_root, game_path)
             if not title or not binary or not binary.is_file():
+                continue
+            # Z: and other Proton drive mappings can resolve outside the
+            # detected Steam library. Never launch a same-named executable
+            # from a stale or unrelated game directory.
+            try:
+                binary.resolve(strict=True).relative_to(game_root)
+            except (OSError, ValueError, RuntimeError):
+                warnings.append(
+                    f"{instance['name']}: executable '{title}' resolves outside the detected Skyrim directory."
+                )
                 continue
             name = binary.name.casefold()
             # The configured title is user-editable metadata. Never treat a
