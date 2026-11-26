@@ -347,5 +347,3 @@ class EnvironmentWorkflowMixin:
             proton_path=self.proton_combo.currentData() or "",
         )
         self.mo2_library_widget.update_context(**context)
-        self.mo2_advanced_widget.update_context(**context)
-        self.mo2_advanced_widget._refresh_registered()
