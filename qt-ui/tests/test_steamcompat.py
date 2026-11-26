@@ -419,13 +419,13 @@ def test_instance_discovery_does_not_require_conventional_mo2_install(monkeypatc
     prefix = root / "steamapps/compatdata/489830"
     users = prefix / "pfx/drive_c/users/steamuser"
     users.mkdir(parents=True)
-    monkeypatch.setattr(steamcompat, "_steam_root_for_game", lambda game, home: root)
+    monkeypatch.setattr(steam_mo2_discovery, "_steam_root_for_game", lambda game, home: root)
     monkeypatch.setattr(
-        steamcompat, "inspect_skyrim_prefix_mo2_installation",
+        steam_mo2_discovery, "inspect_skyrim_prefix_mo2_installation",
         lambda game, home: {"installed": False, "managed": False},
     )
     monkeypatch.setattr(
-        steamcompat, "inspect_external_skyrim_prefix_mo2_installation",
+        steam_mo2_discovery, "inspect_external_skyrim_prefix_mo2_installation",
         lambda game, home: {"installed": False, "managed": False,
                             "message": "No conventional executable found."},
     )
@@ -438,7 +438,7 @@ def test_instance_discovery_does_not_require_conventional_mo2_install(monkeypatc
         return {"ok": True, "instances": [{"name": "Portable"}],
                 "skyrim_instances": [], "message": "Found one instance."}
 
-    monkeypatch.setattr(steamcompat, "inspect_mo2_instances", fake_inventory)
+    monkeypatch.setattr(steam_mo2_discovery, "inspect_mo2_instances", fake_inventory)
     result = steamcompat.inspect_any_skyrim_prefix_mo2_instances(game, tmp_path)
 
     assert result["ok"]
