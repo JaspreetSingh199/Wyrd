@@ -870,6 +870,7 @@ if __name__ == "__main__":
             "ok": True,
             "instances": [{"name": "Skyrim Special Edition"}],
             "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+            "installation": {"installed": False},
             "message": "Found one Skyrim instance.",
         }
         window.mo2_state = {"installed": False, "managed": False}
