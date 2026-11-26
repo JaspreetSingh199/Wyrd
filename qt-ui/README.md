@@ -12,10 +12,10 @@ Install a desktop menu entry:
 bash qt-ui/install-desktop-launcher.sh
 ~~~
 
-The active setup flow is entirely in Qt6. It detects Skyrim SE and compatible Steam Proton builds, installs the standard official MO2 7z release into Wyrd's user-local application folder, initializes a dedicated Proton prefix, and launches MO2 through that runtime.
+Wyrd detects Skyrim SE from Steam libraries, discovers compatible Proton runtimes, and inspects MO2 installations and instances in the selected Skyrim Proton environment. The live read-only MO2 inventory is the source of truth for instance selection and normal launch readiness; users do not need to register an instance with Wyrd before launching it.
+
+MO2 remains responsible for profiles, mods, downloads, load order and configured executables. Wyrd verifies the selected instance and target before handing off the launch through Skyrim's existing Steam AppID 489830 Proton prefix.
+
+Wyrd does not reset the Skyrim prefix, modify saves, or silently change the selected Proton runtime. Existing external MO2 data is not adopted or rewritten during discovery. Custom storage paths are not migrated by changing INI values.
 
 The GUI requires Python 3, venv/pip support, and network access on first run. The project virtual environment installs PySide6 and py7zr automatically.
-
-Wyrd does not call SteamTinkerLaunch to install or launch MO2. Existing MO2 installations outside Wyrd's managed location are detected where possible and are left untouched. The game path is registered only in Wyrd's dedicated prefix. No Steam launch options, Skyrim files, saves, game prefix, or existing MO2 instance are edited.
-
-On first MO2 launch, create a Skyrim Special Edition instance in MO2's own instance picker. Select Skyrim or SKSE in MO2's executable dropdown and press Run to launch through MO2's virtual filesystem.
