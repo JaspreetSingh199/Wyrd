@@ -644,10 +644,18 @@ def inspect_any_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None =
                     "message": "Skyrim's Steam compatdata prefix is missing or unsafe; MO2 instances cannot be inspected."}
         prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
         users_root = prefix / "pfx/drive_c/users"
-        if users_root.is_symlink() or not users_root.is_dir():
+        prefix_components = (
+            prefix / "pfx", prefix / "pfx/drive_c", users_root,
+        )
+        if any(component.is_symlink() for component in prefix_components):
             return {"ok": False, "managed": False, "instances": [],
                     "skyrim_instances": [],
-                    "message": "Skyrim's Proton Wine-user directory is missing or unsafe; MO2 instances cannot be inspected."}
+                    "message": "Skyrim's Proton Wine-user path contains a symlink; MO2 discovery was refused."}
+        if not users_root.is_dir():
+            return {"ok": False, "managed": False, "instances": [],
+                    "skyrim_instances": [],
+                    "message": "Skyrim's Proton Wine-user directory is missing; MO2 instances cannot be inspected."}
+        users_root.resolve(strict=True).relative_to(prefix.resolve(strict=True))
         managed = inspect_skyrim_prefix_mo2_installation(game, home)
         installation = (
             managed if managed.get("installed")
