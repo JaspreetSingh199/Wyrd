@@ -236,8 +236,15 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
                 continue
         if not candidates:
             raise RuntimeError("No existing Proton drive mapping can represent the detected Skyrim directory.")
-        _specificity, letter, windows_path, drive_root = max(
-            candidates, key=lambda item: (item[0], item[1])
+        # Prefer a discovered mapping to the filesystem root when present.
+        # Proton's root mapping can represent any detected Steam library and
+        # avoids depending on an old/custom S: library alias. The letter itself
+        # is still discovered from dosdevices, never assumed.
+        root_mappings = [item for item in candidates if item[3] == Path("/")]
+        _specificity, letter, windows_path, drive_root = (
+            sorted(root_mappings, key=lambda item: item[1])[0]
+            if root_mappings else
+            max(candidates, key=lambda item: (item[0], item[1]))
         )
         return {
             "ok": True, "drive": letter.upper() + ":",
