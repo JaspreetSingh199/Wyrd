@@ -890,7 +890,7 @@ class MainWindow(QMainWindow):
                             self._log("MO2 Bethesda registry: " + registry_state["windows_path"])
                         else:
                             self._log("MO2 Bethesda registry provisioning failed: " + registry_state.get("message", "unknown error"))
-                    else:
+                    elif not proton_value:
                         self.mo2_discovery_state["registry"] = {
                             "ok": False, "message": "No Proton runtime is selected."
                         }
