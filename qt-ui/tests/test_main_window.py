@@ -921,3 +921,31 @@ if __name__ == "__main__":
         window._update_active_instance_from_scan()
         self.assertTrue(window.launch_game_button.isEnabled())
         window.close()
+
+
+
+    def test_launch_mo2_gui_uses_verified_external_inventory_install(self):
+        window = self._window()
+        game = Path(window.game_state["game_dir"])
+        with tempfile.TemporaryDirectory() as tmp:
+            install = Path(tmp) / "MO2"
+            install.mkdir()
+            executable = install / "ModOrganizer.exe"
+            executable.write_bytes(b"MZ")
+            window.mo2_state = {"installed": False, "managed": False}
+            window.instance_state = {
+                "installation": {
+                    "installed": True, "managed": False,
+                    "install": str(install), "executable": str(executable),
+                }
+            }
+            with patch("main._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
+                "main._steam_root_for_game", return_value=Path(tmp)
+            ), patch("main._runtime_environment", return_value={}), patch(
+                "main.subprocess.Popen"
+            ) as popen, patch("main.QMessageBox.warning") as warning:
+                window.launch_mo2_gui()
+            popen.assert_called_once()
+            self.assertEqual(popen.call_args.args[0][-1], "--pick")
+            warning.assert_not_called()
+        window.close()
