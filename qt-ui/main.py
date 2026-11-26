@@ -1976,7 +1976,7 @@ class MainWindow(QMainWindow):
         if not discovery or not discovery.get("ok"):
             QMessageBox.warning(
                 self, "MO2 game discovery is not verified",
-                "Wyrd has not verified the Skyrim S: Steam-library mapping. "
+                "Wyrd has not verified the dynamically derived Skyrim Proton game path. "
                 "The modded launch is blocked until a successful refresh.\\n\\n"
                 + (discovery or {}).get("message", "No verified Steam discovery result is available."),
             )
