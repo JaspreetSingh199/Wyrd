@@ -13,7 +13,7 @@ from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
 )
-from wyrd_mo2 import inspect_skyrim_launch_targets
+from mo2_launch import inspect_skyrim_launch_targets
 
 
 def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,

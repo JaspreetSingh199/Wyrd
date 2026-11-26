@@ -893,7 +893,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
                 "WINEDLLOVERRIDES": "d3d11=n;dxgi=n",
-            }), patch("wyrd_mo2.subprocess.Popen") as popen:
+            }), patch("mo2_launch.subprocess.Popen") as popen:
                 popen.return_value.pid = 6789
                 result = launch_mo2(home)
             self.assertTrue(result["ok"], result)
@@ -939,7 +939,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
             }):
-                with patch("wyrd_mo2.subprocess.Popen") as popen:
+                with patch("mo2_launch.subprocess.Popen") as popen:
                     popen.return_value.pid = 1234
                     with patch("proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]):
                         result = launch_skyrim_via_mo2(
@@ -990,7 +990,7 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             log_path = root / "logs/skyrim-launch.log"
             with patch.dict(os.environ, {"WINEDLLOVERRIDES": ""}), patch(
-                "wyrd_mo2.subprocess.Popen"
+                "mo2_launch.subprocess.Popen"
             ) as popen:
                 popen.return_value.pid = 4242
                 result = launch_skyrim_via_mo2(
@@ -1049,7 +1049,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
                 "WINEDLLOVERRIDES": "d3d11=n;dxgi=n",
-            }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
+            }), patch("mo2_launch.subprocess.Popen") as popen, patch(
                 "proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]
             ):
                 popen.return_value.pid = 5678
@@ -1096,11 +1096,11 @@ class WyrdMO2Tests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
-            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+            }), patch("mo2_launch.inspect_mo2_instances", return_value={
                 "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
-            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+            }), patch("mo2_launch.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": duplicate_targets
-            }), patch("wyrd_mo2.subprocess.Popen") as popen:
+            }), patch("mo2_launch.subprocess.Popen") as popen:
                 result = launch_skyrim_via_mo2("SKSE", "Skyrim SE", home)
             self.assertFalse(result["ok"])
             self.assertIn("ambiguous", result["message"])
@@ -1136,11 +1136,11 @@ class WyrdMO2Tests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
-            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+            }), patch("mo2_launch.inspect_mo2_instances", return_value={
                 "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
-            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+            }), patch("mo2_launch.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": duplicate_targets
-            }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
+            }), patch("mo2_launch.subprocess.Popen") as popen, patch(
                 "proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]
             ):
                 popen.return_value.pid = 77
@@ -1177,11 +1177,11 @@ class WyrdMO2Tests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
-            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+            }), patch("mo2_launch.inspect_mo2_instances", return_value={
                 "ok": True, "skyrim_instances": [{"name": "Skyrim SE"}], "instances": []
-            }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
+            }), patch("mo2_launch.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": [{"title": "SKSE", "binary": str(target)}]
-            }) as inspection, patch("wyrd_mo2.subprocess.Popen") as popen:
+            }) as inspection, patch("mo2_launch.subprocess.Popen") as popen:
                 result = launch_skyrim_via_mo2(
                     "SKSE", "Skyrim SE", home,
                     expected_binary=game / "missing_skse_loader.exe",
@@ -1226,9 +1226,9 @@ class WyrdMO2Tests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "XDG_DATA_HOME": str(home / ".local/share"),
                 "XDG_CONFIG_HOME": str(home / ".config"),
-            }), patch("wyrd_mo2.inspect_mo2_instances", return_value={
+            }), patch("mo2_launch.inspect_mo2_instances", return_value={
                 "ok": True, "skyrim_instances": [], "instances": []
-            }), patch("wyrd_mo2.subprocess.Popen") as popen:
+            }), patch("mo2_launch.subprocess.Popen") as popen:
                 result = launch_skyrim_via_mo2("SKSE", "Missing", home)
             self.assertFalse(result["ok"])
             popen.assert_not_called()
@@ -1261,7 +1261,7 @@ class WyrdMO2Tests(unittest.TestCase):
             proton = make_proton(home / "Proton")
             with patch("proton_runtime.inspect_proton_build", return_value={"ok": True}), \
                  patch("proton_runtime._runtime_environment", return_value={}), \
-                 patch("wyrd_mo2.subprocess.Popen") as popen:
+                 patch("mo2_launch.subprocess.Popen") as popen:
                 popen.return_value.pid = 456
                 result = launch_skyrim_via_mo2(
                     "Skyrim", "Skyrim Special Edition", expected_binary=game_exe,

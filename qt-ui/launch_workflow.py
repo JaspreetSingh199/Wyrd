@@ -24,7 +24,7 @@ from process_monitor import (
     classify_launch_diagnostics,
 )
 from mo2_instances import inspect_mo2_instances
-from wyrd_mo2 import inspect_skyrim_launch_targets
+from mo2_launch import inspect_skyrim_launch_targets
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
