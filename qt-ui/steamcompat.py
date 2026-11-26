@@ -338,6 +338,53 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
         }
 
 
+
+def verify_wine_game_path(proton_path: Path, prefix_root: Path,
+                          steam_root: Path, windows_game_path: str) -> dict:
+    """Ask the active Proton runtime to verify SkyrimSE.exe is visible at its Wine path."""
+    try:
+        proton = Path(proton_path).expanduser()
+        prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
+        steam = _reject_symlinked_path_components(Path(steam_root), "Steam client root")
+        if proton.is_symlink() or not (proton / "proton").is_file():
+            raise RuntimeError("Selected Proton runtime is missing or unsafe.")
+        resolved_prefix = prefix.resolve(strict=True)
+        resolved_steam = steam.resolve(strict=True)
+        expected_prefix = steam_compat_prefix(resolved_steam).resolve(strict=True)
+        if resolved_prefix != expected_prefix:
+            raise RuntimeError("The supplied prefix is not Skyrim AppID 489830 compatdata.")
+        mapped = _resolve_windows_path(windows_game_path, resolved_prefix)
+        if mapped is None or not (mapped / "SkyrimSE.exe").is_file():
+            raise RuntimeError("Generated Wine path does not resolve to SkyrimSE.exe on the Linux filesystem.")
+
+        env = _runtime_environment(proton, resolved_steam, resolved_prefix)
+        env.update({
+            "SteamAppId": APP_ID, "SteamGameId": APP_ID,
+            "STEAM_COMPAT_APP_ID": APP_ID,
+            "STEAM_COMPAT_DATA_PATH": str(resolved_prefix),
+        })
+        windows_exe = windows_game_path.rstrip("\\") + r"\\SkyrimSE.exe"
+        command = f'if exist "{windows_exe}" (exit /b 0) else (exit /b 1)'
+        result = subprocess.run(
+            [str(proton / "proton"), "run", "cmd", "/c", command],
+            cwd=str(resolved_steam), env=env, capture_output=True,
+            text=True, timeout=120, check=False,
+        )
+        if result.returncode != 0:
+            details = (result.stdout + "\\n" + result.stderr).strip()
+            raise RuntimeError(
+                "The selected Proton runtime cannot see SkyrimSE.exe at "
+                f"{windows_exe}." + (" " + details[-1500:] if details else "")
+            )
+        return {
+            "ok": True, "windows_executable": windows_exe,
+            "resolved_executable": str(mapped / "SkyrimSE.exe"),
+            "message": f"Proton verified {windows_exe}.",
+        }
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+        return {"ok": False, "message": str(error)}
+
+
 def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
                                  steam_root: Path, proton_path: Path,
                                  windows_game_path: str | None = None) -> dict:
