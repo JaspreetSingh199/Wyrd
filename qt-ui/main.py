@@ -37,6 +37,8 @@ from steamcompat import (
     reset_wyrd_mo2,
 )
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
+from ui_components import add_info_button, panel
+from steam_workers import SteamPrefixInstallWorker
 @dataclass
 class LaunchSession:
     """Metadata for one MO2-mediated launch handoff and monitoring session."""
@@ -156,54 +158,6 @@ def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
         return steam_compat_prefix(steam_root)
     except (OSError, RuntimeError, ValueError):
         return None
-
-
-def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
-    """Add a compact hover-help control beside an advanced action."""
-    info = QPushButton("i")
-    info.setObjectName("infoButton")
-    info.setFixedSize(24, 24)
-    info.setToolTip(explanation)
-    info.setToolTipDuration(15000)
-    info.setAccessibleName(f"Information about {title}")
-    layout.addWidget(info)
-    return info
-
-
-def panel(title: str, description: str) -> QFrame:
-    frame = QFrame()
-    frame.setObjectName("panel")
-    layout = QVBoxLayout(frame)
-    layout.setContentsMargins(17, 15, 17, 15)
-    heading = QLabel(title)
-    heading.setObjectName("section")
-    detail = QLabel(description)
-    detail.setObjectName("muted")
-    detail.setWordWrap(True)
-    layout.addWidget(heading)
-    layout.addWidget(detail)
-    frame.detail_label = detail
-    return frame
-
-
-class SteamPrefixInstallWorker(QThread):
-    progress = Signal(int, str)
-    completed = Signal(dict)
-
-    def __init__(self, proton_path: str, game_path: str):
-        super().__init__()
-        self.proton_path = Path(proton_path)
-        self.game_path = Path(game_path)
-
-    def run(self) -> None:
-        try:
-            result = install_mo2_into_skyrim_prefix(
-                self.proton_path, self.game_path,
-                callback=lambda value, message: self.progress.emit(value, message),
-            )
-        except Exception as error:
-            result = {"ok": False, "message": str(error)}
-        self.completed.emit(result)
 
 
 class MainWindow(QMainWindow):
