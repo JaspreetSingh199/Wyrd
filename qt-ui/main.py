@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
-    QVBoxLayout, QInputDialog, QWidget, QTabWidget,
+    QVBoxLayout, QWidget, QTabWidget,
 )
 
 from wyrd_mo2 import (
