@@ -1546,12 +1546,6 @@ class MainWindow(QMainWindow):
         self.refresh_button.setEnabled(True)
         self.refresh_all()
 
-    def _instance_inspection(self) -> dict:
-        if not self.game_state.get("found"):
-            return {"ok": False, "instances": [], "skyrim_instances": [],
-                    "message": "Skyrim Special Edition was not detected."}
-        return inspect_any_skyrim_prefix_mo2_instances(Path(self.game_state["game_dir"]))
-
     def copy_instance_to_skyrim_prefix(self) -> None:
         """Offer a non-destructive copy of an existing Wyrd Skyrim instance."""
         state = inspect_wyrd_installation()
