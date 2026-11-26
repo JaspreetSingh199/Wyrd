@@ -181,7 +181,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_inventory_launch_handoff_refuses_unverified_s_drive(self):
         window = self._window()
-        window.mo2_discovery_state = {"ok": False, "message": "S: target mismatch"}
+        window.mo2_discovery_state = {"ok": False, "message": "Proton path mismatch"}
         with patch("main.QInputDialog.getItem") as choose, patch(
             "main.QMessageBox.warning"
         ) as warning:
@@ -201,7 +201,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "skyrim_instances": [{"name": "Skyrim Special Edition"}],
         }
         window.mo2_state = {"installed": True, "managed": False}
-        window.mo2_discovery_state = {"ok": False, "message": "S: target mismatch"}
+        window.mo2_discovery_state = {"ok": False, "message": "Proton path mismatch"}
         window.startup_checks_complete = True
         window._update_active_instance_from_scan()
         self.assertFalse(window.launch_game_button.isEnabled())
