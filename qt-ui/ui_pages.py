@@ -8,8 +8,7 @@ from PySide6.QtWidgets import (
 )
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 from ui_components import add_info_button, panel
-from ui_path_helpers import _steam_prefix_for_game_path
-from skyrim_detection import detect_skyrim
+from ui_path_helpers import initial_mo2_dialog_paths
 
 
 class MainWindowPagesMixin:
@@ -116,16 +115,12 @@ class MainWindowPagesMixin:
         self.mo2_panel = panel("MOD ORGANIZER 2", "Checking the installation…")
         setup_layout.addWidget(self.mo2_panel)
 
-        detected = detect_skyrim()
-        detected_game = detected.get("game_dir", "") if detected.get("found") else ""
-        detected_prefix = _steam_prefix_for_game_path(detected_game) if detected_game else None
-        detected_install = self.mo2_state.get("install") or (
-            str(detected_prefix / "pfx/drive_c/Modding/MO2") if detected_prefix else ""
+        prefix_path, install_path, game_path = initial_mo2_dialog_paths(
+            self.mo2_state, self._saved_settings
         )
         self.mo2_library_widget = Mo2LibraryDialog(
-            self, prefix_path=str(detected_prefix) if detected_prefix else "",
-            install_path=detected_install, game_path=detected_game,
-            proton_path=self._saved_settings.get("proton", ""),
+            self, prefix_path=prefix_path, install_path=install_path,
+            game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget)
         self.mo2_advanced_widget = Mo2AdvancedSettings(
