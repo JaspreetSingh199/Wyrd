@@ -17,8 +17,7 @@ from pathlib import Path
 
 from skyrim_detection import steam_libraries
 from wyrd_mo2 import (
-    inspect_wyrd_installation, inspect_proton_build, _runtime_environment,
-    inspect_mo2_instances, copy_mo2_instance_to_prefix,
+    inspect_proton_build, _runtime_environment, inspect_mo2_instances,
     _steam_root_for_game, managed_paths, _resolve_windows_path,
 )
 
@@ -705,29 +704,6 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
 
 
 from pathlib import Path
-
-def copy_wyrd_instance_to_skyrim_prefix(instance_name: str, home: Path | None = None) -> dict:
-    """Copy a selected Skyrim instance from Wyrd's prefix into Steam's prefix."""
-    state = inspect_wyrd_installation(home)
-    if not state.get("installed"):
-        return {"ok": False, "status": "refused", "message": "Wyrd-managed MO2 is not installed."}
-    paths = state.get("paths", {})
-    source_prefix = Path(paths.get("prefix", "")).expanduser()
-    if source_prefix.is_symlink() or not source_prefix.is_dir():
-        return {"ok": False, "status": "refused", "message": "Wyrd MO2 prefix is missing or unsafe."}
-    source_inventory = inspect_mo2_instances(
-        source_prefix, Path(state["executable"]).expanduser().parent,
-        detected_game_path=Path(state.get("metadata", {}).get("game_path", "")),
-    )
-    if not source_inventory.get("ok"):
-        return {"ok": False, "status": "refused", "message": source_inventory.get("message", "Could not inspect Wyrd MO2 instances.")}
-    source = next((item for item in source_inventory.get("skyrim_instances", [])
-                   if item["name"] == instance_name), None)
-    if source is None:
-        return {"ok": False, "status": "refused", "message": "Selected Skyrim instance was not found in Wyrd's prefix."}
-    steam_root = Path(state.get("metadata", {}).get("steam_root", "")).expanduser()
-    return copy_mo2_instance_to_prefix(Path(source["path"]), steam_compat_prefix(steam_root))
-
 
 def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
                                 home: Path | None = None,
