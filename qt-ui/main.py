@@ -21,6 +21,7 @@ from launch_models import LaunchSession, GameProcess
 from ui_components import add_info_button, panel
 from ui_styles import APP_STYLE as STYLE
 from launch_workflow import LaunchWorkflowMixin
+from process_workflow import ProcessMonitorWorkflowMixin
 from environment_workflow import EnvironmentWorkflowMixin
 from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
@@ -28,6 +29,7 @@ from setup_workflow import SetupWorkflowMixin
 from ui_path_helpers import _steam_prefix_for_game_path, _same_filesystem_path
 class MainWindow(
     LaunchWorkflowMixin,
+    ProcessMonitorWorkflowMixin,
     EnvironmentWorkflowMixin,
     AudioWorkflowMixin,
     Mo2ManagementWorkflowMixin,
