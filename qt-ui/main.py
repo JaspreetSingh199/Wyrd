@@ -7,16 +7,15 @@ from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QInputDialog,
-    QWidget, QTabWidget, QScrollArea,
+    QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QVBoxLayout, QInputDialog, QWidget, QTabWidget,
 )
 
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
     read_settings, write_settings, reset_wyrd_settings,
 )
-from launch_models import LaunchSession, GameProcess
+from launch_models import LaunchSession
 from ui_styles import APP_STYLE as STYLE
 from ui_pages import MainWindowPagesMixin
 from launch_workflow import LaunchWorkflowMixin
@@ -32,6 +31,7 @@ class MainWindow(
     AudioWorkflowMixin,
     Mo2ManagementWorkflowMixin,
     SetupWorkflowMixin,
+    MainWindowPagesMixin,
     QMainWindow,
 ):
     def __init__(self) -> None:
