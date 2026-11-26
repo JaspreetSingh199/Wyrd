@@ -1221,7 +1221,6 @@ class MainWindow(QMainWindow):
         # Reset preferences, but keep the user's existing MO2 connection intact.
         self._saved_settings = {"first_run_completed": False}
         self._saved_game_path = None
-        self.selected_mo2_instance_id = ""
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
         if self.proton_combo.count():
@@ -1255,9 +1254,7 @@ class MainWindow(QMainWindow):
         install = state.get("install", "Wyrd-managed MO2 directory")
         answer = QMessageBox.warning(
             self, "Remove Wyrd-managed MO2?",
-            "This permanently removes Wyrd's verified MO2 installation and its registered instances. "
-            "Instance-local modding data is removed with those instances. Custom storage outside the instance folders is preserved.\n\n"
-            "It will also clear Wyrd's registry entries and active instance selection for this installation.\n\n"
+            "This removes only the verified Wyrd-installed MO2 program directory. Existing MO2 instances and their profiles, mods, downloads and custom storage are preserved.\n\n"
             "NEVER DELETED: Skyrim's Steam compatdata/489830 prefix, Skyrim/game files, saves, external MO2 installations, "
             "and custom storage outside the managed instance folders.\n\n"
             f"Installation: {install}\n\nThis cannot be undone. Continue?",
