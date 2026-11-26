@@ -11,14 +11,9 @@ import os
 import re
 import shutil
 import subprocess
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
-from skyrim_detection import find_steam_roots, steam_libraries
-from mo2_inspection import find_mo2_installations
-from path_utils import is_path_within as _is_path_within
 from mo2_instances import (
     _instance_roots, _same_mo2_game_path, inspect_mo2_instances,
     _resolve_mo2_storage_path, inspect_mo2_storage, _resolve_windows_path,
@@ -30,16 +25,12 @@ from process_monitor import (
     launch_process_status,
 )
 
-
 from proton_runtime import (
     ProgressCallback, managed_paths, inspect_proton_build, discover_proton_builds,
     reset_mo2_compatdata, inspect_wyrd_installation, _steam_root_for_game,
     _runtime_environment, _run_proton, _prefix_ready, _initialize_prefix,
 )
 APP_ID = "489830"
-RELEASE_API = "https://api.github.com/repos/ModOrganizer2/modorganizer/releases/latest"
-APP_DIR_NAME = "wyrd"
-MO2_DIR_NAME = "mo2"
 PREFIX_DIR_NAME = "compatdata/mo2-skyrim"
 ProgressCallback = Callable[[int, str], None]
 
