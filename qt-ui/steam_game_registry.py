@@ -20,7 +20,7 @@ _REGISTRY_SECTION = (
 def _read_installed_path(system_registry: Path) -> str | None:
     """Read Skyrim's Installed Path directly from Wine's system.reg.
 
-    This is a read-only check: unlike `proton run reg`, it does not start a
+    This is a read-only check: unlike \`proton run reg\`, it does not start a
     Wine process or wineserver. Wine escapes backslashes in registry strings.
     """
     if system_registry.is_symlink() or not system_registry.is_file():
@@ -56,7 +56,7 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
     The common refresh path is read-only and launches no Wine processes. Only
     when the value is absent or stale does Wyrd invoke Proton once to import it;
     read-back is then verified from system.reg rather than launching a second
-    Proton process for `reg query`.
+    Proton process for \`reg query\`.
     """
     try:
         prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
@@ -79,22 +79,22 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
         if mapped != resolved_game:
             raise RuntimeError("Generated Wine game path does not resolve to the detected Skyrim directory.")
 
-        windows_path = windows_game_path.rstrip("\\\\") + "\\\\"
+        windows_path = windows_game_path.rstrip("\\") + "\\"
         system_registry = resolved_prefix / "pfx/system.reg"
         existing_path = _read_installed_path(system_registry)
         if existing_path and existing_path.casefold() == windows_path.casefold():
             return {
                 "ok": True, "already_configured": True,
-                "registry_key": r"HKLM\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition",
+                "registry_key": r"HKLM\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition",
                 "value": "Installed Path", "windows_path": windows_game_path,
                 "message": "Skyrim registry path already matches; verified system.reg without starting Proton.",
             }
 
-        registry_path = windows_path.replace("\\\\", "\\\\\\\\")
+        registry_path = windows_path.replace("\\", "\\\\")
         reg_text = (
-            "Windows Registry Editor Version 5.00\\n\\n"
-            "[HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\WOW6432Node\\\\Bethesda Softworks\\\\Skyrim Special Edition]\\n"
-            f'"Installed Path"="{registry_path}"\\n'
+            "Windows Registry Editor Version 5.00\n\n"
+            "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition]\n"
+            f'"Installed Path"="{registry_path}"\n'
         )
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".reg", delete=False) as handle:
             handle.write(reg_text)
@@ -133,7 +133,7 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
             )
         return {
             "ok": True, "already_configured": False,
-            "registry_key": r"HKLM\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition",
+            "registry_key": r"HKLM\SOFTWARE\WOW6432Node\Bethesda Softworks\Skyrim Special Edition",
             "value": "Installed Path", "windows_path": windows_game_path,
             "message": "Registered and verified Skyrim SE's path using one Proton invocation.",
         }
