@@ -825,23 +825,14 @@ class MainWindowSmokeTests(unittest.TestCase):
         }
         with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \
              patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \
-             patch("environment_workflow._steam_root_for_game", return_value=Path("/steam")), \
-             patch("environment_workflow.discover_wine_game_path", return_value={
-                 "ok": True, "drive": "T:",
-                 "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition",
+             patch("mo2_game_mapping.verify_mo2_game_mapping", return_value=({
+                 "ok": True, "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition",
                  "resolved_game_path": "/games/Skyrim Special Edition",
-             }), \
-             patch("environment_workflow.verify_wine_game_path", return_value={"ok": True}), \
-             patch("environment_workflow.synchronize_mo2_instance_game_paths", return_value={
-                 "ok": True, "updated": [], "unchanged": [],
-             }), \
-             patch("environment_workflow.configure_skyrim_se_registry", return_value={
-                 "ok": True, "windows_path": r"T:\\steamapps\\common\\Skyrim Special Edition",
-             }), \
+             }, ["MO2 Steam discovery verified"])), \
              patch("environment_workflow.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory):
             window = self._window()
-        self.assertFalse(window.install_button.isEnabled())
-        self.assertEqual(window.install_button.text(), "Use Existing MO2")
+        self.assertFalse(window.install_button.isVisible())
+        self.assertTrue(window.launch_mo2_button.isVisible())
         self.assertTrue(window.launch_game_button.isEnabled())
         self.assertIn("External (read-only)", window.mo2_panel.detail_label.text())
         self.assertIn("Default", window.mo2_panel.detail_label.text())
