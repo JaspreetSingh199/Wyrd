@@ -1,4 +1,4 @@
-"""Read-only launch diagnostics and Linux process monitoring."""
+"""Linux process discovery, launch attribution, and process identity checks."""
 from __future__ import annotations
 
 import os
