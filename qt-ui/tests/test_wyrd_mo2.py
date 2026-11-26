@@ -1507,7 +1507,7 @@ class WyrdMO2Tests(unittest.TestCase):
                     "source": str(source),
                     "sha256": __import__("hashlib").sha256(source.read_bytes()).hexdigest(),
                 }
-            with patch("wyrd_mo2._resolve_xact_dlls", return_value=sources):
+            with patch("audio_compatibility._resolve_xact_dlls", return_value=sources):
                 result = repair_audio_compatibility(home, confirmed=True)
             self.assertTrue(result["ok"], result)
             self.assertTrue(result["verified"])
@@ -1526,7 +1526,7 @@ class WyrdMO2Tests(unittest.TestCase):
         from wyrd_mo2 import repair_audio_compatibility
         with tempfile.TemporaryDirectory() as tmp:
             self._managed_prefix(Path(tmp))
-            with patch("wyrd_mo2._resolve_xact_dlls", return_value={}):
+            with patch("audio_compatibility._resolve_xact_dlls", return_value={}):
                 result = repair_audio_compatibility(Path(tmp), confirmed=True)
             self.assertFalse(result["ok"])
             self.assertFalse(result["modified"])
@@ -1541,7 +1541,7 @@ class WyrdMO2Tests(unittest.TestCase):
             outside = Path(tmp) / "external-target"
             outside.mkdir()
             syswow64.symlink_to(outside, target_is_directory=True)
-            with patch("wyrd_mo2._resolve_xact_dlls", return_value={
+            with patch("audio_compatibility._resolve_xact_dlls", return_value={
                 "xact": {"source": "/runtime/xact.dll"},
                 "xact_x64": {"source": "/runtime/xact_x64.dll"},
             }):
