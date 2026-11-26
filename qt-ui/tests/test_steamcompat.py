@@ -347,7 +347,7 @@ def test_steam_root_resolver_finds_owner_of_secondary_library(tmp_path):
     assert _steam_root_for_game(game, home) == steam.resolve()
 
 
-def test_dynamic_wine_path_uses_most_specific_existing_drive_mapping(tmp_path):
+def test_dynamic_wine_path_prefers_discovered_root_drive_over_legacy_library_alias(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
     (dosdevices / "z:").symlink_to("/", target_is_directory=True)
     (dosdevices / "t:").symlink_to(library, target_is_directory=True)
