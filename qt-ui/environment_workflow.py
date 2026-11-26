@@ -49,6 +49,26 @@ class EnvironmentWorkflowMixin:
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
+        self._set_scan_progress(58, "Verifying Proton drive mappings and synchronizing MO2 game paths…")
+        self.mo2_discovery_state = (
+            self._verify_mo2_game_mapping(
+                Path(self.game_state["game_dir"]).expanduser(),
+                self.proton_combo.currentData(),
+            )
+            if self.mo2_state.get("installed") and self.game_state.get("found")
+            else None
+        )
+        self._update_precheck(
+            2, "Skyrim prefix and MO2 installation",
+            bool(self.mo2_state.get("installed")),
+            self.mo2_state.get("message", "MO2 installation was not found."),
+        )
+        self.mo2_target_occupied = bool(
+            self.mo2_state.get("installed") or self.mo2_state.get("install")
+        )
+        self.reset_mo2_button.setEnabled(bool(
+            self.mo2_state.get("installed") and self.mo2_state.get("managed", True)
+        ))
 
     def _discover_mo2_instance_inventory(self) -> None:
         """Discover MO2 instances independently of executable installation checks."""
@@ -76,6 +96,7 @@ class EnvironmentWorkflowMixin:
 
     def _present_mo2_installation(self) -> None:
         """Render the current MO2 installation and instance summary in the UI."""
+        skyrim_instances = self.instance_state.get("skyrim_instances", [])
         if self.mo2_state.get("installed"):
             summary = self.instance_state.get("message", "MO2 instance inventory unavailable.")
             if self.mo2_discovery_state is not None:
