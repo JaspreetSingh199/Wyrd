@@ -8,14 +8,13 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QInputDialog, QDialog,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QInputDialog,
     QWidget, QTabWidget, QScrollArea,
 )
 
 from skyrim_detection import detect_skyrim
 from wyrd_mo2 import (
-    read_settings, write_settings, mark_first_run_completed,
-    reset_wyrd_settings,
+    read_settings, write_settings, reset_wyrd_settings,
 )
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 from launch_models import LaunchSession, GameProcess
@@ -27,7 +26,14 @@ from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
 from setup_workflow import SetupWorkflowMixin
 from ui_path_helpers import _steam_prefix_for_game_path, _same_filesystem_path
-class MainWindow(LaunchWorkflowMixin, EnvironmentWorkflowMixin, AudioWorkflowMixin, Mo2ManagementWorkflowMixin, SetupWorkflowMixin, QMainWindow):
+class MainWindow(
+    LaunchWorkflowMixin,
+    EnvironmentWorkflowMixin,
+    AudioWorkflowMixin,
+    Mo2ManagementWorkflowMixin,
+    SetupWorkflowMixin,
+    QMainWindow,
+):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")
