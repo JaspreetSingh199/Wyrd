@@ -1,4 +1,4 @@
-"""MO2 executable discovery and launch orchestration for Wyrd-managed prefixes."""
+"""MO2 launch handoff orchestration for Wyrd-managed prefixes."""
 from __future__ import annotations
 
 import json
@@ -7,12 +7,11 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from mo2_instances import inspect_mo2_instances, _resolve_windows_path
+from mo2_instances import inspect_mo2_instances
 from proton_runtime import (
     _runtime_environment, _steam_root_for_game, _prefix_ready,
     inspect_proton_build, inspect_wyrd_installation, managed_paths,
 )
-from steam_prefix import APP_ID
 
 
 def launch_mo2(home: Path | None = None, pick_instance: bool = False) -> dict:
