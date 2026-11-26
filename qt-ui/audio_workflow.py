@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from audio_compatibility import inspect_audio_compatibility
-from wyrd_mo2 import write_settings
+from wyrd_settings import write_settings
 
 
 class AudioWorkflowMixin:
