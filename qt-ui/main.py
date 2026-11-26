@@ -1096,7 +1096,7 @@ class MainWindow(QMainWindow):
             record = None
 
         # A missing/old registry is not a reason to disable a filesystem-discovered
-        # MO2 instance. The current scan and verified S: mapping own readiness.
+        # MO2 instance. The current scan and dynamically verified Proton game path own readiness.
         if (hasattr(self, "instance_state")
                 and hasattr(self, "launch_game_button")
                 and hasattr(self, "mo2_discovery_state")):
@@ -1767,7 +1767,7 @@ class MainWindow(QMainWindow):
         if not discovery or not discovery.get("ok"):
             QMessageBox.warning(
                 self, "MO2 game discovery is not verified",
-                "Wyrd could not verify MO2's S: Steam-library mapping. "
+                "Wyrd could not verify MO2's dynamically derived Proton game path. "
                 "The modded launch is blocked to avoid using a stale game location.\\n\\n"
                 + discovery.get("message", "Unknown Steam discovery mapping error."),
             )
@@ -1825,7 +1825,7 @@ class MainWindow(QMainWindow):
         if not discovery or not discovery.get("ok"):
             QMessageBox.warning(
                 self, "MO2 game discovery is not verified",
-                "Wyrd has not verified the Skyrim S: Steam-library mapping. "
+                "Wyrd has not verified the dynamically derived Skyrim Proton game path. "
                 "The modded launch is blocked until a successful refresh.\\n\\n"
                 + (discovery or {}).get("message", "No verified Steam discovery result is available."),
             )
