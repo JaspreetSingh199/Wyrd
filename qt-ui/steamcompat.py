@@ -376,11 +376,11 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
                 raise RuntimeError("Verified S: Steam-library mapping is missing or does not point to Skyrim's library.")
             library_root = resolved_game.parent.parent.parent
             windows_path = "S:" + str(resolved_game.relative_to(library_root)).replace("/", "\\")
-        registry_path = windows_path.replace("\\", "\\\\")
+        registry_path = windows_path.rstrip("\\").replace("\\", "\\\\") + "\\\\"
         reg_text = (
-            "Windows Registry Editor Version 5.00\n\n"
-            "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition]\n"
-            f'"Installed Path"="{registry_path}\\\n'
+            "Windows Registry Editor Version 5.00\\n\\n"
+            "[HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\WOW6432Node\\\\Bethesda Softworks\\\\Skyrim Special Edition]\\n"
+            f'"Installed Path"="{registry_path}"\\n'
         )
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".reg", delete=False) as handle:
             handle.write(reg_text)
@@ -395,6 +395,31 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
                 cwd=str(resolved_steam), env=env, capture_output=True,
                 text=True, timeout=120, check=False,
             )
+            if result.returncode != 0:
+                details = (result.stdout + "\\n" + result.stderr).strip()
+                raise RuntimeError(
+                    "Proton regedit failed to import Skyrim's registry path."
+                    + (" " + details[-2000:] if details else "")
+                )
+            query = subprocess.run(
+                [str(proton / "proton"), "run", "reg", "query",
+                 r"HKLM\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\Skyrim Special Edition",
+                 "/v", "Installed Path"],
+                cwd=str(resolved_steam), env=env, capture_output=True,
+                text=True, timeout=120, check=False,
+            )
+            if query.returncode != 0:
+                details = (query.stdout + "\\n" + query.stderr).strip()
+                raise RuntimeError(
+                    "Skyrim registry import could not be verified by reading Installed Path."
+                    + (" " + details[-2000:] if details else "")
+                )
+            expected_registry_value = windows_path.rstrip("\\\\") + "\\\\"
+            if expected_registry_value.casefold() not in query.stdout.casefold():
+                raise RuntimeError(
+                    "Skyrim registry read-back did not match the detected game path. "
+                    f"Expected {windows_path}; registry returned: {query.stdout.strip()[-1000:]}"
+                )
         finally:
             reg_path.unlink(missing_ok=True)
         if result.returncode != 0:
