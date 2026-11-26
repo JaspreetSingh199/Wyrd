@@ -293,8 +293,8 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
         if manifest.is_symlink() or not manifest.is_file():
             raise RuntimeError("The detected Steam library has no safe Skyrim AppID manifest.")
         manifest_text = manifest.read_text(encoding="utf-8", errors="replace")
-        app_id_match = re.search(r'"appid' + r'" + r'\s+"([^"]+)"', manifest_text)
-        install_dir_match = re.search(r'"installdir' + r'" + r'\s+"([^"]+)"', manifest_text)
+        app_id_match = re.search(r'"appid"\s+"([^"]+)"', manifest_text)
+        install_dir_match = re.search(r'"installdir"\s+"([^"]+)"', manifest_text)
         if (not app_id_match or app_id_match.group(1) != APP_ID
                 or not install_dir_match or install_dir_match.group(1) != resolved_game.name):
             raise RuntimeError("The Steam AppID manifest does not identify the detected Skyrim directory.")
@@ -312,7 +312,7 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
                 if not drive_root.is_dir():
                     continue
                 relative = resolved_game.relative_to(drive_root)
-                windows_path = match.group(1).upper() + ":\\" + str(relative).replace("/", "\\\\")
+                windows_path = match.group(1).upper() + ":\\" + str(relative).replace("/", "\\")
                 round_trip = _resolve_windows_path(windows_path, resolved_prefix)
                 if round_trip != resolved_game:
                     continue
