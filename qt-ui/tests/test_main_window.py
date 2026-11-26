@@ -828,7 +828,7 @@ if __name__ == "__main__":
         }
         with patch("environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False}), \
              patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value=external), \
-             patch("mo2_management_workflow._steam_root_for_game", return_value=Path("/steam")), \
+             patch("environment_workflow._steam_root_for_game", return_value=Path("/steam")), \
              patch("environment_workflow.discover_wine_game_path", return_value={
                  "ok": True, "drive": "T:",
                  "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition",
