@@ -26,13 +26,11 @@ from process_monitor import (
 )
 
 from proton_runtime import (
-    ProgressCallback, managed_paths, inspect_proton_build, discover_proton_builds,
+    ProgressCallback, PREFIX_DIR_NAME, managed_paths, inspect_proton_build, discover_proton_builds,
     reset_mo2_compatdata, inspect_wyrd_installation, _steam_root_for_game,
     _runtime_environment, _run_proton, _prefix_ready, _initialize_prefix,
 )
-APP_ID = "489830"
-PREFIX_DIR_NAME = "compatdata/mo2-skyrim"
-ProgressCallback = Callable[[int, str], None]
+from steam_prefix import APP_ID
 
 
 def _validated_wyrd_audio_prefix(home: Path | None = None) -> tuple[Path, dict]:
