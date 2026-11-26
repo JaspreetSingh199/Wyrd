@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-
 from skyrim_detection import detect_skyrim
 from proton_runtime import discover_proton_builds, _steam_root_for_game
 from steam_drive_mapping import discover_wine_game_path, verify_wine_game_path
