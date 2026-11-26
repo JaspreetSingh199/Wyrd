@@ -25,14 +25,18 @@ The GUI requires Python 3, venv/pip support, and network access on first run. Th
 The Qt entry point in `main.py` composes focused UI/workflow mixins. Domain
 operations remain outside the widgets:
 
-- `mo2_instances.py` discovers and validates MO2 instance configuration.
-- `mo2_storage.py` inspects configured storage locations without modifying them.
+- `mo2_instances.py` discovers and validates MO2 instance configuration;
+  `mo2_storage.py` inspects configured storage locations without modifying them.
+- `mo2_targets.py` resolves configured Skyrim/SKSE launch targets;
+  `mo2_launch.py` and `steam_mo2_launch.py` perform launch handoffs through
+  Skyrim's existing Steam AppID 489830 prefix.
 - `mo2_game_mapping.py` verifies the existing Proton drive mapping before
   synchronizing MO2 game paths and Bethesda registry metadata.
-- `mo2_launch.py` and `steam_mo2_launch.py` resolve and launch configured
-  MO2 targets through Skyrim's existing Steam AppID 489830 prefix.
 - `process_monitor.py` attributes game processes to a launch session;
   `launch_log_diagnostics.py` reads and classifies launch logs.
+- `wyrd_settings.py` owns Wyrd preference persistence. `wyrd_mo2.py` remains
+  a compatibility export module; the legacy copy operation is isolated in
+  `mo2_instance_copy.py` and is not part of normal discovery or launch.
 - `environment_workflow.py`, `launch_workflow.py`, and the other
   `*_workflow.py` modules coordinate UI state and user actions.
 
