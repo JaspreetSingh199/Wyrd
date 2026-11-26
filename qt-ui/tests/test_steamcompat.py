@@ -278,7 +278,7 @@ def test_external_launch_uses_skyrim_prefix_and_does_not_write_marker(monkeypatc
         captured["env"] = kwargs["env"]
         captured["cwd"] = kwargs["cwd"]
         return Process()
-    monkeypatch.setattr(steamcompat.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(steam_mo2_launch.subprocess, "Popen", fake_popen)
     before = exe.read_bytes()
     result = steamcompat.launch_external_mo2_in_skyrim_prefix(proton, game, tmp_path, "Skyrim Special Edition")
     assert result["ok"], result

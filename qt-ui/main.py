@@ -20,10 +20,9 @@ from wyrd_mo2 import (
     read_settings, write_settings, mark_first_run_completed,
     inspect_audio_compatibility, reset_wyrd_settings,
 )
-from steamcompat import (
-    discover_wine_game_path, configure_skyrim_se_registry,
-    synchronize_mo2_instance_game_paths, verify_wine_game_path,
-)
+from steam_drive_mapping import discover_wine_game_path, verify_wine_game_path
+from steam_game_registry import configure_skyrim_se_registry
+from mo2_registry import synchronize_mo2_instance_game_paths
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
