@@ -901,3 +901,23 @@ if __name__ == "__main__":
         window._update_active_instance_from_scan()
         self.assertTrue(window.launch_game_button.isEnabled())
         window.close()
+
+
+
+    def test_discovered_external_installation_executable_can_satisfy_launch_readiness(self):
+        window = self._window()
+        window.instance_state = {
+            "ok": True,
+            "instances": [{"name": "Skyrim Special Edition"}],
+            "skyrim_instances": [{"name": "Skyrim Special Edition"}],
+            "installation": {
+                "installed": True, "managed": False,
+                "executable": "/existing/MO2/ModOrganizer.exe",
+            },
+        }
+        window.mo2_state = {"installed": False, "managed": False}
+        window.mo2_discovery_state = {"ok": True}
+        window.startup_checks_complete = True
+        window._update_active_instance_from_scan()
+        self.assertTrue(window.launch_game_button.isEnabled())
+        window.close()
