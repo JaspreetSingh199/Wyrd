@@ -28,7 +28,8 @@ from wyrd_mo2 import (
     inspect_audio_compatibility, reset_wyrd_settings,
 )
 from steamcompat import (
-    install_mo2_into_skyrim_prefix, configure_steam_library_drive, configure_skyrim_se_registry, inspect_skyrim_prefix_mo2_installation,
+    install_mo2_into_skyrim_prefix, configure_steam_library_drive, configure_skyrim_se_registry,
+    synchronize_mo2_instance_game_paths, inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
     steam_compat_prefix, copy_wyrd_instance_to_skyrim_prefix,
@@ -859,8 +860,27 @@ class MainWindow(QMainWindow):
                     Path(self.mo2_state["prefix"]), game_path, steam_root
                 )
                 if self.mo2_discovery_state.get("ok"):
+                    sync_state = synchronize_mo2_instance_game_paths(
+                        Path(self.mo2_state["prefix"]), game_path,
+                        self.mo2_discovery_state["windows_game_path"],
+                    )
+                    self.mo2_discovery_state["instance_sync"] = sync_state
+                    if sync_state.get("ok"):
+                        changed = sync_state.get("updated", [])
+                        unchanged = sync_state.get("unchanged", [])
+                        self._log(
+                            "MO2 gamePath synchronization: "
+                            f"{len(changed)} updated, {len(unchanged)} already current; "
+                            + self.mo2_discovery_state["windows_game_path"]
+                        )
+                    else:
+                        self.mo2_discovery_state["ok"] = False
+                        self._log(
+                            "MO2 gamePath synchronization failed closed: "
+                            + sync_state.get("message", "unknown error")
+                        )
                     proton_value = self.proton_combo.currentData()
-                    if proton_value:
+                    if proton_value and self.mo2_discovery_state.get("ok"):
                         registry_state = configure_skyrim_se_registry(
                             Path(self.mo2_state["prefix"]), game_path, steam_root,
                             Path(proton_value),
