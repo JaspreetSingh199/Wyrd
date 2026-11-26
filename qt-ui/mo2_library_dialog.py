@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
     QInputDialog, QVBoxLayout, QWidget, QStackedWidget,
 )
@@ -33,7 +33,7 @@ def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton
     return info
 
 
-class Mo2LibraryDialog(QWidget):
+class Mo2LibraryDialog(QFrame):
     """Compact Environment widget for finding and selecting MO2 instances."""
 
     def __init__(self, parent=None, *, prefix_path="", install_path="", game_path="", proton_path="", selected_instance_id=""):
@@ -53,9 +53,10 @@ class Mo2LibraryDialog(QWidget):
         self.on_launch_requested = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        self.intro = QLabel("Your Skyrim environments. Each one keeps its own MO2 instance and mod setup.")
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
+        self.intro = QLabel("SKYRIM ENVIRONMENTS")
+        self.intro.setObjectName("section")
         self.intro.setWordWrap(True)
         layout.addWidget(self.intro)
         self.setup_status = QLabel()
@@ -66,9 +67,9 @@ class Mo2LibraryDialog(QWidget):
         # MO2 instances are discovered automatically by the parent scan. Do not
         # expose a second create/register workflow here: it duplicated discovery
         # and previously referenced a removed create_environment handler.
-        self.refresh_button = QPushButton("Refresh MO2 scan")
+        self.refresh_button = QPushButton("Refresh instances")
         self.refresh_button.setToolTip(
-            "Rescan the selected MO2 installation for Skyrim Special Edition instances."
+            "Rescan the detected Skyrim Proton prefix and MO2 installation for configured instances."
         )
         self.refresh_button.clicked.connect(self.discover)
         environment_entry_actions = QHBoxLayout()
