@@ -1423,7 +1423,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
 
     def launch_mo2_gui(self) -> None:
-        """Open the detected MO2 installation in Skyrim's existing Proton prefix."""
+        """Choose a discovered MO2 instance, then launch that instance in Skyrim's Proton prefix."""
         try:
             executable = Path(self.mo2_state.get("executable", "")).expanduser()
             game_path = Path(self.game_state.get("game_dir", "")).expanduser()
@@ -1438,17 +1438,65 @@ class MainWindow(QMainWindow):
             proton = Path(proton_value).expanduser()
             if proton.is_symlink() or not (proton / "proton").is_file():
                 raise RuntimeError("The selected Proton runtime is no longer valid.")
+
+            # Refresh the read-only inventory at the moment the user asks to
+            # launch. Never register, rewrite, copy, or migrate an instance.
+            inventory = inspect_any_skyrim_prefix_mo2_instances(game_path)
+            self.instance_state = inventory
+            instances = inventory.get("instances", [])
+            if not inventory.get("ok") or not instances:
+                details = inventory.get("message", "No MO2 instances were found.")
+                errors = inventory.get("errors", [])
+                if errors:
+                    details += "\\n\\nScan details:\\n" + "\\n".join(errors[:8])
+                QMessageBox.information(
+                    self, "No MO2 instances detected",
+                    details + "\\n\\nWyrd has not changed your MO2 installation or instance data.",
+                )
+                self._log("MO2 instance picker unavailable: " + details.replace("\\n", " | "))
+                return
+
+            choices = [
+                f'{item["name"]} — {item.get("game_name") or "Game not identified"}'
+                + (" [Skyrim SE]" if item.get("is_skyrim_se") else " [not matched to Skyrim SE]")
+                for item in instances
+            ]
+            selected, accepted = QInputDialog.getItem(
+                self, "Launch Mod Organizer 2",
+                "Choose the existing MO2 instance to open:",
+                choices, 0, False,
+            )
+            if not accepted or not selected:
+                return
+            selected_index = choices.index(selected)
+            instance = instances[selected_index]
+            if not instance.get("is_skyrim_se"):
+                answer = QMessageBox.warning(
+                    self, "Instance is not verified for Skyrim SE",
+                    f'"{instance["name"]}" is configured for '
+                    f'{instance.get("game_name") or "an unverified game"}.\\n\\n'
+                    "Open it anyway? This will launch MO2 only; Wyrd will not launch Skyrim through this instance.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+
             steam_root = _steam_root_for_game(game_path, Path.home())
             if not steam_root:
                 raise RuntimeError("Could not identify the Steam library containing Skyrim.")
             env = _runtime_environment(proton, Path(steam_root), prefix)
             process = subprocess.Popen(
-                [str(proton / "proton"), "run", str(executable)],
+                [str(proton / "proton"), "run", str(executable),
+                 "--instance", instance["name"]],
                 cwd=str(executable.parent), env=env, stdin=None, stdout=None,
                 stderr=None, start_new_session=True,
             )
-            self._log(f"MO2 launch handoff started (PID {process.pid}).")
-            self.progress_label.setText("MO2 launch handoff started.")
+            self._log(
+                f'MO2 instance launch handoff started for "{instance["name"]}" '
+                f'(PID {process.pid}).'
+            )
+            self.progress_label.setText(f'Launching MO2 instance: {instance["name"]}')
         except Exception as error:
             self._log(f"MO2 launch failed: {error}")
             QMessageBox.warning(self, "Launch MO2", str(error))
