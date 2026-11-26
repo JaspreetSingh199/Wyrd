@@ -104,22 +104,31 @@ class Mo2LibraryDialog(QFrame):
     def _show_inventory(self):
         self.instances.clear()
         inventory = getattr(self.parent(), "instance_state", {}) or {}
-        instances = inventory.get("skyrim_instances", [])
+        # Show every instance discovered by the conservative prefix scan.
+        # Skyrim classification is a separate property: hiding non-matching
+        # instances made the readiness checklist disagree with this panel.
+        instances = inventory.get("instances", [])
         for instance in instances:
             name = instance.get("name", "Unnamed MO2 instance")
             profile = instance.get("selected_profile") or "No profile selected"
-            row = QListWidgetItem(f"{name} · {profile}")
+            classification = (
+                "Skyrim SE"
+                if instance.get("is_skyrim_se")
+                else f"Not matched to Skyrim SE · {instance.get('game_name') or 'game unknown'}"
+            )
+            row = QListWidgetItem(f"{name} · {profile} · {classification}")
             row.setData(Qt.ItemDataRole.UserRole, instance)
             self.instances.addItem(row)
         self.instances.setVisible(bool(instances))
+        skyrim_count = len(inventory.get("skyrim_instances", []))
         if instances:
             self.setup_status.setText(
-                f"Automatically discovered {len(instances)} Skyrim MO2 instance(s). "
-                "Select one to inspect it; no Wyrd registration is needed."
+                f"Discovered {len(instances)} MO2 instance(s); {skyrim_count} match Skyrim SE. "
+                "Select an instance to inspect it. Discovery is read-only; no Wyrd registration is needed."
             )
         else:
             self.setup_status.setText(
-                inventory.get("message", "No Skyrim Special Edition MO2 instances were found.")
+                inventory.get("message", "No MO2 instances were found in the known prefix locations.")
             )
 
     def _show_selected(self, row: int):
@@ -360,22 +369,30 @@ class Mo2AdvancedSettings(QWidget):
         widget.clear()
         parent = self.parent()
         inventory = getattr(parent, "instance_state", {}) or {}
-        instances = inventory.get("skyrim_instances", [])
+        # Keep Advanced → Detected instances consistent with the main picker:
+        # list all scanned instances and explicitly mark the Skyrim match result.
+        instances = inventory.get("instances", [])
         for instance in instances:
             name = instance.get("name", "Unnamed MO2 instance")
             profile = instance.get("selected_profile") or "No profile selected"
-            row = QListWidgetItem(f"{name} · {profile}")
+            classification = (
+                "Skyrim SE"
+                if instance.get("is_skyrim_se")
+                else f"Not matched to Skyrim SE · {instance.get('game_name') or 'game unknown'}"
+            )
+            row = QListWidgetItem(f"{name} · {profile} · {classification}")
             row.setData(Qt.ItemDataRole.UserRole, instance)
             widget.addItem(row)
         if instances:
             widget.setCurrentRow(0)
             summary.setText(
-                f"Automatically discovered {len(instances)} Skyrim Special Edition instance(s). "
-                "The scan reads MO2 directly; it does not create Wyrd registration records."
+                f"Discovered {len(instances)} MO2 instance(s); "
+                f"{len(inventory.get('skyrim_instances', []))} match Skyrim SE. "
+                "Read-only scan; no Wyrd registration records are created."
             )
         else:
             summary.setText(
-                inventory.get("message", "No Skyrim Special Edition instances were found in the detected MO2 installation.")
+                inventory.get("message", "No MO2 instances were found in the known prefix locations.")
             )
 
 
