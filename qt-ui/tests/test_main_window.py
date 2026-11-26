@@ -807,10 +807,6 @@ class MainWindowSmokeTests(unittest.TestCase):
 
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_external_mo2_is_shown_as_read_only_and_disables_install(self):
         external = {
             "installed": True, "managed": False,
@@ -981,3 +977,6 @@ if __name__ == "__main__":
             self.assertEqual(popen.call_args.args[0][-1], "--pick")
             warning.assert_not_called()
         window.close()
+
+if __name__ == "__main__":
+    unittest.main()
