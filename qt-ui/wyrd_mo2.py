@@ -671,9 +671,12 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
     """
     users = prefix_root / "pfx/drive_c/users"
     roots: list[Path] = []
-    if users.is_dir():
+    if users.is_dir() and not users.is_symlink():
         try:
-            user_dirs = [entry for entry in users.iterdir() if entry.is_dir()]
+            user_dirs = [
+                entry for entry in users.iterdir()
+                if entry.is_dir() and not entry.is_symlink()
+            ]
         except OSError:
             user_dirs = []
         for user_dir in user_dirs:
@@ -682,12 +685,21 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
                 user_dir / "AppData/Local/ModOrganizer",
                 user_dir / "AppData/Roaming/ModOrganizer",
                 user_dir / "Documents/Modding/ModOrganizer",
-                # Legacy/alternate nested layouts remain inventory-only.
+                # Some layouts place named instances beneath instances/.
                 user_dir / "AppData/Local/ModOrganizer/instances",
                 user_dir / "AppData/Roaming/ModOrganizer/instances",
                 user_dir / "Documents/Modding/ModOrganizer/instances",
             )
-            roots.extend(path for path in candidates if path.is_dir() and not path.is_symlink())
+            for candidate in candidates:
+                if candidate.is_symlink() or not candidate.is_dir():
+                    continue
+                try:
+                    candidate.resolve(strict=True).relative_to(
+                        prefix_root.resolve(strict=True)
+                    )
+                except (OSError, ValueError, RuntimeError):
+                    continue
+                roots.append(candidate)
 
     # Restrict portable discovery to the explicitly supplied Wyrd-owned install
     # root. The root itself may be the active portable instance; instances/
