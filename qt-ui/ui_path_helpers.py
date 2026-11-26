@@ -30,7 +30,7 @@ def _same_filesystem_path(left: str | os.PathLike | None,
         return os.path.normpath(os.path.expanduser(str(left))) == os.path.normpath(os.path.expanduser(str(right)))
 
 
-def initial_mo2_dialog_paths(mo2_state: dict, saved_settings: dict) -> tuple[str, str, str]:
+def initial_mo2_dialog_paths(mo2_state: dict) -> tuple[str, str, str]:
     """Resolve initial dialog paths without putting discovery logic in page construction."""
     from skyrim_detection import detect_skyrim
 
