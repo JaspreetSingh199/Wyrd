@@ -1,6 +1,7 @@
 """Read-only launch preflight checks and confirmation UI for MainWindow."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from mo2_instances import inspect_mo2_instances
+from steam_prefix import steam_compat_prefix
 
 
 class LaunchPreflightWorkflowMixin:
