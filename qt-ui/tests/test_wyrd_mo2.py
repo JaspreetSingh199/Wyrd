@@ -1507,3 +1507,27 @@ class WyrdMO2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+    def test_mo2_instance_roots_ignore_symlinked_users_and_escape_roots(self):
+        from wyrd_mo2 import _instance_roots
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "compatdata/489830"
+            users = prefix / "pfx/drive_c/users"
+            users.mkdir(parents=True)
+            safe_user = users / "steamuser"
+            safe_root = safe_user / "AppData/Local/ModOrganizer"
+            safe_root.mkdir(parents=True)
+            outside = root / "outside"
+            outside.mkdir()
+            (users / "linked-user").symlink_to(outside, target_is_directory=True)
+            (safe_user / "AppData/Roaming").mkdir(parents=True)
+            (safe_user / "AppData/Roaming/ModOrganizer").symlink_to(
+                outside, target_is_directory=True
+            )
+            roots = _instance_roots(prefix)
+            self.assertIn(safe_root, roots)
+            self.assertNotIn(outside, roots)
+            self.assertTrue(all(not item.is_symlink() for item in roots))
