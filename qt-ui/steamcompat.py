@@ -165,8 +165,12 @@ def synchronize_mo2_instance_game_paths(
         for user in sorted(users.iterdir(), key=lambda item: item.name.casefold()):
             if user.is_symlink() or not user.is_dir():
                 continue
-            root = user / "AppData/Local/ModOrganizer"
-            if root.is_symlink() or not root.is_dir():
+            appdata = user / "AppData"
+            local = appdata / "Local"
+            root = local / "ModOrganizer"
+            if any(component.is_symlink() for component in (appdata, local, root)):
+                continue
+            if not root.is_dir():
                 continue
             for instance in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
                 if instance.is_symlink() or not instance.is_dir():
