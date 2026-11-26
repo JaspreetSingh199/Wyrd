@@ -15,7 +15,6 @@ from steam_mo2_discovery import (
     inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances,
 )
-from steam_prefix import steam_compat_prefix
 from ui_path_helpers import _same_filesystem_path
 
 

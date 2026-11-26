@@ -972,7 +972,7 @@ if __name__ == "__main__":
                 }
             }
             with patch("main._steam_prefix_for_game_path", return_value=Path(tmp) / "prefix"), patch(
-                "environment_workflow._steam_root_for_game", return_value=Path(tmp)
+                "main._steam_root_for_game", return_value=Path(tmp)
             ), patch("main._runtime_environment", return_value={}), patch(
                 "main.subprocess.Popen"
             ) as popen, patch("main.QMessageBox.warning") as warning:
