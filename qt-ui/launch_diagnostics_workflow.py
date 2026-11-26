@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from proton_runtime import managed_paths
-from process_monitor import read_launch_diagnostics
+from launch_log_diagnostics import read_launch_diagnostics
 from PySide6.QtWidgets import QMessageBox
 
 
