@@ -622,19 +622,62 @@ def inspect_external_skyrim_prefix_mo2_installation(game_path: Path, home: Path 
 
 
 def inspect_any_skyrim_prefix_mo2_instances(game_path: Path, home: Path | None = None) -> dict:
-    """Read-only inventory for either Wyrd-managed or external MO2 in Skyrim's prefix."""
-    managed = inspect_skyrim_prefix_mo2_installation(game_path, home)
-    state = managed if managed.get("installed") else inspect_external_skyrim_prefix_mo2_installation(game_path, home)
-    if not state.get("installed"):
-        return {"ok": False, "managed": False, "instances": [], "skyrim_instances": [],
-                "message": state.get("message", "MO2 installation was not found.")}
-    inventory = inspect_mo2_instances(
-        Path(state["prefix"]), Path(state["install"]), require_managed=False,
-        detected_game_path=Path(game_path).expanduser(),
-    )
-    inventory["managed"] = bool(state.get("managed", managed.get("installed", False)))
-    inventory["installation"] = state
-    return inventory
+    """Discover MO2 instances independently of the MO2 executable installation.
+
+    The AppID 489830 prefix is the discovery boundary. MO2 instances are
+    user data and can outlive, or live separately from, the executable Wyrd
+    recognizes at its conventional install path. This function therefore
+    validates the Steam prefix first, then inventories known MO2 instance
+    roots even when no MO2 installation is registered at that path.
+    """
+    game = Path(game_path).expanduser()
+    if not game.is_dir() or game.is_symlink():
+        return {"ok": False, "managed": False, "instances": [],
+                "skyrim_instances": [],
+                "message": "Skyrim game directory is missing or unsafe; MO2 discovery was not run."}
+    try:
+        steam_root = _steam_root_for_game(game, (home or Path.home()).expanduser())
+        prefix = steam_compat_prefix(steam_root)
+        if prefix.is_symlink() or not prefix.is_dir():
+            return {"ok": False, "managed": False, "instances": [],
+                    "skyrim_instances": [],
+                    "message": "Skyrim's Steam compatdata prefix is missing or unsafe; MO2 instances cannot be inspected."}
+        prefix.resolve(strict=True).relative_to(steam_root.resolve(strict=True))
+        users_root = prefix / "pfx/drive_c/users"
+        if users_root.is_symlink() or not users_root.is_dir():
+            return {"ok": False, "managed": False, "instances": [],
+                    "skyrim_instances": [],
+                    "message": "Skyrim's Proton Wine-user directory is missing or unsafe; MO2 instances cannot be inspected."}
+        managed = inspect_skyrim_prefix_mo2_installation(game, home)
+        installation = (
+            managed if managed.get("installed")
+            else inspect_external_skyrim_prefix_mo2_installation(game, home)
+        )
+        install_root = (
+            Path(installation["install"])
+            if installation.get("installed") and installation.get("install")
+            else None
+        )
+        inventory = inspect_mo2_instances(
+            prefix, install_root, require_managed=False,
+            detected_game_path=game,
+        )
+        inventory["managed"] = bool(installation.get("managed", False))
+        inventory["installation"] = installation
+        if not installation.get("installed"):
+            inventory["installation_message"] = installation.get(
+                "message", "No conventional MO2 executable installation was identified."
+            )
+        if not inventory.get("instances"):
+            inventory["message"] = (
+                "No MO2 instances were found in the known Skyrim-prefix instance locations. "
+                "MO2 executable discovery is independent and is not required for this scan."
+            )
+        return inventory
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"ok": False, "managed": False, "instances": [],
+                "skyrim_instances": [],
+                "message": f"Could not safely inspect Skyrim's MO2 prefix: {error}"}
 
 
 def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
