@@ -380,7 +380,6 @@ class MainWindow(QMainWindow):
         self.mo2_advanced_widget = Mo2AdvancedSettings(
             self, selected_instance_id=self.selected_mo2_instance_id
         )
-        self.mo2_advanced_widget.on_registry_changed = self._on_mo2_registry_changed
 
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
@@ -566,7 +565,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(maintenance_scroll, "MAINTENANCE")
 
         self.setCentralWidget(root)
-        self._restore_registered_instance()
+        self._update_active_instance_from_scan()
         self._restoring_selection = False
         # Let Qt paint the startup checklist before any filesystem/Steam scans
         # begin. refresh_all updates each row as its read-only check completes.
@@ -1095,64 +1094,8 @@ class MainWindow(QMainWindow):
         self.launch_game_button.setEnabled(ready)
         self.launch_direct_button.setEnabled(bool(self.game_state.get("found") and not busy))
 
-    def _restore_registered_instance(self) -> dict | None:
-        """Load legacy associations for maintenance, never use them as launch authority."""
-        from wyrd_mo2_registry_service import RegistryService
-        try:
-            registry = RegistryService(managed_paths()["config"] / "mo2-registry.json").load()
-            self.registered_instance_registry = registry
-            record = next(
-                (item for item in registry.get("instances", [])
-                 if item.get("id") == self.selected_mo2_instance_id),
-                None,
-            )
-        except Exception as error:
-            self._log(f"Could not load legacy MO2 associations: {error}")
-            self.registered_instance_registry = None
-            record = None
-
-        # A missing/old registry is not a reason to disable a filesystem-discovered
-        # MO2 instance. The current scan and dynamically verified Proton game path own readiness.
-        if (hasattr(self, "instance_state")
-                and hasattr(self, "launch_game_button")
-                and hasattr(self, "mo2_discovery_state")):
-            self._update_active_instance_from_scan()
-        return record
-
-    def _set_active_instance(self, record: dict | None) -> None:
-        # Passing None explicitly clears a primary selection that was unregistered.
-        self.selected_mo2_instance_id = record.get("id", "") if record else ""
-        settings = dict(self._saved_settings)
-        settings["selected_mo2_instance_id"] = self.selected_mo2_instance_id
-        self._saved_settings = settings
-        # The restore helper owns launch-button readiness; do not enable an incomplete association.
-        self._restore_registered_instance()
-        # Preserve the normal Proton/game/audio preferences while saving the
-        # additional selection key using the same atomic settings-file pattern.
-        import json, os, tempfile
-        path = managed_paths()["settings"]
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            payload = {}
-        payload["selected_mo2_instance_id"] = self.selected_mo2_instance_id
-        fd, temp_name = tempfile.mkstemp(prefix=".wyrd-settings-", dir=str(path.parent))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump(payload, handle, indent=2)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_name, path)
-        except Exception:
-            try:
-                os.unlink(temp_name)
-            except OSError:
-                pass
-            raise
-
     def manage_mo2_library(self) -> None:
-        """Refresh context for the embedded Environment and Advanced widgets."""
+        """Refresh the read-only MO2 inventory widgets from the current scan."""
         saved_game = self.game_state.get("game_dir", "")
         prefix = _steam_prefix_for_game_path(saved_game) if saved_game else None
         install_path = self.mo2_state.get("install") or (
@@ -1169,16 +1112,6 @@ class MainWindow(QMainWindow):
         self.mo2_library_widget.update_context(**context)
         self.mo2_advanced_widget.update_context(**context)
         self.mo2_advanced_widget._refresh_registered()
-
-    def _on_mo2_registry_changed(self, record: dict | None, changed: bool = False) -> None:
-        if record:
-            self._set_active_instance(record)
-        elif changed:
-            self._set_active_instance(None)
-        self.mo2_advanced_widget.preferred_instance_id = self.selected_mo2_instance_id
-        self.mo2_advanced_widget._refresh_registered()
-        self.mo2_library_widget.preferred_instance_id = self.selected_mo2_instance_id
-        self._restore_registered_instance()
 
     def _restore_saved_selection(self) -> None:
         """Restore the last selected Proton when it is still discoverable."""
@@ -1290,21 +1223,15 @@ class MainWindow(QMainWindow):
             return
 
         # Reset preferences, but keep the user's existing MO2 connection intact.
-        active_instance_id = self.selected_mo2_instance_id or self._saved_settings.get("selected_mo2_instance_id", "")
-        self._saved_settings = {
-            "selected_mo2_instance_id": active_instance_id,
-            "first_run_completed": False,
-        } if active_instance_id else {"first_run_completed": True}
+        self._saved_settings = {"first_run_completed": False}
         self._saved_game_path = None
-        self.selected_mo2_instance_id = active_instance_id
+        self.selected_mo2_instance_id = ""
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
         if self.proton_combo.count():
             self.proton_combo.setCurrentIndex(0)
         self.proton_combo.blockSignals(False)
-        self.mo2_library_widget.preferred_instance_id = active_instance_id
-        if active_instance_id:
-            self._set_active_instance({"id": active_instance_id})
+        self.mo2_library_widget.preferred_instance_id = ""
         # Do not schedule onboarding in this session. Leave the completion flag
         # clear so normal startup offers setup on the next app launch.
         self._saved_settings["first_run_completed"] = False
@@ -1353,7 +1280,7 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "MO2 removal incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
-        self._restore_registered_instance()
+        self._update_active_instance_from_scan()
 
     def check_mo2_installation(self) -> None:
         """Show a read-only inventory of Skyrim prefix, MO2 files and instances."""
