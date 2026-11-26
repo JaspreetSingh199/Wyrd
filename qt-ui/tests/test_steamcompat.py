@@ -52,9 +52,10 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     proton.mkdir()
     game.mkdir()
     metadata = {"proton": str(proton), "steam_root": str(root), "game_path": str(game)}
-    monkeypatch.setattr(steamcompat, "inspect_wyrd_installation", lambda home: {
-        "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"
-    )})
+    monkeypatch.setattr(steam_mo2_discovery, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {
+        "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"),
+        "prefix": str(steam_prefix), "install": str(install), "steam_root": str(root),
+    })
     monkeypatch.setattr(steam_mo2_launch, "inspect_proton_build", lambda path: {"ok": True})
     monkeypatch.setattr(steam_mo2_launch, "_runtime_environment", lambda proton, root, prefix: {})
     class Proc:
@@ -65,7 +66,7 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
         calls["env"] = kwargs["env"]
         calls["cwd"] = kwargs["cwd"]
         return Proc()
-    monkeypatch.setattr(steamcompat.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(steam_mo2_launch.subprocess, "Popen", fake_popen)
     result = steamcompat.launch_mo2_in_skyrim_prefix(tmp_path)
     assert result["ok"]
     assert result["pid"] == 1234
