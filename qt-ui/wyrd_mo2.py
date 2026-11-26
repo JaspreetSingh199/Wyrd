@@ -706,9 +706,9 @@ def _same_mo2_game_path(raw_game_path: str, prefix_root: Path,
                          detected_game_path: Path | None = None) -> bool:
     """Recognize Skyrim SE when MO2 gamePath resolves to the detected install.
 
-    MO2 persists Windows paths. Resolve Z: through Proton and S: through the
-    prefix mapping, then require an exact match with the detected Steam game
-    directory. A directory merely containing SkyrimSE.exe is not sufficient.
+    MO2 persists Windows paths. Resolve the selected drive through the active
+    Proton prefix's dosdevices mapping, then require an exact match with the
+    detected Steam game directory. A stale game label is not sufficient.
     """
     raw = (raw_game_path or "").strip().strip('"')
     if not raw:
@@ -1098,19 +1098,23 @@ def _resolve_windows_path(value: str, prefix_root: Path,
     and the resolved target is treated as that drive's root.
     """
     raw = value.strip().strip('"')
-    match = re.match(r"^([A-Za-z]):(?:[\\\\/])?(.*)$", raw)
-    if not match:
+    if len(raw) < 2 or raw[1] != ":" or not raw[0].isalpha():
         return None
-    drive_letter, relative = match.groups()
+    drive_letter = raw[0].casefold()
+    separator = chr(92)
+    relative = raw[2:].lstrip(separator + "/")
     dosdevices = Path(prefix_root).expanduser() / "pfx/dosdevices"
-    drive_link = dosdevices / f"{drive_letter.casefold()}:"
+    drive_link = dosdevices / f"{drive_letter}:"
     try:
-        if dosdevices.is_symlink() or drive_link.is_symlink() is False:
+        if dosdevices.is_symlink() or not drive_link.is_symlink():
             return None
         drive_root = drive_link.resolve(strict=True)
         if not drive_root.is_dir():
             return None
-        parts = [part for part in re.split(r"[\\\\/]+", relative) if part not in ("", ".")]
+        parts = [
+            part for part in relative.replace("/", separator).split(separator)
+            if part not in ("", ".")
+        ]
         candidate = drive_root.joinpath(*parts)
         resolved = candidate.resolve(strict=True)
         resolved.relative_to(drive_root)
