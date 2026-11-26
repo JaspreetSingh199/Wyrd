@@ -1158,8 +1158,6 @@ class MainWindow(LaunchWorkflowMixin, QMainWindow):
             prefix = Path(prefix_value).expanduser() if prefix_value else None
             if prefix is None:
                 try:
-                    from steamcompat import steam_compat_prefix
-                    from wyrd_mo2 import _steam_root_for_game
                     prefix = steam_compat_prefix(_steam_root_for_game(game, Path.home()))
                 except Exception as error:
                     lines.append(f"Steam prefix: UNKNOWN ({error})")

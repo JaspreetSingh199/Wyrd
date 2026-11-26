@@ -157,9 +157,6 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     STEAM_COMPAT_APP_ID and STEAM_COMPAT_DATA_PATH. It never creates or resets
     the Steam prefix.
     """
-    from wyrd_mo2 import inspect_skyrim_launch_targets
-    import uuid
-
     home = (home or Path.home()).expanduser()
     game = Path(game_path).expanduser()
     proton = Path(proton_path).expanduser()
