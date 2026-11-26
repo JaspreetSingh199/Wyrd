@@ -15,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import steam_mo2_launch
+import steam_game_registry
 from steam_prefix import steam_compat_prefix
 from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
 
