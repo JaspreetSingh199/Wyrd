@@ -23,8 +23,6 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
     The installer is interactive so the user can review its options. Wyrd supplies
     the intended C:\\Modding\\MO2 target and never creates or resets a prefix.
     """
-    import urllib.request
-
     home = (home or Path.home()).expanduser()
     proton = Path(proton_path).expanduser().resolve()
     game = Path(game_path).expanduser().resolve()
@@ -132,9 +130,6 @@ def reset_wyrd_mo2(home: Path | None = None, game_path: Path | None = None) -> d
     Global MO2 instances and all user data are deliberately left in place.
     Wyrd has no instance-registration or storage-ownership system.
     """
-    import json
-    import shutil
-
     home = (home or Path.home()).expanduser()
     game = Path(game_path).expanduser() if game_path is not None else _game_path_for_wyrd_install(home)
     state = inspect_skyrim_prefix_mo2_installation(game, home)

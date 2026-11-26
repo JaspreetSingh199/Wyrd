@@ -29,8 +29,8 @@ from steam_mo2_launch import (
     launch_external_mo2_in_skyrim_prefix,
     launch_mo2_in_skyrim_prefix,
     launch_skyrim_via_mo2_in_skyrim_prefix,
-from steam_mo2_management import install_mo2_into_skyrim_prefix, reset_wyrd_mo2
 )
+from steam_mo2_management import install_mo2_into_skyrim_prefix, reset_wyrd_mo2
 
 
 
