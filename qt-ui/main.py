@@ -28,7 +28,7 @@ from wyrd_mo2 import (
     inspect_audio_compatibility, reset_wyrd_settings,
 )
 from steamcompat import (
-    install_mo2_into_skyrim_prefix, configure_steam_library_drive, configure_skyrim_se_registry,
+    install_mo2_into_skyrim_prefix, discover_wine_game_path, configure_skyrim_se_registry,
     synchronize_mo2_instance_game_paths, inspect_skyrim_prefix_mo2_installation,
     inspect_skyrim_prefix_mo2_instances, inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances, launch_skyrim_via_mo2_in_skyrim_prefix,
@@ -856,7 +856,7 @@ class MainWindow(QMainWindow):
             try:
                 game_path = Path(self.game_state["game_dir"]).expanduser()
                 steam_root = _steam_root_for_game(game_path, Path.home())
-                self.mo2_discovery_state = configure_steam_library_drive(
+                self.mo2_discovery_state = discover_wine_game_path(
                     Path(self.mo2_state["prefix"]), game_path, steam_root
                 )
                 if self.mo2_discovery_state.get("ok"):
@@ -883,7 +883,7 @@ class MainWindow(QMainWindow):
                     if proton_value and self.mo2_discovery_state.get("ok"):
                         registry_state = configure_skyrim_se_registry(
                             Path(self.mo2_state["prefix"]), game_path, steam_root,
-                            Path(proton_value),
+                            Path(proton_value), self.mo2_discovery_state["windows_game_path"],
                         )
                         self.mo2_discovery_state["registry"] = registry_state
                         if registry_state.get("ok"):
