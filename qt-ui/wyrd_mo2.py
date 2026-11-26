@@ -768,7 +768,8 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
 
     discovered = []
     errors = []
-    for root in _instance_roots(prefix_root, install_root):
+    scan_roots = _instance_roots(prefix_root, install_root)
+    for root in scan_roots:
         try:
             entries = sorted(root.iterdir(), key=lambda item: item.name.casefold())
         except OSError as error:
@@ -935,6 +936,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
         "ok": True, "managed": bool(require_managed),
         "instances": instances,
         "skyrim_instances": skyrim_instances,
+        "scan_roots": [str(root) for root in scan_roots],
         "errors": errors,
         "message": (
             f"Found {len(instances)} MO2 instance(s), including "
