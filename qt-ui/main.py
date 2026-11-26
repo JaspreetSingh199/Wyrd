@@ -303,6 +303,12 @@ class MainWindow(QMainWindow):
         # centered text was unreadable and visually collided with the checks.
         self.precheck_progress.hide()
         setup_layout.addWidget(self.precheck_panel)
+        self.check_mo2_button = QPushButton("Check installation")
+        self.check_mo2_button.setObjectName("secondaryAction")
+        self.check_mo2_button.setToolTip(
+            "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
+        )
+        self.check_mo2_button.clicked.connect(self.check_mo2_installation)
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
@@ -379,12 +385,6 @@ class MainWindow(QMainWindow):
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
-        self.check_mo2_button = QPushButton("Check installation")
-        self.check_mo2_button.setObjectName("secondaryAction")
-        self.check_mo2_button.setToolTip(
-            "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
-        )
-        self.check_mo2_button.clicked.connect(self.check_mo2_installation)
         self.launch_game_button = QPushButton("Launch Modded Skyrim")
         self.launch_game_button.setObjectName("primaryAction")
         self.launch_game_button.setMinimumHeight(46)
