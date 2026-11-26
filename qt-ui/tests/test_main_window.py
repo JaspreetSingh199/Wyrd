@@ -75,6 +75,34 @@ class MainWindowSmokeTests(unittest.TestCase):
 
 
 
+    def test_mo2_environment_panels_read_inventory_from_main_window_after_qt_reparenting(self):
+        instance = {
+            "name": "Skyrim Special Edition",
+            "path": "/prefix/ModOrganizer/Skyrim Special Edition",
+            "game_name": "Skyrim Special Edition",
+            "is_skyrim_se": True,
+        }
+        inventory = {
+            "ok": True,
+            "instances": [instance],
+            "skyrim_instances": [instance],
+            "message": "Found 1 MO2 instance(s), including 1 Skyrim SE instance(s).",
+        }
+        window = self._window(inventory=inventory)
+        try:
+            # Adding these widgets to page layouts reparents them away from
+            # MainWindow. Their inventory owner must remain the main window.
+            self.assertIsNot(window.mo2_library_widget.parent(), window)
+            self.assertIs(window.mo2_library_widget._owner_window, window)
+            self.assertIs(window.mo2_advanced_widget._owner_window, window)
+            window.mo2_library_widget._show_inventory()
+            window.mo2_advanced_widget._refresh_registered()
+            self.assertEqual(window.mo2_library_widget.instances.count(), 1)
+            self.assertEqual(window.mo2_advanced_widget.detected_instances.count(), 1)
+            self.assertIn("Found 1 MO2 instance(s)", window.mo2_library_widget.setup_status.text())
+        finally:
+            window.close()
+
     def test_check_launch_status_logs_detected_audio_mapping_observations(self):
         window = self._window()
         process = {
