@@ -10,7 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from process_monitor import _proc_start_time
 from mo2_launch import inspect_skyrim_launch_targets
