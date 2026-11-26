@@ -5,7 +5,6 @@ monitoring is owned by ProcessMonitorWorkflowMixin.
 """
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import time
@@ -13,7 +12,6 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QMessageBox
 
-from proton_runtime import managed_paths, _runtime_environment
 from process_monitor import _proc_start_time
 from mo2_launch import inspect_skyrim_launch_targets
 from steam_mo2_discovery import (
