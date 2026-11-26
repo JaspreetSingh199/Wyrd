@@ -26,6 +26,13 @@ from mo2_instances import (
     _instance_roots, _same_mo2_game_path, inspect_mo2_instances,
     _resolve_mo2_storage_path, inspect_mo2_storage, _resolve_windows_path,
 )
+from process_monitor import (
+    read_launch_diagnostics, classify_launch_diagnostics,
+    detect_game_processes, detect_skyrim_processes,
+    _proc_identity, _proc_start_time, _is_descendant_process,
+    launch_process_status,
+)
+
 
 APP_ID = "489830"
 RELEASE_API = "https://api.github.com/repos/ModOrganizer2/modorganizer/releases/latest"
