@@ -264,7 +264,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
             window.mo2_state = {"installed": True, "managed": True, "metadata": {"game_path": window.game_state["game_dir"]}}
-            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"S:\\steamapps\\common\\Skyrim Special Edition"}
+            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition"}
             window.start_skyrim()
         self.assertEqual(window.launch_session.wrapper_pid, 501)
         self.assertEqual(window.launch_session.wrapper_start_time, 123)
@@ -291,7 +291,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         ):
             window.instance_state = {"skyrim_instances": [{"name": "Skyrim"}]}
             window.mo2_state = {"installed": True, "managed": True, "metadata": {"game_path": window.game_state["game_dir"]}}
-            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"S:\\steamapps\\common\\Skyrim Special Edition"}
+            window.mo2_discovery_state = {"ok": True, "windows_game_path": r"T:\\steamapps\\common\\Skyrim Special Edition"}
             window.start_skyrim()
         self.assertFalse(launch.call_args.kwargs["xaudio2_compat"])
         window.close()
