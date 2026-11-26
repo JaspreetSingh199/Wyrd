@@ -1092,28 +1092,31 @@ def inspect_mo2_storage(prefix_root: Path, install_root: Path | None = None,
 
 def _resolve_windows_path(value: str, prefix_root: Path,
                           game_path: Path | None = None) -> Path | None:
-    """Resolve Wine DOS paths beneath their known drive mappings."""
+    """Resolve any Windows drive through the active Proton prefix's mappings.
+
+    Drive letters are never assumed: each mapping is read from pfx/dosdevices
+    and the resolved target is treated as that drive's root.
+    """
     raw = value.strip().strip('"')
-    if not raw:
+    match = re.match(r"^([A-Za-z]):(?:[\\\\/])?(.*)$", raw)
+    if not match:
         return None
-    normalized = raw.replace("/", "\\\\")
-    drive = normalized[:2].casefold()
-    if drive == "z:":
-        relative = normalized[2:].lstrip("\\\\")
-        candidate = Path("/") / relative.replace("\\\\", "/")
-        allowed_root = Path("/")
-    elif drive == "c:":
-        relative = normalized[2:].lstrip("\\\\")
-        allowed_root = prefix_root / "pfx/drive_c"
-        candidate = allowed_root / relative.replace("\\\\", "/")
-    else:
-        return None
+    drive_letter, relative = match.groups()
+    dosdevices = Path(prefix_root).expanduser() / "pfx/dosdevices"
+    drive_link = dosdevices / f"{drive_letter.casefold()}:"
     try:
+        if dosdevices.is_symlink() or drive_link.is_symlink() is False:
+            return None
+        drive_root = drive_link.resolve(strict=True)
+        if not drive_root.is_dir():
+            return None
+        parts = [part for part in re.split(r"[\\\\/]+", relative) if part not in ("", ".")]
+        candidate = drive_root.joinpath(*parts)
         resolved = candidate.resolve(strict=True)
-        resolved.relative_to(allowed_root.resolve(strict=True))
+        resolved.relative_to(drive_root)
+        return resolved
     except (OSError, ValueError, RuntimeError):
         return None
-    return resolved
 
 
 def copy_mo2_instance_to_prefix(source_instance: Path, destination_prefix: Path,
