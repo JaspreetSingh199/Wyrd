@@ -216,6 +216,8 @@ class MainWindow(QMainWindow):
         self.game_state: dict = {"found": False}
         self.proton_builds: list[dict] = []
         self.mo2_state: dict = {"installed": False}
+        # Populated by refresh_all(); readiness checks must be safe before first scan.
+        self.mo2_discovery_state: dict | None = None
         self.instance_state: dict = {"ok": False, "instances": [], "skyrim_instances": []}
         self.launch_target_state: dict = {"ok": False, "targets": []}
         self.launch_session = LaunchSession()
