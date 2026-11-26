@@ -304,6 +304,9 @@ class WyrdMO2Tests(unittest.TestCase):
             skyrim.mkdir(parents=True)
             other.mkdir()
             (skyrim / "profiles/Default").mkdir(parents=True)
+            dosdevices = prefix / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
             (prefix / ".wyrd-managed.json").write_text(
                 json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
             )
@@ -325,7 +328,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "gameName=Fallout 4\n", encoding="utf-8"
             )
             before = ini.read_bytes()
-            detected_game = Path("/games/Skyrim Special Edition")
+            detected_game = Path(tmp) / "games/Skyrim Special Edition"
             detected_game.mkdir(parents=True, exist_ok=True)
             (detected_game / "SkyrimSE.exe").write_bytes(b"skyrim")
             result = inspect_mo2_instances(prefix, detected_game_path=detected_game)
@@ -341,7 +344,7 @@ class WyrdMO2Tests(unittest.TestCase):
     def test_read_only_instance_inspection_finds_portable_instances(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
-            install = Path(tmp) / "install"
+            install = prefix / "pfx/drive_c/Modding/MO2"
             portable = install / "instances" / "Skyrim SE"
             portable.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").parent.mkdir(parents=True)
@@ -357,7 +360,7 @@ class WyrdMO2Tests(unittest.TestCase):
     def test_read_only_instance_inspection_finds_root_portable_instance(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
-            install = Path(tmp) / "install"
+            install = prefix / "pfx/drive_c/Modding/MO2"
             install.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").parent.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").write_text(
@@ -380,7 +383,7 @@ class WyrdMO2Tests(unittest.TestCase):
     def test_instance_profile_unwraps_qsettings_byte_array_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "prefix"
-            install = Path(tmp) / "install"
+            install = prefix / "pfx/drive_c/Modding/MO2"
             instance = install / "instances" / "Skyrim SE"
             instance.mkdir(parents=True)
             (prefix / ".wyrd-managed.json").parent.mkdir(parents=True, exist_ok=True)
@@ -600,7 +603,7 @@ class WyrdMO2Tests(unittest.TestCase):
             users = prefix / "pfx/drive_c/users/steamuser"
             instance = users / "AppData/Local/ModOrganizer/Skyrim Special Edition - G"
             instance.mkdir(parents=True)
-            portable = root / "managed-mo2"
+            portable = prefix / "pfx/drive_c/Modding/managed-mo2"
             portable.mkdir()
             (portable / "ModOrganizer.ini").write_text(
                 "[General]\ngameName=Portable unrelated\n", encoding="utf-8"
@@ -908,6 +911,9 @@ class WyrdMO2Tests(unittest.TestCase):
             paths = managed_paths(home)
             paths["install"].mkdir(parents=True)
             paths["prefix"].mkdir(parents=True)
+            dosdevices = paths["prefix"] / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
             proton = make_proton(home / "Proton")
             game = home / "Skyrim"
             game.mkdir()
@@ -971,6 +977,9 @@ class WyrdMO2Tests(unittest.TestCase):
             game = steam / "steamapps/common/Skyrim Special Edition"
             instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/instances/Skyrim SE"
             install.mkdir(parents=True)
+            dosdevices = prefix / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
             (install / "ModOrganizer.exe").write_bytes(b"MO2")
             instance.mkdir(parents=True)
             game.mkdir(parents=True)
@@ -1019,6 +1028,9 @@ class WyrdMO2Tests(unittest.TestCase):
             paths = managed_paths(home)
             paths["install"].mkdir(parents=True)
             paths["prefix"].mkdir(parents=True)
+            dosdevices = paths["prefix"] / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
             proton = make_proton(home / "Proton")
             game = home / "Skyrim"
             game.mkdir()
@@ -1241,6 +1253,9 @@ class WyrdMO2Tests(unittest.TestCase):
             prefix = home / ".steam/steam/steamapps/compatdata/489830"
             install = prefix / "pfx/drive_c/Modding/MO2"
             install.mkdir(parents=True)
+            dosdevices = prefix / "pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "z:").symlink_to("/", target_is_directory=True)
             (install / "ModOrganizer.exe").write_bytes(b"MZ")
             instance = prefix / "pfx/drive_c/users/steamuser/AppData/Local/ModOrganizer/Skyrim Special Edition"
             instance.mkdir(parents=True)
