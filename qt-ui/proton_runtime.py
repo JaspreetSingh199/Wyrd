@@ -18,8 +18,7 @@ from typing import Callable
 
 from skyrim_detection import find_steam_roots, steam_libraries
 from mo2_inspection import find_mo2_installations
-
-APP_ID = "489830"
+from steam_prefix import APP_ID
 APP_DIR_NAME = "wyrd"
 MO2_DIR_NAME = "mo2"
 PREFIX_DIR_NAME = "compatdata/mo2-skyrim"
