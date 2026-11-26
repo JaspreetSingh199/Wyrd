@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 
 import steamcompat
+import steam_mo2_discovery
 from wyrd_mo2 import inspect_mo2_instances, copy_mo2_instance_to_prefix, _steam_root_for_game
 
 
