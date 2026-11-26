@@ -39,7 +39,7 @@ from steam_mo2_launch import launch_skyrim_via_mo2_in_skyrim_prefix
 from steam_prefix import steam_compat_prefix
 from steam_mo2_management import reset_wyrd_mo2
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
-from launch_models import LaunchSession
+from launch_models import LaunchSession, GameProcess
 from ui_components import add_info_button, panel
 from steam_workers import SteamPrefixInstallWorker
 from ui_styles import APP_STYLE as STYLE
@@ -57,7 +57,7 @@ def _same_filesystem_path(left: str | os.PathLike | None,
 
 
 
-
+class MainWindow(LaunchWorkflowMixin, QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Wyrd — Skyrim Modding Environment")

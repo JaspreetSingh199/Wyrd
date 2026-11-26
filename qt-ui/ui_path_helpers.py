@@ -16,6 +16,3 @@ def _steam_prefix_for_game_path(game_path: str | Path | None) -> Path | None:
         return steam_compat_prefix(steam_root)
     except (OSError, RuntimeError, ValueError):
         return None
-
-
-class MainWindow(QMainWindow):
