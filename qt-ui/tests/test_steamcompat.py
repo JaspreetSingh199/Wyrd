@@ -355,9 +355,24 @@ def test_dynamic_wine_path_prefers_discovered_root_drive_over_legacy_library_ali
     result = steamcompat.discover_wine_game_path(prefix, game, steam)
 
     assert result["ok"], result
-    assert result["drive"] == "T:"
-    assert result["windows_game_path"] == r"T:\steamapps\common\Skyrim Special Edition"
+    assert result["drive"] == "Z:"
+    assert result["windows_game_path"] == (
+        "Z:" + str(game.resolve()).replace("/", "\\\\")
+    )
     assert Path(result["resolved_game_path"]) == game.resolve()
+    assert not (dosdevices / "s:").exists()
+    assert not (dosdevices / "s:").is_symlink()
+
+
+def test_dynamic_wine_path_uses_arbitrary_existing_drive_when_no_root_mapping(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    (dosdevices / "t:").symlink_to(library, target_is_directory=True)
+
+    result = steamcompat.discover_wine_game_path(prefix, game, steam)
+
+    assert result["ok"], result
+    assert result["drive"] == "T:"
+    assert result["windows_game_path"] == r"T:\\steamapps\\common\\Skyrim Special Edition"
     assert not (dosdevices / "s:").exists()
     assert not (dosdevices / "s:").is_symlink()
 
