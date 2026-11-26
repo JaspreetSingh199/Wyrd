@@ -28,13 +28,22 @@ class EnvironmentWorkflowMixin:
         # the persisted runtime, overwriting the user's choice.
         self._restoring_selection = True
         self.proton_combo.blockSignals(True)
-        self._discover_game_installation()
-        self._populate_proton_runtimes(selected)
+        scan_completed = False
+        try:
+            self._discover_game_installation()
+            self._populate_proton_runtimes(selected)
 
-        self._inspect_mo2_installation_and_mapping()
-        self._discover_mo2_instance_inventory()
-        self._present_mo2_installation()
-        self._finalize_environment_readiness()
+            self._inspect_mo2_installation_and_mapping()
+            self._discover_mo2_instance_inventory()
+            self._present_mo2_installation()
+            self._finalize_environment_readiness()
+            scan_completed = True
+        finally:
+            # A failed stage must not leave the combo permanently signal-blocked
+            # or allow a partial scan to persist a guessed runtime selection.
+            self.proton_combo.blockSignals(False)
+            if not scan_completed:
+                self._restoring_selection = True
 
     def _inspect_mo2_installation_and_mapping(self) -> None:
         """Inspect the active Skyrim prefix and verify MO2/Steam path integration."""
