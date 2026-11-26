@@ -952,14 +952,17 @@ class MainWindow(QMainWindow):
             self.mo2_state.get("installed") and self.mo2_state.get("managed", True)
         ))
         self._set_scan_progress(78, "Scanning MO2 installations and validating instance configurations…")
-        if self.mo2_state.get("installed"):
+        if self.game_state.get("found"):
+            # Instance inventory is independent of the conventional MO2
+            # executable check. Existing instances remain discoverable even
+            # when MO2 is installed elsewhere or its executable is unknown.
             self.instance_state = inspect_any_skyrim_prefix_mo2_instances(
                 Path(self.game_state["game_dir"])
             )
         else:
             self.instance_state = {
                 "ok": False, "instances": [], "skyrim_instances": [],
-                "message": self.mo2_state.get("message", "MO2 is not installed.")
+                "message": "Skyrim Special Edition was not detected; MO2 instance discovery was skipped."
             }
         skyrim_instances = self.instance_state.get("skyrim_instances", [])
         self._update_precheck(
