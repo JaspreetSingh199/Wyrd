@@ -941,7 +941,7 @@ class WyrdMO2Tests(unittest.TestCase):
             }):
                 with patch("wyrd_mo2.subprocess.Popen") as popen:
                     popen.return_value.pid = 1234
-                    with patch("wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]):
+                    with patch("proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]):
                         result = launch_skyrim_via_mo2(
                             "SKSE", "Skyrim SE", home,
                             expected_binary=game / "skse64_loader.exe",
@@ -1050,7 +1050,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "XDG_CONFIG_HOME": str(home / ".config"),
                 "WINEDLLOVERRIDES": "d3d11=n;dxgi=n",
             }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
-                "wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]
+                "proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]
             ):
                 popen.return_value.pid = 5678
                 result = launch_skyrim_via_mo2(
@@ -1141,7 +1141,7 @@ class WyrdMO2Tests(unittest.TestCase):
             }), patch("wyrd_mo2.inspect_skyrim_launch_targets", return_value={
                 "ok": True, "targets": duplicate_targets
             }), patch("wyrd_mo2.subprocess.Popen") as popen, patch(
-                "wyrd_mo2.find_steam_roots", return_value=[home / ".steam/steam"]
+                "proton_runtime.find_steam_roots", return_value=[home / ".steam/steam"]
             ):
                 popen.return_value.pid = 77
                 result = launch_skyrim_via_mo2(
@@ -1259,8 +1259,8 @@ class WyrdMO2Tests(unittest.TestCase):
             )
             (instance / "ModOrganizer.ini").write_text(ini, encoding="utf-8")
             proton = make_proton(home / "Proton")
-            with patch("wyrd_mo2.inspect_proton_build", return_value={"ok": True}), \
-                 patch("wyrd_mo2._runtime_environment", return_value={}), \
+            with patch("proton_runtime.inspect_proton_build", return_value={"ok": True}), \
+                 patch("proton_runtime._runtime_environment", return_value={}), \
                  patch("wyrd_mo2.subprocess.Popen") as popen:
                 popen.return_value.pid = 456
                 result = launch_skyrim_via_mo2(
@@ -1355,7 +1355,7 @@ class WyrdMO2Tests(unittest.TestCase):
             custom_root = root / "compatibilitytools.d"
             for name in ["GE-Proton Latest", "proton-cachyos-slr"]:
                 make_proton(custom_root / name)
-            with patch("wyrd_mo2.find_steam_roots", return_value=[root]):
+            with patch("proton_runtime.find_steam_roots", return_value=[root]):
                 with patch("pathlib.Path.home", return_value=home):
                     builds = discover_proton_builds(home, system_roots=[])
             self.assertEqual(
@@ -1377,7 +1377,7 @@ class WyrdMO2Tests(unittest.TestCase):
             (root / "steamapps/common").mkdir(parents=True)
             make_proton(root / "steamapps/common/Proton Good", machine=62)
             make_proton(root / "steamapps/common/Proton aarch64", machine=183)
-            with patch("wyrd_mo2.find_steam_roots", return_value=[root]):
+            with patch("proton_runtime.find_steam_roots", return_value=[root]):
                 # Do not let host-installed compatibility tools leak into this
                 # fixture-based discovery test.
                 with patch("pathlib.Path.home", return_value=home):
