@@ -58,7 +58,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 (entry / "comm").write_text(comm, encoding="utf-8")
             def fake_readlink(path):
                 return {"100": "/fake/SkyrimSE.exe", "101": "/fake/skse64_loader.exe", "102": "/usr/bin/python"}[Path(path).parent.name]
-            with patch("wyrd_mo2.os.readlink", side_effect=fake_readlink):
+            with patch("process_monitor.os.readlink", side_effect=fake_readlink):
                 result = detect_skyrim_processes(prefix, proc_root=proc)
             self.assertTrue(result["ok"])
             self.assertEqual([item["pid"] for item in result["processes"]], [100, 101])
@@ -93,7 +93,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 return original_read_bytes(path)
 
             with patch("pathlib.Path.read_bytes", new=guarded_read_bytes), patch(
-                "wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"
+                "process_monitor.os.readlink", return_value="/fake/SkyrimSE.exe"
             ):
                 result = detect_skyrim_processes(
                     Path("/managed/prefix"), proc_root=proc
@@ -115,7 +115,7 @@ class WyrdMO2Tests(unittest.TestCase):
             (entry / "environ").write_bytes(
                 b"STEAM_COMPAT_DATA_PATH=/managed/prefix-extra\\0WYRD_LAUNCHED=1\\0"
             )
-            with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+            with patch("process_monitor.os.readlink", return_value="/fake/SkyrimSE.exe"):
                 result = detect_skyrim_processes(
                     Path("/managed/prefix"), proc_root=proc
                 )
@@ -137,7 +137,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 "7f1000-7f2000 r-xp 0000 00:00 0 /drive_c/windows/system32/faudio.dll\n",
                 encoding="utf-8",
             )
-            with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+            with patch("process_monitor.os.readlink", return_value="/fake/SkyrimSE.exe"):
                 result = detect_skyrim_processes(Path("/managed/prefix"), proc_root=proc)
             self.assertTrue(result["ok"])
             process = result["processes"][0]
@@ -172,7 +172,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 return original(path, *args, **kwargs)
 
             with patch("pathlib.Path.read_text", new=guarded_read_text), patch(
-                "wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"
+                "process_monitor.os.readlink", return_value="/fake/SkyrimSE.exe"
             ):
                 result = detect_skyrim_processes(proc_root=proc)
             process = result["processes"][0]
@@ -196,7 +196,7 @@ class WyrdMO2Tests(unittest.TestCase):
                 return original_read_bytes(path)
 
             with patch("pathlib.Path.read_bytes", new=read_bytes_with_denied_environ):
-                with patch("wyrd_mo2.os.readlink", return_value="/fake/SkyrimSE.exe"):
+                with patch("process_monitor.os.readlink", return_value="/fake/SkyrimSE.exe"):
                     result = detect_skyrim_processes(proc_root=proc)
             self.assertTrue(result["ok"])
             self.assertEqual(len(result["processes"]), 1)
@@ -1274,18 +1274,18 @@ class WyrdMO2Tests(unittest.TestCase):
 
 
     def test_launch_process_status_validates_process_start_time(self):
-        with patch("wyrd_mo2.os.kill", return_value=None), patch(
+        with patch("process_monitor.os.kill", return_value=None), patch(
             "process_monitor._proc_start_time", return_value=500
         ):
             self.assertEqual(launch_process_status(123, start_time=500)["state"], "running")
             reused = launch_process_status(123, start_time=499)
             self.assertEqual(reused["state"], "exited")
             self.assertIn("reused", reused["message"])
-        with patch("wyrd_mo2.os.kill", return_value=None), patch(
+        with patch("process_monitor.os.kill", return_value=None), patch(
             "process_monitor._proc_start_time", return_value=None
         ):
             self.assertEqual(launch_process_status(123, start_time=500)["state"], "unknown")
-        with patch("wyrd_mo2.os.kill") as kill:
+        with patch("process_monitor.os.kill") as kill:
             kill.side_effect = ProcessLookupError()
             self.assertEqual(launch_process_status(123)["state"], "exited")
             kill.side_effect = PermissionError()
