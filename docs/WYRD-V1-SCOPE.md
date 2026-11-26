@@ -1,39 +1,43 @@
 # Wyrd V1 scope
 
-Wyrd is a GUI for managing Steam compatibility and the Skyrim Special Edition + Mod Organizer 2 workflow.
+Wyrd is a Qt6 desktop application for the Steam/Proton + Skyrim Special Edition + Mod Organizer 2 workflow.
 
-## Core architecture
+## V1 architecture
 
-- Wyrd manages detection, Proton selection, setup, launch orchestration, diagnostics, and compatibility options.
-- MO2 manages mods, profiles, load order, modlist content, and SKSE launch configuration.
-- Steam/Proton manages the game compatibility runtime and game execution.
-- Skyrim's AppID 489830 Steam compatdata prefix is the working baseline for MO2 and Skyrim launches.
+- Steam owns game installation, Steam libraries, compatdata and Proton runtimes.
+- Proton owns the Windows compatibility environment.
+- MO2 owns instances, profiles, mods, downloads, load order and configured executables.
+- Wyrd discovers Skyrim, Proton and MO2; verifies the selected environment; provides launch orchestration and diagnostics.
+- The live filesystem scan is the source of truth for MO2 instance availability and normal launch readiness. A Wyrd registry record is not required to discover, select or launch an instance.
+- Optional Wyrd metadata may retain user preferences and maintenance information, but it must never override a fresh filesystem/Proton verification.
 
-## V1 requirements
+## Discovery and selection
 
-1. Install MO2 inside Skyrim's Steam compatdata prefix (AppID 489830), not Wyrd's separate MO2 prefix.
-2. Detect and verify MO2 installation and startup. Do not report success merely because an installer or launch command returned success. Capture early crashes and useful logs.
-3. Mods and SKSE are managed through MO2; Wyrd does not implement mod management.
-4. Support MO2-managed modlists as the preferred workflow.
-5. Investigate standalone modlist installers that require paths or command-line configuration. Support path configuration where reliable; diagnose failures and allow at most 2–3 retries only for recoverable failures. Never blindly retry potentially destructive or partially completed installs.
-6. Preserve Skyrim files, Steam compatdata, saves, MO2 instances, and mod data. No destructive reset without explicit confirmation.
-7. Keep an optional XAudio2 compatibility override as a checkbox, disabled by default. Persist the preference and apply it to the Wyrd launch chain only when enabled. The override is `WINEDLLOVERRIDES=xaudio2_7=n,b`.
+1. Detect Skyrim SE from Steam library manifests.
+2. Discover compatible Proton runtimes without silently changing the user's selected runtime.
+3. Inspect only the selected Skyrim AppID 489830 Proton prefix and explicitly supplied MO2 installation roots.
+4. Discover MO2 instances from supported MO2 layouts and parse their ModOrganizer.ini files read-only.
+5. Determine whether an instance targets the detected Skyrim installation using the existing Proton drive mappings; do not trust the game label alone.
+6. Let the user select an instance directly from the discovered inventory. Do not require a registration step.
+7. Revalidate the selected instance and executable immediately before launch.
 
-## Known-good launch baseline
+Discovery must not recursively scan arbitrary disks or follow symlinks into unknown locations. Custom storage paths are inventory metadata only until explicitly verified.
 
-Launching MO2 installed in Skyrim's prefix with:
+## Launch and safety
 
-- `STEAM_COMPAT_DATA_PATH=~/.local/share/Steam/steamapps/compatdata/489830`
-- `STEAM_COMPAT_CLIENT_INSTALL_PATH=~/.local/share/Steam`
-- `SteamAppId=489830`
-- `SteamGameId=489830`
+- Use Skyrim's existing Steam AppID 489830 compatdata prefix as the known-good launch baseline.
+- Never reset, replace or modify the Steam prefix as part of detection or ordinary launch.
+- Never migrate, copy or symlink saves.
+- Never overwrite existing MO2 instances, profiles, mods, downloads or custom storage.
+- Never automatically change the Proton runtime.
+- Fail closed when the game path, prefix mapping, instance or executable cannot be uniquely verified.
+- Report process startup separately from confirmed game-process detection.
+- Keep the optional XAudio2 compatibility override disabled by default and scoped to Wyrd's launch environment.
 
-restores full Skyrim audio (music, dialogue, and sound effects). The Wyrd-specific MO2 prefix did not. This is an acceptance-test baseline.
+## Out of scope
 
-## Out of scope for V1
-
-- Building a mod manager or load-order manager.
-- Replacing MO2, SKSE, Steam, or Proton.
+- Reimplementing MO2's instance manager, mod manager or load-order manager.
+- Replacing Steam, Proton, MO2 or SKSE.
 - Universal automatic modlist installation.
-- Global or unconditional DLL overrides.
-- Unverified success states.
+- Unverified automatic adoption or registration of external MO2 data.
+- Destructive prefix reset or data migration as a side effect of discovery.
