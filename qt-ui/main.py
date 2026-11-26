@@ -1071,7 +1071,16 @@ class MainWindow(QMainWindow):
         if not self.game_state.get("found"):
             detail = "Skyrim Special Edition has not been detected."
         elif not self.mo2_state.get("installed"):
-            detail = "MO2 is not installed in Skyrim's Steam prefix."
+            if instances:
+                names = ", ".join(item.get("name", "Unnamed instance") for item in instances)
+                detail = (
+                    f"Discovered {len(instances)} Skyrim MO2 instance(s): {names}. "
+                    "The MO2 executable is not verified, so modded launch is unavailable."
+                )
+            else:
+                detail = self.instance_state.get(
+                    "message", "No MO2 instance or verified MO2 installation was found."
+                )
         elif instances:
             names = ", ".join(item.get("name", "Unnamed instance") for item in instances)
             detail = f"Automatically discovered {len(instances)} Skyrim MO2 instance(s): {names}"
@@ -1087,6 +1096,7 @@ class MainWindow(QMainWindow):
             self.startup_checks_complete
             and self.game_state.get("found")
             and self.mo2_state.get("installed")
+            and bool(self.mo2_state.get("executable"))
             and instances
             and proton
             and mapping_ok
