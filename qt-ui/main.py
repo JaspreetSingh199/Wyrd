@@ -1519,7 +1519,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "MO2 instance copy", "Wyrd's managed MO2 prefix is not ready.")
             return
         source = inspect_mo2_instances(
-            Path(state["paths"]["prefix"]), Path(state["executable"]).parent
+            Path(state["paths"]["prefix"]), Path(state["executable"]).parent,
+            detected_game_path=Path(state.get("metadata", {}).get("game_path", "")),
         )
         if not source.get("ok"):
             QMessageBox.warning(self, "MO2 instance copy", source.get("message", "Could not inspect Wyrd MO2."))
@@ -1633,7 +1634,10 @@ class MainWindow(QMainWindow):
         # Re-read the actual MO2 INI at launch time. The executable list shown
         # before the confirmation dialog is only a preview and may have changed.
         from wyrd_mo2 import inspect_mo2_instances, _resolve_windows_path
-        inventory = inspect_mo2_instances(prefix, executable.parent, require_managed=False)
+        inventory = inspect_mo2_instances(
+            prefix, executable.parent, require_managed=False,
+            detected_game_path=Path(self.game_state["game_dir"]),
+        )
         if not inventory.get("ok"):
             return {"ok": False, "message": inventory.get("message", "Could not re-inspect the selected MO2 prefix.")}
         live_instance = next(
