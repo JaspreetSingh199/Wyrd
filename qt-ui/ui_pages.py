@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
     QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QWidget, QScrollArea,
 )
-from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
+from mo2_library_dialog import Mo2LibraryDialog
 from ui_components import add_info_button, panel
 from ui_path_helpers import initial_mo2_dialog_paths
 
@@ -123,10 +123,6 @@ class MainWindowPagesMixin:
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget)
-        self.mo2_advanced_widget = Mo2AdvancedSettings(
-            self
-        )
-
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
@@ -177,32 +173,6 @@ class MainWindowPagesMixin:
         setup_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         setup_scroll.setWidget(setup_page)
         self.tabs.addTab(setup_scroll, "ENVIRONMENT")
-
-        advanced_page = QWidget()
-        advanced_layout = QVBoxLayout(advanced_page)
-        advanced_layout.setContentsMargins(12, 16, 12, 12)
-        advanced_layout.setSpacing(12)
-
-        mo2_advanced_heading = QLabel("MO2 CONFIGURATION")
-        mo2_advanced_heading.setObjectName("section")
-        advanced_layout.addWidget(mo2_advanced_heading)
-        mo2_advanced_help = QLabel(
-            "Inspect detected paths, manage instance associations and configure per-instance storage. "
-            "Audio, launch diagnostics and recovery tools are grouped under Maintenance."
-        )
-        mo2_advanced_help.setObjectName("muted")
-        mo2_advanced_help.setWordWrap(True)
-        advanced_layout.addWidget(mo2_advanced_help)
-        advanced_layout.addWidget(self.mo2_advanced_widget)
-
-        advanced_layout.addStretch(1)
-        advanced_scroll = QScrollArea()
-        advanced_scroll.setWidgetResizable(True)
-        advanced_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        advanced_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        advanced_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        advanced_scroll.setWidget(advanced_page)
-        self.tabs.addTab(advanced_scroll, "ADVANCED")
 
         maintenance_page = QWidget()
         maintenance_layout = QVBoxLayout(maintenance_page)
