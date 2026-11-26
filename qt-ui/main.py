@@ -1696,9 +1696,15 @@ class MainWindow(QMainWindow):
         if not mo2_state.get("installed"):
             mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
         if not mo2_state.get("installed"):
+            # Discovery may find an MO2 instance without finding its executable.
+            # Never guess or launch another copy; keep the inventory visible and
+            # fail closed until an executable can be verified.
             QMessageBox.warning(
-                self, "MO2 unavailable",
-                mo2_state.get("message", "MO2 installation could not be discovered."),
+                self, "MO2 executable unavailable",
+                self.instance_state.get(
+                    "installation_message",
+                    mo2_state.get("message", "MO2 instance found, but no verified ModOrganizer.exe is available."),
+                ),
             )
             return
         proton_value = self.proton_combo.currentData()
