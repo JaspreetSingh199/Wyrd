@@ -6,7 +6,6 @@ monitoring is owned by ProcessMonitorWorkflowMixin.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import time
@@ -16,14 +15,12 @@ from PySide6.QtWidgets import QMessageBox
 
 from proton_runtime import managed_paths, _runtime_environment
 from process_monitor import _proc_start_time
-from mo2_instances import inspect_mo2_instances
 from mo2_launch import inspect_skyrim_launch_targets
 from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
 )
 from steam_mo2_launch import launch_skyrim_via_mo2_in_skyrim_prefix
-from steam_prefix import steam_compat_prefix
 
 
 class LaunchWorkflowMixin:
@@ -193,10 +190,7 @@ class LaunchWorkflowMixin:
         self.launch_session.launch_token = launch_token
         self.launch_session.state = "handoff"
         self.launch_session.poll_count = 0
-        if app_id == "489830" or not app_id:
-            self._launch_monitor.start()
-        else:
-            self._launch_monitor.start()
+        self._launch_monitor.start()
         return {
             "ok": True, "pid": process.pid, "log_path": str(log_path),
             "message": f"Started '{title}' through MO2 instance '{instance_path.name}'.",
