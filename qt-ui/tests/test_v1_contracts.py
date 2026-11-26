@@ -169,5 +169,48 @@ class WyrdV1ContractTests(unittest.TestCase):
                 self.assertTrue(paths["settings"].is_symlink())
 
 
+class SteamGameRegistryRefreshTests(unittest.TestCase):
+    def test_registry_path_parser_decodes_wine_escaped_backslashes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "system.reg"
+            registry.write_text(
+                '[Software\\\\WOW6432Node\\\\Bethesda Softworks\\\\Skyrim Special Edition]\n'
+                '"Installed Path"="S:\\\\steamapps\\\\common\\\\Skyrim Special Edition\\\\"\n',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                steam_game_registry._read_installed_path(registry),
+                "S:\\steamapps\\common\\Skyrim Special Edition\\",
+            )
+
+    def test_matching_registry_path_does_not_start_proton_on_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            steam_root = home / ".local/share/Steam"
+            game = steam_root / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            (game / "SkyrimSE.exe").write_bytes(b"fixture")
+            prefix = steam_game_registry.steam_compat_prefix(steam_root)
+            (prefix / "pfx").mkdir(parents=True)
+            proton = home / "Proton"
+            proton.mkdir()
+            (proton / "proton").write_text("#!/bin/sh\n", encoding="utf-8")
+            windows_path = r"S:\steamapps\common\Skyrim Special Edition"
+
+            with (
+                patch.object(steam_game_registry, "_resolve_windows_path", return_value=game),
+                patch.object(steam_game_registry, "_read_installed_path", return_value=windows_path + "\\"),
+                patch.object(steam_game_registry.subprocess, "run") as run,
+            ):
+                result = steam_game_registry.configure_skyrim_se_registry(
+                    prefix, game, steam_root, proton, windows_path,
+                )
+
+            self.assertTrue(result["ok"], result)
+            self.assertTrue(result["already_configured"])
+            run.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
