@@ -15,7 +15,7 @@ from steam_mo2_discovery import (
     inspect_external_skyrim_prefix_mo2_installation,
     inspect_any_skyrim_prefix_mo2_instances,
 )
-from ui_path_helpers import _same_filesystem_path
+from ui_path_helpers import _same_filesystem_path, _steam_prefix_for_game_path
 
 
 class EnvironmentWorkflowMixin:
