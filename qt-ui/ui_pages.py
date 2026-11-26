@@ -116,7 +116,7 @@ class MainWindowPagesMixin:
         setup_layout.addWidget(self.mo2_panel)
 
         prefix_path, install_path, game_path = initial_mo2_dialog_paths(
-            self.mo2_state, self._saved_settings
+            self.mo2_state
         )
         self.mo2_library_widget = Mo2LibraryDialog(
             self, prefix_path=prefix_path, install_path=install_path,
