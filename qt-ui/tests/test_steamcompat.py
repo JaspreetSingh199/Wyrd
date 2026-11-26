@@ -313,6 +313,7 @@ def _make_steam_discovery_fixture(tmp_path):
     library = tmp_path / "Library"
     game = library / "steamapps/common/Skyrim Special Edition"
     game.mkdir(parents=True)
+    (game / "SkyrimSE.exe").write_bytes(b"fixture")
     (library / "steamapps/appmanifest_489830.acf").write_text(
         '"AppState" { "appid" "489830" "installdir" "Skyrim Special Edition" }',
         encoding="utf-8",
@@ -346,86 +347,49 @@ def test_steam_root_resolver_finds_owner_of_secondary_library(tmp_path):
     assert _steam_root_for_game(game, home) == steam.resolve()
 
 
-def test_s_drive_mapping_reconciles_secondary_steam_library(tmp_path):
+def test_dynamic_wine_path_uses_most_specific_existing_drive_mapping(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    (dosdevices / "s:").symlink_to(steam, target_is_directory=True)
+    (dosdevices / "z:").symlink_to("/", target_is_directory=True)
+    (dosdevices / "t:").symlink_to(library, target_is_directory=True)
 
-    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
+    result = steamcompat.discover_wine_game_path(prefix, game, steam)
 
     assert result["ok"], result
-    assert result["changed"] is True
-    assert (dosdevices / "s:").resolve() == library.resolve()
-    assert result["windows_game_path"] == r"S:\steamapps\common\Skyrim Special Edition"
+    assert result["drive"] == "T:"
+    assert result["windows_game_path"] == r"T:\steamapps\common\Skyrim Special Edition"
     assert Path(result["resolved_game_path"]) == game.resolve()
-
-
-def test_s_drive_mapping_is_idempotent_when_library_is_already_mapped(tmp_path):
-    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    link = dosdevices / "s:"
-    link.symlink_to(library, target_is_directory=True)
-    original_target = link.resolve()
-
-    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
-
-    assert result["ok"], result
-    assert result["changed"] is False
-    assert link.is_symlink()
-    assert link.resolve() == original_target == library.resolve()
-    assert result["windows_game_path"] == r"S:\steamapps\common\Skyrim Special Edition"
-
-
-def test_s_drive_mapping_refuses_non_symlink_entry(tmp_path):
-    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    (dosdevices / "s:").write_text("leave me alone", encoding="utf-8")
-
-    result = steamcompat.configure_steam_library_drive(prefix, game, steam)
-
-    assert not result["ok"]
-    assert "not a symlink" in result["message"]
-    assert (dosdevices / "s:").read_text(encoding="utf-8") == "leave me alone"
-
-
-def test_s_drive_mapping_refuses_symlinked_prefix_ancestor(tmp_path):
-    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    real_steam = tmp_path / "real-steam"
-    steam.rename(real_steam)
-    steam_link = tmp_path / "Steam"
-    steam_link.symlink_to(real_steam, target_is_directory=True)
-    linked_prefix = steam_link / "steamapps/compatdata/489830"
-    linked_dosdevices = linked_prefix / "pfx/dosdevices"
-
-    result = steamcompat.configure_steam_library_drive(
-        linked_prefix, game, steam_link
-    )
-
-    assert not result["ok"]
-    assert "symlinked component" in result["message"]
-    assert not (linked_dosdevices / "s:").exists()
-    assert not (linked_dosdevices / "s:").is_symlink()
-
-
-def test_s_drive_mapping_refuses_symlinked_library_ancestor(tmp_path):
-    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    linked_library = tmp_path / "Linked Library"
-    linked_library.symlink_to(library, target_is_directory=True)
-    linked_game = linked_library / "steamapps/common/Skyrim Special Edition"
-
-    result = steamcompat.configure_steam_library_drive(prefix, linked_game, steam)
-
-    assert not result["ok"]
-    assert "symlinked component" in result["message"]
     assert not (dosdevices / "s:").exists()
     assert not (dosdevices / "s:").is_symlink()
 
 
-def test_s_drive_mapping_refuses_wrong_compatdata_prefix(tmp_path):
+def test_dynamic_wine_path_falls_back_to_existing_root_drive_mapping(tmp_path):
     steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
-    wrong_prefix = tmp_path / "other-prefix"
-    (wrong_prefix / "pfx/drive_c").mkdir(parents=True)
-    (wrong_prefix / "pfx/dosdevices").mkdir()
+    (dosdevices / "z:").symlink_to("/", target_is_directory=True)
 
-    result = steamcompat.configure_steam_library_drive(wrong_prefix, game, steam)
+    result = steamcompat.discover_wine_game_path(prefix, game, steam)
+
+    assert result["ok"], result
+    assert result["drive"] == "Z:"
+    assert result["windows_game_path"] == (
+        "Z:" + str(game.resolve()).replace("/", "\\\\")
+    )
+    assert not (dosdevices / "s:").exists()
+    assert not (dosdevices / "s:").is_symlink()
+
+
+def test_dynamic_wine_path_fails_closed_without_existing_drive_mapping(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+
+    result = steamcompat.discover_wine_game_path(prefix, game, steam)
 
     assert not result["ok"]
-    assert "AppID 489830" in result["message"]
-    assert not (wrong_prefix / "pfx/dosdevices/s:").exists()
+    assert "No existing Proton drive mapping" in result["message"]
+
+
+def test_registry_requires_a_dynamically_discovered_path(tmp_path):
+    steam, library, game, prefix, dosdevices = _make_steam_discovery_fixture(tmp_path)
+    result = steamcompat.configure_skyrim_se_registry(
+        prefix, game, steam, tmp_path / "Proton"
+    )
+    assert not result["ok"]
+    assert "dynamically discovered Proton game path is required" in result["message"]
