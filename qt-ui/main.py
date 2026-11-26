@@ -18,6 +18,7 @@ from launch_models import LaunchSession
 from ui_styles import APP_STYLE as STYLE
 from ui_pages import MainWindowPagesMixin
 from launch_workflow import LaunchWorkflowMixin
+from launch_preflight_workflow import LaunchPreflightWorkflowMixin
 from process_workflow import ProcessMonitorWorkflowMixin
 from environment_workflow import EnvironmentWorkflowMixin
 from audio_workflow import AudioWorkflowMixin
@@ -27,6 +28,7 @@ from setup_workflow import SetupWorkflowMixin
 
 class MainWindow(
     LaunchWorkflowMixin,
+    LaunchPreflightWorkflowMixin,
     ProcessMonitorWorkflowMixin,
     EnvironmentWorkflowMixin,
     AudioWorkflowMixin,
