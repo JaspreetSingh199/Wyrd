@@ -28,3 +28,16 @@ def _same_filesystem_path(left: str | os.PathLike | None,
         return Path(left).expanduser().resolve(strict=False) == Path(right).expanduser().resolve(strict=False)
     except (OSError, RuntimeError, ValueError):
         return os.path.normpath(os.path.expanduser(str(left))) == os.path.normpath(os.path.expanduser(str(right)))
+
+
+def initial_mo2_dialog_paths(mo2_state: dict, saved_settings: dict) -> tuple[str, str, str]:
+    """Resolve initial dialog paths without putting discovery logic in page construction."""
+    from skyrim_detection import detect_skyrim
+
+    detected = detect_skyrim()
+    game_path = detected.get("game_dir", "") if detected.get("found") else ""
+    prefix = _steam_prefix_for_game_path(game_path) if game_path else None
+    install_path = mo2_state.get("install") or (
+        str(prefix / "pfx/drive_c/Modding/MO2") if prefix else ""
+    )
+    return str(prefix) if prefix else "", str(install_path), str(game_path)
