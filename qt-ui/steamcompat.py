@@ -652,7 +652,10 @@ def copy_wyrd_instance_to_skyrim_prefix(instance_name: str, home: Path | None = 
     source_prefix = Path(paths.get("prefix", "")).expanduser()
     if source_prefix.is_symlink() or not source_prefix.is_dir():
         return {"ok": False, "status": "refused", "message": "Wyrd MO2 prefix is missing or unsafe."}
-    source_inventory = inspect_mo2_instances(source_prefix, Path(state["executable"]).expanduser().parent)
+    source_inventory = inspect_mo2_instances(
+        source_prefix, Path(state["executable"]).expanduser().parent,
+        detected_game_path=Path(state.get("metadata", {}).get("game_path", "")),
+    )
     if not source_inventory.get("ok"):
         return {"ok": False, "status": "refused", "message": source_inventory.get("message", "Could not inspect Wyrd MO2 instances.")}
     source = next((item for item in source_inventory.get("skyrim_instances", [])
