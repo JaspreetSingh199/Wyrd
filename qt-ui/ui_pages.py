@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from mo2_library_dialog import Mo2LibraryDialog, Mo2AdvancedSettings
 from ui_components import add_info_button, panel
 from ui_path_helpers import _steam_prefix_for_game_path
+from skyrim_detection import detect_skyrim
 
 
 class MainWindowPagesMixin:
