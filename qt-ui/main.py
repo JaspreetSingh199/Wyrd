@@ -7,7 +7,6 @@ import sys
 import time
 import shutil
 import subprocess
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt

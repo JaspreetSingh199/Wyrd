@@ -330,7 +330,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         window.launch_session.wrapper_pid = 500
         window.launch_session.app_id = "489830"
         window.launch_session.wrapper_start_time = 900
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
             "main.launch_process_status", return_value={
                 "state": "exited", "message": "original wrapper was replaced"
             }
@@ -353,7 +353,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "state": "exited", "message": "wrapper exited"
         }), patch("main.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
-        }), patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+        }), patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.read_launch_diagnostics", return_value={
                 "ok": True, "content": "MO2 could not resolve executable title",
             }
@@ -376,7 +376,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             ],
             "wyrd_processes": [],
         }
-        with patch("process_monitor._proc_identity", return_value={"ppid": 500, "start_time": 900}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 500, "start_time": 900}), patch(
             "main.launch_process_status", return_value={"state": "running", "message": "running"}
         ), patch("main.detect_skyrim_processes", return_value=scan), patch(
             "main._is_descendant_process", side_effect=lambda pid, ancestor: True
@@ -397,7 +397,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window()
         window.launch_session.wrapper_pid = 500
         window.launch_session.log_path = "/tmp/wyrd-launch.log"
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.launch_process_status", return_value={"state": "exited", "message": "wrapper exited"}
         ), patch("main.detect_skyrim_processes", return_value={
             "ok": True, "processes": [], "wyrd_processes": []
@@ -419,7 +419,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "wyrd_processes": [],
         }
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
@@ -459,7 +459,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "pid": 700, "binary": "skyrimse.exe",
             "prefix_attributed": True, "attributed_to_wyrd": False,
         }
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.launch_process_status", return_value={
                 "state": "running", "message": "wrapper still running"
             }
@@ -520,7 +520,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             ],
             "message": "Detected Skyrim processes in Wyrd prefix.",
         }
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 900}), patch(
             "main.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
@@ -544,7 +544,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "wyrd_processes": [{"pid": 700, "binary": "skyrimse.exe"}],
             "message": "Detected Skyrim in Wyrd prefix.",
         }
-        with patch("process_monitor._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
+        with patch("main._proc_identity", return_value={"ppid": 1, "start_time": 901}), patch(
             "main.launch_process_status", return_value={
                 "state": "exited", "message": "wrapper exited"
             }
