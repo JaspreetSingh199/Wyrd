@@ -263,11 +263,17 @@ def discover_wine_game_path(prefix_root: Path, game_path: Path, steam_root: Path
 
 def verify_wine_game_path(proton_path: Path, prefix_root: Path,
                           steam_root: Path, windows_game_path: str) -> dict:
-    """Ask the active Proton runtime to verify SkyrimSE.exe is visible at its Wine path."""
+    """Verify Skyrim's Wine path using the existing filesystem mapping only.
+
+    The drive mapping has already been derived from Proton's dosdevices and
+    round-trip checked by discover_wine_game_path(). Do not spawn cmd.exe just
+    to repeat an existence check: that creates a visible Windows console and
+    can interfere with the desktop session.
+    """
     try:
-        proton = Path(proton_path).expanduser()
         prefix = _reject_symlinked_path_components(Path(prefix_root), "Steam compatdata prefix")
         steam = _reject_symlinked_path_components(Path(steam_root), "Steam client root")
+        proton = Path(proton_path).expanduser()
         if proton.is_symlink() or not (proton / "proton").is_file():
             raise RuntimeError("Selected Proton runtime is missing or unsafe.")
         resolved_prefix = prefix.resolve(strict=True)
@@ -277,33 +283,16 @@ def verify_wine_game_path(proton_path: Path, prefix_root: Path,
             raise RuntimeError("The supplied prefix is not Skyrim AppID 489830 compatdata.")
         mapped = _resolve_windows_path(windows_game_path, resolved_prefix)
         if mapped is None or not (mapped / "SkyrimSE.exe").is_file():
-            raise RuntimeError("Generated Wine path does not resolve to SkyrimSE.exe on the Linux filesystem.")
-
-        env = _runtime_environment(proton, resolved_steam, resolved_prefix)
-        env.update({
-            "SteamAppId": APP_ID, "SteamGameId": APP_ID,
-            "STEAM_COMPAT_APP_ID": APP_ID,
-            "STEAM_COMPAT_DATA_PATH": str(resolved_prefix),
-        })
-        windows_exe = windows_game_path.rstrip("\\") + "\\SkyrimSE.exe"
-        command = f'if exist "{windows_exe}" (exit /b 0) else (exit /b 1)'
-        result = subprocess.run(
-            [str(proton / "proton"), "run", "cmd", "/c", command],
-            cwd=str(resolved_steam), env=env, capture_output=True,
-            text=True, timeout=120, check=False,
-        )
-        if result.returncode != 0:
-            details = (result.stdout + "\\n" + result.stderr).strip()
             raise RuntimeError(
-                "The selected Proton runtime cannot see SkyrimSE.exe at "
-                f"{windows_exe}." + (" " + details[-1500:] if details else "")
+                "Generated Wine path does not resolve to SkyrimSE.exe on the Linux filesystem."
             )
         return {
-            "ok": True, "windows_executable": windows_exe,
+            "ok": True,
+            "windows_executable": windows_game_path.rstrip("\\\\") + "\\\\SkyrimSE.exe",
             "resolved_executable": str(mapped / "SkyrimSE.exe"),
-            "message": f"Proton verified {windows_exe}.",
+            "message": f"Filesystem mapping verified {windows_game_path}\\\\SkyrimSE.exe; no Windows command shell was launched.",
         }
-    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+    except (OSError, ValueError, RuntimeError) as error:
         return {"ok": False, "message": str(error)}
 
 
