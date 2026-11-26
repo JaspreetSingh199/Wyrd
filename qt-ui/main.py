@@ -21,6 +21,7 @@ from launch_workflow import LaunchWorkflowMixin
 from registered_executable_workflow import RegisteredExecutableWorkflowMixin
 from launch_preflight_workflow import LaunchPreflightWorkflowMixin
 from process_workflow import ProcessMonitorWorkflowMixin
+from launch_diagnostics_workflow import LaunchDiagnosticsWorkflowMixin
 from environment_workflow import EnvironmentWorkflowMixin
 from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
@@ -33,6 +34,7 @@ class MainWindow(
     RegisteredExecutableWorkflowMixin,
     LaunchPreflightWorkflowMixin,
     ProcessMonitorWorkflowMixin,
+    LaunchDiagnosticsWorkflowMixin,
     EnvironmentWorkflowMixin,
     AudioWorkflowMixin,
     Mo2ManagementWorkflowMixin,
