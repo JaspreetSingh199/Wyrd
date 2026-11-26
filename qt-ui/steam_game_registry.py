@@ -108,7 +108,7 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
             })
             # Keep Proton output off the Python heap. A runaway or verbose
             # wrapper must not accumulate unbounded captured stdout/stderr.
-            with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as log:
+            with tempfile.TemporaryFile(mode="w+b") as log:
                 result = subprocess.run(
                     [str(proton / "proton"), "run", "regedit", "/S", str(reg_path)],
                     cwd=str(resolved_steam), env=env,
@@ -117,7 +117,7 @@ def configure_skyrim_se_registry(prefix_root: Path, game_path: Path,
                 )
                 if result.returncode != 0:
                     log.seek(max(0, log.tell() - 4000))
-                    details = log.read().strip()
+                    details = log.read().decode("utf-8", errors="replace").strip()
                     raise RuntimeError(
                         "Proton regedit failed to import Skyrim's registry path."
                         + (" " + details[-2000:] if details else "")
