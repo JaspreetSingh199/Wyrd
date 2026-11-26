@@ -55,8 +55,8 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.QMessageBox.information"),
             patch("main.QMessageBox.warning"),
             patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.No),
-            patch("main.QInputDialog.getItem", return_value=("", False)),
-            patch("main.QInputDialog.getText", return_value=("", False)),
+            patch("setup_workflow.QInputDialog.getItem", return_value=("", False)),
+            patch("setup_workflow.QInputDialog.getText", return_value=("", False)),
             patch("launch_preflight_workflow.inspect_mo2_instances", return_value={
                 "ok": True, "instances": [], "skyrim_instances": [],
                 "message": "No MO2 instances were found in the known prefix locations."
@@ -205,7 +205,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_inventory_launch_handoff_refuses_unverified_s_drive(self):
         window = self._window()
         window.mo2_discovery_state = {"ok": False, "message": "Proton path mismatch"}
-        with patch("main.QInputDialog.getItem") as choose, patch(
+        with patch("setup_workflow.QInputDialog.getItem") as choose, patch(
             "main.QMessageBox.warning"
         ) as warning:
             window._launch_skyrim_target_from_inventory(
@@ -269,7 +269,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_launch_monitor_starts_after_successful_handoff(self):
         window = self._window()
-        with patch("main.QInputDialog.getItem", side_effect=[
+        with patch("setup_workflow.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True)
         ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
             "launch_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
@@ -297,7 +297,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_start_skyrim_default_audio_is_first_and_passed_unchanged(self):
         window = self._window()
-        with patch("main.QInputDialog.getItem", side_effect=[
+        with patch("setup_workflow.QInputDialog.getItem", side_effect=[
             ("Skyrim", True), ("Skyrim", True)
         ]), patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
             "launch_workflow.inspect_skyrim_prefix_mo2_installation", return_value={
@@ -650,7 +650,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_first_launch_handles_missing_saved_proton_path(self):
         window = self._window(settings={})
         yes = QMessageBox.StandardButton.Yes
-        with patch("main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)) as choose, patch(
+        with patch("setup_workflow.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)) as choose, patch(
             "main.QMessageBox.question", side_effect=[yes, QMessageBox.StandardButton.No]
         ), patch("setup_workflow.mark_first_run_completed"), patch.object(
             window, "_save_selection"
@@ -662,7 +662,7 @@ class MainWindowSmokeTests(unittest.TestCase):
     def test_cancelled_first_launch_runtime_choice_does_not_mark_setup_complete(self):
         window = self._window()
         with patch("setup_workflow.mark_first_run_completed") as mark, patch(
-            "main.QInputDialog.getItem", return_value=("", False)
+            "setup_workflow.QInputDialog.getItem", return_value=("", False)
         ):
             window._run_first_launch_setup()
         mark.assert_not_called()
