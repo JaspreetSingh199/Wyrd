@@ -127,9 +127,16 @@ class Mo2LibraryDialog(QFrame):
                 "Select an instance to inspect it. Discovery is read-only; no Wyrd registration is needed."
             )
         else:
-            self.setup_status.setText(
-                inventory.get("message", "No MO2 instances were found in the known prefix locations.")
+            message = inventory.get(
+                "message", "No MO2 instances were found in the known prefix locations."
             )
+            roots = inventory.get("scan_roots", [])
+            errors = inventory.get("errors", [])
+            if roots:
+                message += "\\n\\nLocations checked:\\n" + "\\n".join(roots)
+            if errors:
+                message += "\\n\\nRead errors:\\n" + "\\n".join(errors[:6])
+            self.setup_status.setText(message)
 
     def _show_selected(self, row: int):
         item = self.instances.item(row) if row >= 0 else None
