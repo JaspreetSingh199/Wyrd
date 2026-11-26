@@ -80,8 +80,8 @@ class RegisteredExecutableWorkflowMixin:
                 Path.home() / ".local/share/Steam",
                 Path.home() / ".steam/root",
             )
-            steam_root = next((path for path in candidates if path.is_dir()), Path(""))
-        if not steam_root.is_dir():
+            steam_root = next((path for path in candidates if path.is_dir()), None)
+        if steam_root is None or not steam_root.is_dir():
             return {"ok": False, "message": "A Steam client install root is needed by this Proton runtime but was not found."}
 
         env = _runtime_environment(proton, steam_root, prefix)
