@@ -480,9 +480,54 @@ class WyrdMO2Tests(unittest.TestCase):
             result = inspect_mo2_instances(prefix, detected_game_path=game)
             self.assertTrue(result["ok"])
             self.assertEqual(result["instances"][0]["name"], "Stale Skyrim")
-            self.assertEqual(result["skyrim_instances"], [])
+            # The instance name/game identity remains discoverable so Wyrd
+            # can pass it to MO2's --instance selector. Its stale gamePath is
+            # explicitly reported and cannot authorize an external binary.
+            self.assertEqual(
+                [item["name"] for item in result["skyrim_instances"]],
+                ["Stale Skyrim"],
+            )
+            self.assertFalse(result["skyrim_instances"][0]["game_path_matches"])
             self.assertEqual(ini.read_text(encoding="utf-8").splitlines()[1], "gameName=Skyrim Special Edition")
 
+
+    def test_stale_game_path_does_not_authorize_executable_outside_detected_game(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "prefix"
+            game = root / "detected-game"
+            stale_game = root / "old-steam-library"
+            game.mkdir()
+            stale_game.mkdir()
+            (game / "SkyrimSE.exe").write_bytes(b"current-game")
+            (stale_game / "SkyrimSE.exe").write_bytes(b"stale-game")
+            instance = (
+                prefix / "pfx/drive_c/users/steamuser/AppData/Local/"
+                "ModOrganizer/Skyrim Special Edition"
+            )
+            instance.mkdir(parents=True)
+            (prefix / ".wyrd-managed.json").write_text(
+                json.dumps({"managed_by": "Wyrd"}), encoding="utf-8"
+            )
+            stale_win = "Z:" + str(stale_game).replace("/", "\\\\")
+            binary_win = stale_win + "\\\\SkyrimSE.exe"
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\\n"
+                "gameName=Skyrim Special Edition\\n"
+                f"gamePath={stale_win}\\n"
+                "[customExecutables]\\n"
+                "size=1\\n"
+                "1\\\\title=Skyrim\\n"
+                f"1\\\\binary={binary_win}\\n",
+                encoding="utf-8",
+            )
+            result = inspect_skyrim_launch_targets(
+                prefix, game, instance_name="Skyrim Special Edition"
+            )
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["targets"], [])
+            self.assertTrue(any("outside the detected Skyrim directory" in warning
+                                for warning in result["warnings"]))
 
     def test_launch_target_inspection_validates_skyrim_and_skse_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
