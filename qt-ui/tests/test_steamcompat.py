@@ -12,7 +12,7 @@ def test_prefix_path_is_skyrim_appid():
 
 
 def test_launch_refuses_uninstalled_mo2(monkeypatch, tmp_path):
-    monkeypatch.setattr(steam_mo2_discovery, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {"installed": False})
+    monkeypatch.setattr(steam_mo2_launch, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {"installed": False})
     result = steamcompat.launch_mo2_in_skyrim_prefix(tmp_path)
     assert not result["ok"]
     assert "not installed" in result["message"].lower()
@@ -28,7 +28,7 @@ def test_launch_refuses_missing_skyrim_prefix(monkeypatch, tmp_path):
     proton.mkdir()
     game.mkdir()
     metadata = {"proton": str(proton), "steam_root": str(root), "game_path": str(game)}
-    monkeypatch.setattr(steam_mo2_discovery, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {
+    monkeypatch.setattr(steam_mo2_launch, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {
         "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"),
         "prefix": str(steam_prefix), "install": str(install), "steam_root": str(root),
     })
@@ -52,7 +52,7 @@ def test_launch_uses_skyrim_compatdata_and_does_not_initialize_it(monkeypatch, t
     proton.mkdir()
     game.mkdir()
     metadata = {"proton": str(proton), "steam_root": str(root), "game_path": str(game)}
-    monkeypatch.setattr(steam_mo2_discovery, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {
+    monkeypatch.setattr(steam_mo2_launch, "inspect_skyrim_prefix_mo2_installation", lambda game, home: {
         "installed": True, "metadata": metadata, "executable": str(install / "ModOrganizer.exe"),
         "prefix": str(steam_prefix), "install": str(install), "steam_root": str(root),
     })
