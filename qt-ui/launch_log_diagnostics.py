@@ -1,6 +1,7 @@
 """Read and classify diagnostic output from MO2/Proton launch logs."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -18,7 +19,6 @@ def read_launch_diagnostics(log_path: Path, max_bytes: int = 65536) -> dict:
     except OSError as error:
         return {"ok": False, "message": f"Could not read launch diagnostics: {error}", "content": ""}
     return {"ok": True, "path": str(path), "content": content, "truncated": size > max_bytes}
-
 
 
 def classify_launch_diagnostics(content: str) -> list[dict]:
