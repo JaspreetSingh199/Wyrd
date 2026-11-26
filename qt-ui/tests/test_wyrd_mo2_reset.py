@@ -47,7 +47,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
             settings.write_text(json.dumps({
                 "game_path": str(game), "selected_mo2_instance_id": "legacy-id"
             }), encoding="utf-8")
-            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+            with patch("steam_mo2_management.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "managed": True,
                 "install": str(install), "prefix": str(prefix),
             }):
@@ -66,7 +66,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             prefix, install, _instance, game, _custom, sentinel = self._layout(home)
-            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+            with patch("steam_mo2_management.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": True, "managed": True,
                 "install": str(install), "prefix": str(prefix),
             }), patch.dict("os.environ", {"XDG_CONFIG_HOME": str(home / ".config")}):
@@ -80,7 +80,7 @@ class WyrdMO2ResetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             _prefix, install, _instance, game, _custom, _sentinel = self._layout(home)
-            with patch("steamcompat.inspect_skyrim_prefix_mo2_installation", return_value={
+            with patch("steam_mo2_management.inspect_skyrim_prefix_mo2_installation", return_value={
                 "installed": False, "managed": False, "message": "not owned",
             }):
                 result = reset_wyrd_mo2(home, game)
