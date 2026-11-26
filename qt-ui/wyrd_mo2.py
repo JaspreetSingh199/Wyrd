@@ -687,17 +687,17 @@ def _instance_roots(prefix_root: Path, install_root: Path | None = None) -> list
                 user_dir / "AppData/Roaming/ModOrganizer/instances",
                 user_dir / "Documents/Modding/ModOrganizer/instances",
             )
-            roots.extend(path for path in candidates if path.is_dir())
+            roots.extend(path for path in candidates if path.is_dir() and not path.is_symlink())
 
     # Restrict portable discovery to the explicitly supplied Wyrd-owned install
     # root. The root itself may be the active portable instance; instances/
     # is also supported for named portable instances. No arbitrary paths are read.
     if install_root is not None:
         install = Path(install_root).expanduser()
-        if install.is_dir():
+        if install.is_dir() and not install.is_symlink():
             roots.append(install)
             portable_instances = install / "instances"
-            if portable_instances.is_dir():
+            if portable_instances.is_dir() and not portable_instances.is_symlink():
                 roots.append(portable_instances)
     return roots
 
@@ -780,7 +780,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
         if (root / "ModOrganizer.ini").is_file():
             entries.insert(0, root)
         for directory in entries:
-            if not directory.is_dir():
+            if not directory.is_dir() or directory.is_symlink():
                 continue
             ini = directory / "ModOrganizer.ini"
             if not ini.is_file():
