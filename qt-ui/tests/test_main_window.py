@@ -9,7 +9,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
     from PySide6.QtWidgets import QApplication, QMessageBox, QLabel
-    from main import MainWindow, GameProcess
+    from main import MainWindow
+    from launch_models import GameProcess
 except ImportError:
     QApplication = None
     QMessageBox = None
