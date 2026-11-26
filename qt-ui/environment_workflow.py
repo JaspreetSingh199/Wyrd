@@ -31,6 +31,13 @@ class EnvironmentWorkflowMixin:
         self._discover_game_installation()
         self._populate_proton_runtimes(selected)
 
+        self._inspect_mo2_installation_and_mapping()
+        self._discover_mo2_instance_inventory()
+        self._present_mo2_installation()
+        self._finalize_environment_readiness()
+
+    def _inspect_mo2_installation_and_mapping(self) -> None:
+        """Inspect the active Skyrim prefix and verify MO2/Steam path integration."""
         self._set_scan_progress(43, "Locating MO2 in Skyrim’s Proton environment…")
         self.mo2_state = inspect_skyrim_prefix_mo2_installation(
             Path(self.game_state["game_dir"])
@@ -42,26 +49,9 @@ class EnvironmentWorkflowMixin:
             self.mo2_state = inspect_external_skyrim_prefix_mo2_installation(
                 Path(self.game_state["game_dir"])
             )
-        self._set_scan_progress(58, "Verifying Proton drive mappings and synchronizing MO2 game paths…")
-        self.mo2_discovery_state = (
-            self._verify_mo2_game_mapping(
-                Path(self.game_state["game_dir"]).expanduser(),
-                self.proton_combo.currentData(),
-            )
-            if self.mo2_state.get("installed") and self.game_state.get("found")
-            else None
-        )
-        self._update_precheck(
-            2, "Skyrim prefix and MO2 installation",
-            bool(self.mo2_state.get("installed")),
-            self.mo2_state.get("message", "MO2 installation was not found."),
-        )
-        self.mo2_target_occupied = bool(
-            self.mo2_state.get("installed") or self.mo2_state.get("install")
-        )
-        self.reset_mo2_button.setEnabled(bool(
-            self.mo2_state.get("installed") and self.mo2_state.get("managed", True)
-        ))
+
+    def _discover_mo2_instance_inventory(self) -> None:
+        """Discover MO2 instances independently of executable installation checks."""
         self._set_scan_progress(78, "Scanning MO2 installations and validating instance configurations…")
         if self.game_state.get("found"):
             # Instance inventory is independent of the conventional MO2
@@ -83,6 +73,9 @@ class EnvironmentWorkflowMixin:
             f"{len(skyrim_instances)} Skyrim SE instance(s) found."
             if self.instance_state.get("ok") else self.instance_state.get("message", "Instance scan unavailable."),
         )
+
+    def _present_mo2_installation(self) -> None:
+        """Render the current MO2 installation and instance summary in the UI."""
         if self.mo2_state.get("installed"):
             summary = self.instance_state.get("message", "MO2 instance inventory unavailable.")
             if self.mo2_discovery_state is not None:
@@ -141,6 +134,8 @@ class EnvironmentWorkflowMixin:
             self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
+    def _finalize_environment_readiness(self) -> None:
+        """Restore selection, refresh panels, and derive final launch readiness."""
         self._set_scan_progress(92, "Finalizing environment readiness…")
         self._refresh_audio_status()
         ready = bool(self.game_state.get("found") and self.proton_builds)
