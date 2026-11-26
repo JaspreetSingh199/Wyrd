@@ -1275,14 +1275,14 @@ class WyrdMO2Tests(unittest.TestCase):
 
     def test_launch_process_status_validates_process_start_time(self):
         with patch("wyrd_mo2.os.kill", return_value=None), patch(
-            "wyrd_mo2._proc_start_time", return_value=500
+            "process_monitor._proc_start_time", return_value=500
         ):
             self.assertEqual(launch_process_status(123, start_time=500)["state"], "running")
             reused = launch_process_status(123, start_time=499)
             self.assertEqual(reused["state"], "exited")
             self.assertIn("reused", reused["message"])
         with patch("wyrd_mo2.os.kill", return_value=None), patch(
-            "wyrd_mo2._proc_start_time", return_value=None
+            "process_monitor._proc_start_time", return_value=None
         ):
             self.assertEqual(launch_process_status(123, start_time=500)["state"], "unknown")
         with patch("wyrd_mo2.os.kill") as kill:
