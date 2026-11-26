@@ -1,7 +1,7 @@
-"""Launch orchestration and process monitoring methods for MainWindow.
+"""Launch orchestration methods for MainWindow.
 
-This mixin owns launch workflows while the window supplies UI state, widgets,
-and presentation callbacks.
+The window supplies UI state, widgets, and presentation callbacks; process
+monitoring is owned by ProcessMonitorWorkflowMixin.
 """
 from __future__ import annotations
 
