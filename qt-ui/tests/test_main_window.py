@@ -651,7 +651,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         yes = QMessageBox.StandardButton.Yes
         with patch("main.QInputDialog.getItem", return_value=("Proton Test (x86_64)", True)) as choose, patch(
             "main.QMessageBox.question", side_effect=[yes, QMessageBox.StandardButton.No]
-        ), patch("main.mark_first_run_completed"), patch.object(
+        ), patch("setup_workflow.mark_first_run_completed"), patch.object(
             window, "_save_selection"
         ), patch.object(window, "manage_mo2_library"):
             window._run_first_launch_setup()
@@ -660,7 +660,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_cancelled_first_launch_runtime_choice_does_not_mark_setup_complete(self):
         window = self._window()
-        with patch("main.mark_first_run_completed") as mark, patch(
+        with patch("setup_workflow.mark_first_run_completed") as mark, patch(
             "main.QInputDialog.getItem", return_value=("", False)
         ):
             window._run_first_launch_setup()
@@ -688,7 +688,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_first_launch_prompt_is_not_repeated_after_completion(self):
         window = self._window(settings={"first_run_completed": True})
-        with patch("main.mark_first_run_completed") as mark, patch(
+        with patch("setup_workflow.mark_first_run_completed") as mark, patch(
             "main.QMessageBox.question"
         ) as question:
             window._run_first_launch_setup()
@@ -709,7 +709,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
         ) as reset, patch.object(window, "_set_active_instance") as set_active, patch.object(
             window, "refresh_all"
-        ) as refresh, patch("main.mark_first_run_completed") as mark_completed, patch(
+        ) as refresh, patch("setup_workflow.mark_first_run_completed") as mark_completed, patch(
             "main.QTimer.singleShot"
         ) as schedule:
             window.reset_wyrd_preferences()
@@ -728,7 +728,7 @@ class MainWindowSmokeTests(unittest.TestCase):
         window = self._window(settings={"first_run_completed": False})
         with patch("main.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), patch(
             "main.reset_wyrd_settings", return_value={"ok": True, "message": "Wyrd preferences cleared."}
-        ), patch.object(window, "refresh_all"), patch("main.mark_first_run_completed") as mark_completed, patch(
+        ), patch.object(window, "refresh_all"), patch("setup_workflow.mark_first_run_completed") as mark_completed, patch(
             "main.QTimer.singleShot"
         ) as schedule:
             window.reset_wyrd_preferences()
