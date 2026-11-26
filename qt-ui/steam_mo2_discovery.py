@@ -6,7 +6,7 @@ from pathlib import Path
 
 from proton_runtime import _steam_root_for_game
 from mo2_instances import inspect_mo2_instances
-from steam_prefix import steam_compat_prefix
+from steam_prefix import APP_ID, steam_compat_prefix
 
 
 def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = None) -> dict:
