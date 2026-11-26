@@ -375,7 +375,6 @@ class MainWindow(QMainWindow):
             proton_path=self._saved_settings.get("proton", ""),
             selected_instance_id=self.selected_mo2_instance_id,
         )
-        self.mo2_library_widget.on_registry_changed = self._on_mo2_registry_changed
         setup_layout.addWidget(self.mo2_library_widget)
         self.mo2_advanced_widget = Mo2AdvancedSettings(
             self, selected_instance_id=self.selected_mo2_instance_id
@@ -1208,8 +1207,7 @@ class MainWindow(QMainWindow):
         answer = QMessageBox.question(
             self, "Reset Wyrd Settings",
             "Reset Wyrd's preferences to their defaults?\n\n"
-            "This does NOT uninstall Wyrd or remove MO2, its registrations, Skyrim, "
-            "Steam compatdata, game files or saves. Existing MO2 registrations and the active environment are preserved. "
+            "This does NOT uninstall Wyrd or remove MO2, Skyrim, Steam compatdata, game files or saves. "
             "First-launch setup will appear next time you start Wyrd.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
@@ -1224,6 +1222,7 @@ class MainWindow(QMainWindow):
 
         # Reset preferences, but keep the user's existing MO2 connection intact.
         self._saved_settings = {"first_run_completed": False}
+        self.selected_mo2_instance_id = ""
         self._saved_game_path = None
         self.selected_mo2_instance_id = ""
         self._restoring_selection = True
@@ -1274,7 +1273,6 @@ class MainWindow(QMainWindow):
         self._log(result.get("message", "MO2 removal attempted."))
         if result.get("ok"):
             self.selected_mo2_instance_id = ""
-            self._saved_settings.pop("selected_mo2_instance_id", None)
             self.progress_label.setText("Wyrd-managed MO2 removed.")
             QMessageBox.information(self, "MO2 removed", result["message"])
         else:
@@ -1331,21 +1329,6 @@ class MainWindow(QMainWindow):
                         lines.append("Instance scan: " + inventory.get("message", "unavailable"))
                 except Exception as error:
                     lines.append(f"MO2 instance scan: ERROR ({error})")
-
-        try:
-            registry = self.mo2_library_widget.service.load()
-            registered_instances = registry.get("instances", [])
-            registered_installations = registry.get("installations", [])
-            lines.append("")
-            lines.append(f"Legacy Wyrd installation records (not used for discovery/launch): {len(registered_installations)}")
-            lines.append(f"Legacy Wyrd environment records (not used for discovery/launch): {len(registered_instances)}")
-            for item in registered_instances:
-                lines.append(
-                    f"  • {item.get('display_name') or item.get('instance_name') or item.get('id')} "
-                    f"— {'folder exists' if Path(item.get('instance_path', '')).is_dir() else 'FOLDER MISSING'}"
-                )
-        except Exception as error:
-            lines.append(f"Wyrd registry: ERROR ({error})")
 
         QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
 
