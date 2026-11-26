@@ -47,7 +47,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             patch("main.inspect_skyrim_prefix_mo2_instances", return_value={"ok": False, "instances": [], "skyrim_instances": [], "message": "MO2 is not installed."}),
             patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "managed": False, "message": "No external MO2 installation was found in Skyrim's Steam prefix."}),
             patch("environment_workflow.inspect_any_skyrim_prefix_mo2_instances", return_value=inventory or {"ok": False, "instances": [], "skyrim_instances": [], "message": "No MO2 instance was found."}),
-            patch("main.inspect_audio_compatibility", return_value={"ok": False, "safe": False, "message": "Legacy audio prefix is unavailable."}),
+            patch("audio_workflow.inspect_audio_compatibility", return_value={"ok": False, "safe": False, "message": "Legacy audio prefix is unavailable."}),
             patch("main.read_settings", return_value=settings or {}),
             patch("main.write_settings"),
             # Default-deny dialogs keep offscreen tests deterministic. Individual
@@ -639,7 +639,7 @@ class MainWindowSmokeTests(unittest.TestCase):
             "environment_workflow.inspect_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}
         ), patch("environment_workflow.inspect_external_skyrim_prefix_mo2_installation", return_value={"installed": False, "message": "none"}), patch.object(
             window, "manage_mo2_library"
-        ), patch("main.inspect_audio_compatibility", return_value={"ok": True, "dlls": {}}), patch(
+        ), patch("audio_workflow.inspect_audio_compatibility", return_value={"ok": True, "dlls": {}}), patch(
             "launch_workflow.read_launch_diagnostics", return_value={}
         ), patch("main.write_settings") as save:
             window.refresh_all()
@@ -751,7 +751,7 @@ class MainWindowSmokeTests(unittest.TestCase):
 
     def test_audio_panel_shows_unverified_dialogue_status_and_check_button(self):
         window = self._window()
-        with patch("main.inspect_audio_compatibility", return_value={
+        with patch("audio_workflow.inspect_audio_compatibility", return_value={
             "ok": True, "safe": True, "prefix": "/home/test/.local/share/wyrd/compatdata/mo2-skyrim",
             "components": {
                 "xact": {"state": "missing"},
