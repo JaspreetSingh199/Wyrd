@@ -1,4 +1,4 @@
-"""Wyrd-owned MO2 installation and launch through a discovered Steam Proton build.
+"""Wyrd MO2 settings and instance operations with compatibility exports.
 
 All paths are user-local. Existing MO2 installs and unknown prefixes are never
 adopted or overwritten automatically.
@@ -10,7 +10,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
