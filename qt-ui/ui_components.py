@@ -8,7 +8,7 @@ def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton
     """Add a compact hover-help control beside an advanced action."""
     info = QPushButton("i")
     info.setObjectName("infoButton")
-    info.setFixedSize(24, 24)
+    info.setFixedSize(20, 20)
     info.setToolTip(explanation)
     info.setToolTipDuration(15000)
     info.setAccessibleName(f"Information about {title}")
