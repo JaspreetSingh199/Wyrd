@@ -61,7 +61,6 @@ class MainWindowPagesMixin:
         # The checklist itself communicates readiness. A 6px progress bar with
         # centered text was unreadable and visually collided with the checks.
         self.precheck_progress.hide()
-        setup_layout.addWidget(self.precheck_panel)
         self.check_mo2_button = QPushButton("Check installation")
         self.check_mo2_button.setObjectName("secondaryAction")
         self.check_mo2_button.setToolTip(
@@ -130,10 +129,6 @@ class MainWindowPagesMixin:
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget)
-        self.active_instance_label = QLabel("Modded launch is available from each Skyrim instance row above.")
-        self.active_instance_label.setObjectName("muted")
-        self.active_instance_label.setWordWrap(True)
-        setup_layout.addWidget(self.active_instance_label)
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
@@ -159,6 +154,7 @@ class MainWindowPagesMixin:
         maintenance_layout = QVBoxLayout(maintenance_page)
         maintenance_layout.setContentsMargins(12, 16, 12, 12)
         maintenance_layout.setSpacing(12)
+        maintenance_layout.addWidget(self.precheck_panel)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(12)
         diagnostics_grid.setVerticalSpacing(12)
@@ -178,23 +174,20 @@ class MainWindowPagesMixin:
         diagnostics_grid.addWidget(proton_diagnostics_panel, 0, 0)
 
         self.audio_panel = panel(
-            "AUDIO COMPATIBILITY",
-            "Inspect audio components or enable the XAudio2 override."
+            "AUDIO OPTIONS",
+            "Optional launch-time compatibility setting. This does not inspect or modify Wine/Proton audio libraries."
         )
         audio_layout = self.audio_panel.layout()
-        self.audio_detail = QLabel("Audio diagnostics will be checked during detection.")
-        self.audio_detail.setObjectName("muted")
-        self.audio_detail.setWordWrap(True)
-        audio_layout.addWidget(self.audio_detail)
         audio_actions = QHBoxLayout()
-        self.audio_check_button = QPushButton("Inspect audio libraries")
-        self.audio_check_button.clicked.connect(self.check_audio_libraries)
-        audio_actions.addWidget(self.audio_check_button)
-        add_info_button(audio_actions, self, "Inspect audio libraries", "Checks the Skyrim Proton prefix for relevant audio libraries and reports what Wyrd can detect. This is diagnostic only; it does not install or replace audio files. The XAudio2 checkbox separately controls the launch-time compatibility override.")
         self.xaudio_override_checkbox = QCheckBox("Enable XAudio2 compatibility override")
         self.xaudio_override_checkbox.setChecked(bool(self._saved_settings.get("xaudio2_compat", False)))
         self.xaudio_override_checkbox.toggled.connect(self._save_audio_option)
         audio_actions.addWidget(self.xaudio_override_checkbox)
+        add_info_button(
+            audio_actions, self, "XAudio2 compatibility override",
+            "Adds the XAudio2 compatibility override to Wyrd's existing SteamCompat launch. "
+            "Leave it disabled unless you need it for Skyrim audio troubleshooting."
+        )
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         diagnostics_grid.addWidget(self.audio_panel, 0, 1)
