@@ -68,6 +68,13 @@ The standalone bundle includes Python, PySide6, and the Qt application runtime. 
 - Destructive MO2 removal is restricted to a verified Wyrd-managed MO2 program directory; MO2 instances and user data are preserved.
 - Wyrd settings reset does not uninstall MO2 or touch Skyrim/Steam data.
 
+## Future nice-to-haves (not V1 requirements)
+
+Wyrd intentionally stays focused on launching modded Skyrim. The following conveniences may be considered later if real user demand justifies the extra complexity; they are not promises or prerequisites for V1.
+
+- **Smoother adoption of existing MO2 installations:** make it easier to select and validate MO2 installations that were set up independently of Wyrd, while reusing the same discovery and launch workflow. MO2 should remain responsible for its own instances and data. For instance/profile transfers, prefer MO2's own instance-creation workflow and user-managed file moves with backups rather than having Wyrd perform an automatic migration.
+- **Broader multi-library and secondary-drive edge-case handling:** Wyrd already discovers Skyrim using Steam's registered library metadata. Future work could improve resilience for unusual library layouts, mount points, or Proton access to secondary drives. This does not mean turning Wyrd into a general Steam library or multi-game manager; Skyrim SE remains the supported game.
+
 ## Known limitations and troubleshooting
 
 See [Known limitations and troubleshooting](docs/TROUBLESHOOTING.md). In particular, Wyrd depends on Steam's local library metadata, a usable Proton runtime, and a correctly configured MO2 Skyrim instance.
