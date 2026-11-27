@@ -18,6 +18,7 @@ def verify_mo2_game_mapping(
 ) -> tuple[dict, list[str]]:
     """Return verified mapping state and diagnostic messages; fail closed."""
     messages: list[str] = []
+    failures: list[str] = []
     try:
         steam_root = _steam_root_for_game(game_path, Path.home())
         state = discover_wine_game_path(prefix_path, game_path, steam_root)
@@ -34,10 +35,12 @@ def verify_mo2_game_mapping(
             state["proton_path_verification"] = wine_path_state
             if not wine_path_state.get("ok"):
                 state["ok"] = False
-                messages.append(
-                    "Proton game-path verification failed closed: "
+                failure = (
+                    "Proton game-path verification failed: "
                     + wine_path_state.get("message", "unknown error")
                 )
+                failures.append(failure)
+                messages.append(failure)
             sync_state = (
                 synchronize_mo2_instance_game_paths(
                     prefix_path, game_path, state["windows_game_path"]
@@ -58,10 +61,12 @@ def verify_mo2_game_mapping(
                 )
             else:
                 state["ok"] = False
-                messages.append(
-                    "MO2 gamePath synchronization failed closed: "
+                failure = (
+                    "MO2 gamePath synchronization failed: "
                     + sync_state.get("message", "unknown error")
                 )
+                failures.append(failure)
+                messages.append(failure)
             if proton_value and state.get("ok"):
                 registry_state = configure_skyrim_se_registry(
                     prefix_path, game_path, steam_root, Path(proton_value),
@@ -74,10 +79,12 @@ def verify_mo2_game_mapping(
                     )
                 else:
                     state["ok"] = False
-                    messages.append(
-                        "MO2 Bethesda registry provisioning failed closed: "
+                    failure = (
+                        "Read-only Skyrim registry verification failed: "
                         + registry_state.get("message", "unknown error")
                     )
+                    failures.append(failure)
+                    messages.append(failure)
             elif not proton_value:
                 state["registry"] = {
                     "ok": False, "message": "No Proton runtime is selected."
@@ -86,13 +93,20 @@ def verify_mo2_game_mapping(
         state = {"ok": False, "message": str(error)}
 
     if state.get("ok"):
-        messages.append(
-            "MO2 Steam discovery: " + state["windows_game_path"]
+        state["mapping_message"] = state.get("message", "")
+        state["message"] = (
+            "Verified MO2 Steam mapping: " + state["windows_game_path"]
             + " resolves to " + state["resolved_game_path"]
         )
+        messages.append("MO2 Steam discovery: " + state["message"])
     else:
+        state["mapping_message"] = state.get("message", "")
+        if failures:
+            state["message"] = " | ".join(failures)
+        else:
+            state["message"] = state.get("message", "Unknown Steam mapping verification failure.")
         messages.append(
             "MO2 Steam discovery verification failed closed: "
-            + state.get("message", "unknown mapping error")
+            + state["message"]
         )
     return state, messages
