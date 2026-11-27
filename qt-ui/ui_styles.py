@@ -312,4 +312,14 @@ QLabel#unmoddedTitle {
     color: #e8dfce; font-family: "Noto Serif", serif; font-size: 17px; font-weight: 700;
     padding-right: 10px;
 }
+
+QFrame#heroBanner {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #263b47, stop:0.52 #1b2b34, stop:1 #142027);
+    border: 1px solid #7d7058;
+    border-radius: 9px;
+}
+QLabel#heroSubtitle {
+    color: #d1c9b8; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 15px; padding: 0 5px 3px 5px;
+}
 """
