@@ -39,7 +39,7 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
             zombie = proc / "4321"
             zombie.mkdir()
             (zombie / "cmdline").write_bytes(
-                b"Z:\\\\ModOrganizer.exe\\0--instance\\0Skyrim\\0"
+                b"Z:\\ModOrganizer.exe\0--instance\0Skyrim\0"
             )
             (zombie / "environ").write_bytes(
                 f"STEAM_COMPAT_DATA_PATH={prefix}".encode() + bytes([0])
@@ -61,7 +61,7 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
             live = proc / "4322"
             live.mkdir()
             (live / "cmdline").write_bytes(
-                b"Z:\\\\ModOrganizer.exe\\0--instance\\0Skyrim\\0"
+                b"Z:\\ModOrganizer.exe\0--instance\0Skyrim\0"
             )
             (live / "environ").write_bytes(
                 f"STEAM_COMPAT_DATA_PATH={prefix}".encode() + bytes([0])
