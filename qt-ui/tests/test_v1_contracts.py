@@ -80,6 +80,46 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
         self.assertFalse(window._mo2_session_seen)
         window.refresh_all.assert_called_once_with()
 
+    def test_reopen_clears_undetected_session_after_startup_grace(self):
+        class Timer:
+            def __init__(self):
+                self.active = True
+                self.stopped = False
+            def isActive(self):
+                return self.active
+            def stop(self):
+                self.active = False
+                self.stopped = True
+
+        timer = Timer()
+        visible_loader = SimpleNamespace(isVisible=lambda: True)
+        window = SimpleNamespace(
+            _mo2_session_timer=timer,
+            _mo2_session_prefix=Path("/steam/steamapps/compatdata/489830"),
+            _mo2_session_seen=False,
+            _mo2_session_polls=30,
+            _mo2_session_loader_active=True,
+            _mo2_session_launch_token="old-token",
+            _mo2_session_wrapper_pid=1234,
+            _launch_progress_dialog=visible_loader,
+            _log=Mock(),
+        )
+        with (
+            patch.object(mo2_management_workflow, "detect_mo2_processes",
+                         return_value={"ok": True, "processes": []}),
+            patch.object(mo2_management_workflow.QMessageBox, "information") as info,
+        ):
+            mo2_management_workflow.Mo2ManagementWorkflowMixin.launch_mo2_gui(
+                window, instance_name="Skyrim SE",
+            )
+
+        self.assertTrue(timer.stopped)
+        self.assertIsNone(window._mo2_session_prefix)
+        self.assertFalse(window._mo2_session_seen)
+        self.assertIsNone(window._mo2_session_launch_token)
+        info.assert_called_once()
+        self.assertEqual(info.call_args.args[1], "Another launch is in progress")
+
     def test_live_mo2_process_is_still_detected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
