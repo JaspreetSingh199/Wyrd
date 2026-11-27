@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 from PySide6.QtWidgets import QMessageBox
@@ -15,7 +17,8 @@ from steam_mo2_management import reset_wyrd_mo2
 from steam_prefix import APP_ID, steam_compat_prefix
 from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
-from process_monitor import detect_mo2_processes
+from process_monitor import detect_mo2_processes, snapshot_wyrd_session
+from proton_runtime import managed_paths
 
 
 class Mo2ManagementWorkflowMixin:
@@ -141,25 +144,43 @@ class Mo2ManagementWorkflowMixin:
             if not steam_root:
                 raise RuntimeError("Could not identify the Steam library containing Skyrim.")
             env = _runtime_environment(proton, Path(steam_root), prefix)
+            launch_token = uuid.uuid4().hex
             env.update({
                 "SteamAppId": APP_ID,
                 "SteamGameId": APP_ID,
                 "STEAM_COMPAT_APP_ID": APP_ID,
                 "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
+                "WYRD_LAUNCHED": "1",
+                "WYRD_LAUNCH_ID": launch_token,
             })
             # MO2's own --pick option opens its native instance selector.
-            # This deliberately avoids Wyrd registration and does not depend
-            # on Wyrd's read-only inventory being able to classify an instance.
-            process = subprocess.Popen(
-                [str(proton / "proton"), "run", str(executable), "--pick"],
-                cwd=str(executable.parent), env=env, stdin=None, stdout=None,
-                stderr=None, start_new_session=True,
-            )
+            # Preserve the established Skyrim AppID 489830 Proton context.
+            diagnostics = managed_paths()["root"] / "logs" / "skyrim-launch.log"
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            with diagnostics.open("a", encoding="utf-8") as log:
+                log.write("\n=== Wyrd Open MO2 session (Steam AppID 489830) ===\n")
+                log.write(f"runtime: {proton}\nprefix: {prefix}\nlaunch_id: {launch_token}\n")
+                log.write("monitoring: session RSS, process/thread count, CPU, winedbg count, host RAM and swap\n")
+                log.flush()
+                process = subprocess.Popen(
+                    [str(proton / "proton"), "run", str(executable), "--pick"],
+                    cwd=str(executable.parent), env=env, stdin=subprocess.DEVNULL,
+                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+                )
+                log.write(f"wrapper_pid: {process.pid}\n")
+                log.flush()
             self._mo2_session_prefix = prefix
             self._mo2_session_seen = False
             self._mo2_session_polls = 0
+            self._mo2_session_launch_token = launch_token
+            self._mo2_session_wrapper_pid = process.pid
+            self._mo2_session_log_path = diagnostics
+            self._mo2_session_last_log = 0.0
+            self._mo2_session_peak_rss = 0
+            self._mo2_session_peak_processes = 0
+            self._mo2_session_warned = set()
             self._mo2_session_timer.start()
-            self._log(f"MO2 native instance-picker handoff started (PID {process.pid}); waiting for MO2 to open.")
+            self._log(f"MO2 native instance-picker started (PID {process.pid}); resource monitoring active.")
             self.progress_label.setText("Opening MO2 instance picker…")
         except Exception as error:
             self._log(f"MO2 launch failed: {error}")
@@ -174,6 +195,49 @@ class Mo2ManagementWorkflowMixin:
             return
 
         self._mo2_session_polls += 1
+        token = getattr(self, "_mo2_session_launch_token", None)
+        if token:
+            snapshot = snapshot_wyrd_session(token, getattr(self, "_mo2_session_wrapper_pid", None))
+            if snapshot.get("ok"):
+                rss = snapshot["rss_bytes"]
+                count = snapshot["process_count"]
+                self._mo2_session_peak_rss = max(getattr(self, "_mo2_session_peak_rss", 0), rss)
+                self._mo2_session_peak_processes = max(getattr(self, "_mo2_session_peak_processes", 0), count)
+                thresholds = ((2 * 1024**3, "2 GiB"), (4 * 1024**3, "4 GiB"))
+                warned = getattr(self, "_mo2_session_warned", set())
+                for threshold, label in thresholds:
+                    if rss >= threshold and label not in warned:
+                        warned.add(label)
+                        self._log(f"MO2 resource warning: Wyrd session RSS reached {label}.")
+                if snapshot["winedbg_count"] >= 8 and "winedbg" not in warned:
+                    warned.add("winedbg")
+                    self._log(f"MO2 resource warning: {snapshot['winedbg_count']} winedbg processes detected.")
+                self._mo2_session_warned = warned
+                now = time.monotonic()
+                if now - getattr(self, "_mo2_session_last_log", 0.0) >= 10:
+                    self._mo2_session_last_log = now
+                    try:
+                        mem = {}
+                        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+                            key, _, value = line.partition(":")
+                            parts = value.split()
+                            if parts and parts[0].isdigit():
+                                mem[key] = int(parts[0]) * 1024
+                        with self._mo2_session_log_path.open("a", encoding="utf-8") as log:
+                            log.write(
+                                f"RESOURCE sample: session_rss={rss} process_count={count} "
+                                f"thread_count={snapshot['thread_count']} cpu_ticks={snapshot['cpu_ticks']} "
+                                f"winedbg_count={snapshot['winedbg_count']} "
+                                f"host_mem_available={mem.get('MemAvailable', 0)} "
+                                f"swap_free={mem.get('SwapFree', 0)}\n"
+                            )
+                            for item in snapshot["processes"][:8]:
+                                log.write(
+                                    f"  PID={item['pid']} PPID={item['ppid']} RSS={item['rss_bytes']} "
+                                    f"threads={item['threads']} state={item['state']} name={item['name']}\n"
+                                )
+                    except (OSError, AttributeError):
+                        pass
         scan = detect_mo2_processes(prefix)
         if scan.get("ok") and scan.get("processes"):
             if not self._mo2_session_seen:
