@@ -108,6 +108,8 @@ def verify_skyrim_launch_context(
     Runs after Steam becomes ready and before MO2 is launched. It never
     creates, repairs, resets or writes to the game, prefix, or user data.
     """
+    if not game_path or not steam_root or not prefix_path:
+        return {"ok": False, "message": "Skyrim game path, Steam root, or existing AppID 489830 prefix is unavailable."}
     game = Path(game_path).expanduser()
     root = Path(steam_root).expanduser()
     prefix = Path(prefix_path).expanduser()
