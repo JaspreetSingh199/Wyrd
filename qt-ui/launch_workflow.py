@@ -13,6 +13,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from process_monitor import _proc_start_time
+from proton_runtime import managed_paths
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
 
@@ -36,11 +37,19 @@ class LaunchWorkflowMixin:
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
+        diagnostics = managed_paths()["root"] / "logs" / "skyrim-launch.log"
         try:
-            process = subprocess.Popen(
-                [steam, "-applaunch", "489830"],
-                stdin=None, stdout=None, stderr=None, start_new_session=True,
-            )
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            with diagnostics.open("a", encoding="utf-8") as log:
+                log.write("\\n=== Wyrd direct Steam launch (AppID 489830; unmodded) ===\\n")
+                log.flush()
+                process = subprocess.Popen(
+                    [steam, "-applaunch", "489830"],
+                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                log.write(f"steam_pid: {process.pid}\\n")
+                log.flush()
         except OSError as error:
             QMessageBox.warning(self, "Steam launch failed", f"Could not start Steam: {error}")
             self._log(f"Direct Steam launch failed: {error}")
