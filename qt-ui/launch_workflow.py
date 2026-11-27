@@ -10,10 +10,10 @@ import subprocess
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QMessageBox, QInputDialog
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QMessageBox, QInputDialog, QProgressDialog
 
-from process_monitor import _proc_start_time
+from process_monitor import _proc_start_time, detect_mo2_processes, detect_skyrim_processes
 from proton_runtime import managed_paths
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
@@ -225,6 +225,7 @@ class LaunchWorkflowMixin:
             QMessageBox.warning(self, "Steam unavailable", message)
             return
 
+        self._show_launch_loader("Opening Steam…", "Waiting for the Steam client to finish starting.")
         self._steam_launch_pending = {
             "instance_name": instance_name,
             "selected_target": dict(selected_target),
@@ -249,6 +250,7 @@ class LaunchWorkflowMixin:
             f"(bootstrap PID {steam_result.get('pid', 'unknown')}); waiting for Steam UI readiness."
         )
         self.progress_label.setText("Opening Steam… waiting for its client and UI helper before checking Skyrim.")
+        self._update_launch_loader("Opening Steam…", "Waiting for Steam's client and UI helper.")
         self._steam_launch_wait_timer.start()
 
     def _poll_steam_before_modded_launch(self) -> None:
@@ -270,6 +272,10 @@ class LaunchWorkflowMixin:
             return
 
         status_message = status.get("message", "Checking Steam client status.")
+        self._update_launch_loader(
+            "Opening Steam…",
+            f"{status_message} ({pending['attempts']}/120)",
+        )
         if status_message != pending["last_status"]:
             self._log(status_message)
             pending["last_status"] = status_message
@@ -308,6 +314,7 @@ class LaunchWorkflowMixin:
 
         self._log("Steam is ready. " + game_check.get("message", "Skyrim launch context verified."))
         self.progress_label.setText("Steam is ready; Skyrim verified. Starting MO2…")
+        self._update_launch_loader("Starting MO2…", "Steam is ready and Skyrim's installation and prefix are verified.")
         self._start_modded_skyrim_after_steam(pending)
 
     def _start_modded_skyrim_after_steam(self, pending: dict) -> None:
@@ -331,6 +338,8 @@ class LaunchWorkflowMixin:
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
+            self._update_launch_loader("Launching MO2…", "Proton has been asked to start MO2. Waiting for MO2 or Skyrim to appear.")
+            self._start_mo2_launch_wait(pending)
             self.launch_session.wrapper_pid = result.get("pid")
             self.launch_session.wrapper_start_time = _proc_start_time(self.launch_session.wrapper_pid) if self.launch_session.wrapper_pid else None
             self.launch_session.log_path = result.get("log_path")
@@ -354,4 +363,104 @@ class LaunchWorkflowMixin:
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
         else:
+            self._close_launch_loader(
+                "MO2 launch failed",
+                result.get("message", "Could not launch Skyrim through MO2."),
+            )
             QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
+
+    def _show_launch_loader(self, title: str, message: str) -> None:
+        """Show a non-cancellable busy dialog while the explicit launch proceeds."""
+        dialog = getattr(self, "_launch_progress_dialog", None)
+        if dialog is None:
+            dialog = QProgressDialog(message, "", 0, 0, self)
+            dialog.setWindowTitle("Launching Skyrim")
+            dialog.setWindowModality(Qt.WindowModality.WindowModal)
+            dialog.setCancelButton(None)
+            dialog.setMinimumDuration(0)
+            dialog.setAutoClose(False)
+            dialog.setAutoReset(False)
+            dialog.setMinimumWidth(420)
+            self._launch_progress_dialog = dialog
+        dialog.setLabelText(message)
+        dialog.setWindowTitle(title)
+        dialog.setRange(0, 0)
+        dialog.show()
+        dialog.raise_()
+
+    def _update_launch_loader(self, title: str, message: str) -> None:
+        dialog = getattr(self, "_launch_progress_dialog", None)
+        if dialog is None:
+            self._show_launch_loader(title, message)
+            return
+        dialog.setWindowTitle(title)
+        dialog.setLabelText(message)
+        if not dialog.isVisible():
+            dialog.show()
+        dialog.raise_()
+
+    def _close_launch_loader(self, title: str, message: str) -> None:
+        dialog = getattr(self, "_launch_progress_dialog", None)
+        if dialog is not None:
+            dialog.setLabelText(message)
+            dialog.setWindowTitle(title)
+            dialog.close()
+            self._launch_progress_dialog = None
+        if getattr(self, "_mo2_launch_wait_timer", None) is not None:
+            self._mo2_launch_wait_timer.stop()
+
+    def _start_mo2_launch_wait(self, pending: dict) -> None:
+        """Wait until MO2 or Skyrim is visible in the selected AppID prefix."""
+        self._mo2_launch_wait_pending = pending
+        self._mo2_launch_wait_attempts = 0
+        if not hasattr(self, "_mo2_launch_wait_timer"):
+            self._mo2_launch_wait_timer = QTimer(self)
+            self._mo2_launch_wait_timer.setInterval(1000)
+            self._mo2_launch_wait_timer.timeout.connect(self._poll_mo2_launch_visibility)
+        self._mo2_launch_wait_timer.start()
+
+    def _poll_mo2_launch_visibility(self) -> None:
+        pending = getattr(self, "_mo2_launch_wait_pending", None)
+        if not pending:
+            self._close_launch_loader("Launch monitoring stopped", "No pending MO2 launch.")
+            return
+        self._mo2_launch_wait_attempts += 1
+        prefix = pending["prefix"]
+        mo2 = detect_mo2_processes(prefix)
+        if mo2.get("ok") and mo2.get("processes"):
+            pids = ", ".join(str(item["pid"]) for item in mo2["processes"])
+            self._mo2_launch_wait_pending = None
+            self._close_launch_loader(
+                "MO2 launched",
+                f"Mod Organizer is running (PID {pids}). Skyrim will continue launching through MO2.",
+            )
+            self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE detection.")
+            self._log("MO2 process detected after Steam startup: PID " + pids)
+            return
+
+        game = detect_skyrim_processes(prefix)
+        if game.get("ok") and game.get("processes"):
+            pids = ", ".join(str(item["pid"]) for item in game["processes"])
+            self._mo2_launch_wait_pending = None
+            self._close_launch_loader(
+                "Skyrim launched",
+                f"Skyrim/SKSE process detected (PID {pids}).",
+            )
+            self.progress_label.setText("Skyrim/SKSE process detected.")
+            self._log("Skyrim/SKSE process detected while waiting for MO2: PID " + pids)
+            return
+
+        if self._mo2_launch_wait_attempts % 5 == 0:
+            self._update_launch_loader(
+                "Launching MO2…",
+                f"Waiting for MO2 or Skyrim to appear in the verified prefix "
+                f"({self._mo2_launch_wait_attempts}/120 seconds).",
+            )
+        if self._mo2_launch_wait_attempts >= 120:
+            self._mo2_launch_wait_pending = None
+            self._close_launch_loader(
+                "Launch still unconfirmed",
+                "No MO2 or Skyrim process was detected after 120 seconds. Check the launch log.",
+            )
+            self.progress_label.setText("MO2/Skyrim launch was not confirmed; inspect launch diagnostics.")
+            self._log("Timed out waiting for MO2 or Skyrim process detection.")
