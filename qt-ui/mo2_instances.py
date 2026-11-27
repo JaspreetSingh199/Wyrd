@@ -250,14 +250,22 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
             profiles_root = Path(profiles_value).expanduser()
             if not profiles_root.is_absolute():
                 profiles_root = Path(base_value).expanduser() / profiles_root
+            profile_scope = Path(install_root).expanduser() if install_root is not None else prefix_root
+            profiles_verified = False
+            profile_names: list[str] = []
+            try:
+                if (not profiles_root.is_symlink() and profiles_root.is_dir()
+                        and _is_path_within(profiles_root, profile_scope)):
+                    profiles_verified = True
+                    profile_names = sorted(
+                        entry.name for entry in profiles_root.iterdir()
+                        if entry.is_dir() and not entry.is_symlink()
+                    )
+            except OSError as error:
+                errors.append(f"{profiles_root}: {error}")
             profile_dir = profiles_root / profile if profile else None
             profile_verified = bool(
-                profile_dir and profile_dir.is_dir()
-                and not profile_dir.is_symlink()
-                and (
-                    _is_path_within(profile_dir, Path(install_root).expanduser())
-                    if install_root is not None else _is_path_within(profile_dir, prefix_root)
-                )
+                profile_dir and profiles_verified and profile in profile_names
             )
             if profile_dir is not None and not profile_verified:
                 profile_status = "unverified"
@@ -311,6 +319,7 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
                 "game_name": game_name,
                 "game_path": game_path,
                 "selected_profile": profile if profile_verified else "",
+                "profiles": profile_names if profiles_verified else [],
                 "selected_profile_candidate": profile,
                 "selected_profile_path": str(profile_dir) if profile_dir else "",
                 "selected_profile_status": profile_status,
