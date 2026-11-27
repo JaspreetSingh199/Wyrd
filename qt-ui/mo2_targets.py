@@ -91,6 +91,17 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
     for target in targets:
         key = (target["title"].casefold(), target["binary"].casefold())
         unique[key] = target
+    # Prefer SKSE in Wyrd's launch picker when MO2 has a verified SKSE
+    # executable configured. Keep Skyrim available as the explicit fallback.
+    ordered_targets = sorted(
+        unique.values(),
+        key=lambda target: (
+            0 if Path(target["binary"]).name.casefold()
+            in {"skse64_loader.exe", "skse_loader.exe"} else 1,
+            target["title"].casefold(),
+            target["binary"].casefold(),
+        ),
+    )
     diagnostic = None if unique else ("unresolved_game_path" if warnings else "missing_executable_entry")
     message = (
         f"Verified {len(unique)} Skyrim/SKSE launch target(s) from MO2."
@@ -100,7 +111,7 @@ def inspect_skyrim_launch_targets(prefix_root: Path, game_path: Path, instance_n
     )
     return {
         "ok": bool(unique),
-        "targets": list(unique.values()),
+        "targets": ordered_targets,
         "warnings": warnings,
         "diagnostic": diagnostic,
         "message": message,
