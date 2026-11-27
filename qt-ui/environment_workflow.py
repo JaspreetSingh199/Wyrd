@@ -157,7 +157,6 @@ class EnvironmentWorkflowMixin:
             self.install_button.show()
             self.launch_mo2_button.hide()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
-            self.launch_game_button.setEnabled(False)
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
     def _finalize_environment_readiness(self) -> None:
