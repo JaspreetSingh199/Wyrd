@@ -16,6 +16,7 @@ from mo2_launch_preflight import inspect_instance_launch
 
 class EnvironmentWorkflowMixin:
     def refresh_all(self) -> None:
+        self._set_interaction_locked(True, "Environment checks are running.")
         self.startup_checks_complete = False
         self._set_scan_progress(2, "Starting environment scan…")
         self.active_launch_ready = False
@@ -42,6 +43,9 @@ class EnvironmentWorkflowMixin:
             self.proton_combo.blockSignals(False)
             if not scan_completed:
                 self._restoring_selection = True
+            # Keep the window locked if a game/MO2 session is already active;
+            # otherwise restore interaction even when a scan stage raises.
+            self._refresh_session_ui_status()
 
     def _inspect_mo2_installation_and_mapping(self) -> None:
         """Inspect the active Skyrim prefix and verify MO2/Steam path integration."""
@@ -185,6 +189,7 @@ class EnvironmentWorkflowMixin:
         self.precheck_progress.setFormat("")
         self._set_scan_progress(100, "Environment scan complete.")
         self.progress_panel.hide()
+        self._refresh_session_ui_status()
         self.precheck_status.setText(
             "Startup checks complete. " +
             ("A detected MO2 instance is ready for launch." if active_ready
