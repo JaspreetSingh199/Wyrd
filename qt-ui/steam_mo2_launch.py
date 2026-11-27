@@ -249,8 +249,17 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
             log.write("\n=== Wyrd SteamCompat Skyrim launch ===\n")
-            log.write(f"instance: {instance_name}\nexecutable: {executable_title}\n")
-            log.write(f"binary: {wanted}\naudio_mode: {'xaudio2_compat' if xaudio2_compat else 'default'}\n")
+            log.write(
+                f"instance: {instance_name}\n"
+                f"profile: {profile_name or 'MO2 saved selection'}\n"
+                f"executable: {executable_title}\n"
+            )
+            log.write(
+                f"binary: {wanted}\n"
+                f"working_directory: {matches[0].get('working_directory') or wanted.parent}\n"
+                f"arguments: {matches[0].get('arguments', '')}\n"
+                f"audio_mode: {'xaudio2_compat' if xaudio2_compat else 'default'}\n"
+            )
             log.write("command: " + json.dumps(command) + "\n")
             log.write("SteamAppId: 489830\n")
             log.flush()
