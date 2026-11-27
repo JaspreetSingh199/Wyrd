@@ -146,16 +146,11 @@ class EnvironmentWorkflowMixin:
                 f"{instance_summary}"
             )
             self.install_button.hide()
-            self.launch_mo2_button.show()
-            self.launch_mo2_button.setEnabled(
-                bool(self.mo2_state.get("executable") and self.proton_combo.currentData())
-            )
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
             self.install_button.setText("Install MO2")
             self.install_button.show()
-            self.launch_mo2_button.hide()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
             self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
