@@ -4,6 +4,12 @@ Wyrd is a focused Qt 6 desktop application for Linux that helps configure and la
 
 V1 focuses on one job: discover the installed Skyrim/Proton environment, verify the MO2 instance and executable, and launch modded Skyrim through the game's existing Steam AppID `489830` compatibility context.
 
+## Where Wyrd came from
+
+Wyrd started as a collection of personal scripts written to solve one person's Skyrim-on-Linux setup and launch problems. Those scripts gradually grew into a desktop application: AI tools were later used to help refine the scripts, work through implementation details, and build a graphical interface around them.
+
+It was originally made for personal use, not conceived as a commercial product or a universal modding solution. It is being shared in case the approach and tools are useful to other Linux players with a similar Skyrim and MO2 setup. The project is still intentionally focused, and your setup may differ.
+
 ## What Wyrd does
 
 - Detects Skyrim Special Edition from Steam libraries, including libraries registered in Steam's `libraryfolders.vdf`.
