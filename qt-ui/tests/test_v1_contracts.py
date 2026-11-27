@@ -55,13 +55,13 @@ class SteamClientActivationTests(unittest.TestCase):
             bin_dir.mkdir()
             steam_exe = bin_dir / "steam"
             webhelper_exe = bin_dir / "steamwebhelper"
-            steam_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
-            webhelper_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+            steam_exe.write_text("#!/bin/sh\n", encoding="utf-8")
+            webhelper_exe.write_text("#!/bin/sh\n", encoding="utf-8")
 
             main = proc / "100"
             main.mkdir()
-            (main / "comm").write_text("steam\\n", encoding="utf-8")
-            (main / "cmdline").write_bytes(b"/usr/bin/steam\\0")
+            (main / "comm").write_text("steam\n", encoding="utf-8")
+            (main / "cmdline").write_bytes(b"/usr/bin/steam\0")
             (main / "exe").symlink_to(steam_exe)
 
             status = steam_client.steam_client_status(proc)
@@ -69,8 +69,8 @@ class SteamClientActivationTests(unittest.TestCase):
 
             helper = proc / "101"
             helper.mkdir()
-            (helper / "comm").write_text("steamwebhelper\\n", encoding="utf-8")
-            (helper / "cmdline").write_bytes(b"./steamwebhelper\\0-steampid=100\\0")
+            (helper / "comm").write_text("steamwebhelper\n", encoding="utf-8")
+            (helper / "cmdline").write_bytes(b"./steamwebhelper\0-steampid=100\0")
             (helper / "exe").symlink_to(webhelper_exe)
 
             status = steam_client.steam_client_status(proc)
@@ -86,15 +86,15 @@ class SteamClientActivationTests(unittest.TestCase):
             bin_dir.mkdir()
             steam_exe = bin_dir / "steam"
             helper_exe = bin_dir / "steamwebhelper"
-            steam_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
-            helper_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+            steam_exe.write_text("#!/bin/sh\n", encoding="utf-8")
+            helper_exe.write_text("#!/bin/sh\n", encoding="utf-8")
             for pid, comm, argv, exe in (
-                (100, "steam", b"/usr/bin/steam\\0", steam_exe),
-                (101, "steamwebhelper", b"./steamwebhelper\\0-steampid=999\\0", helper_exe),
+                (100, "steam", b"/usr/bin/steam\0", steam_exe),
+                (101, "steamwebhelper", b"./steamwebhelper\0-steampid=999\0", helper_exe),
             ):
                 entry = proc / str(pid)
                 entry.mkdir()
-                (entry / "comm").write_text(comm + "\\n", encoding="utf-8")
+                (entry / "comm").write_text(comm + "\n", encoding="utf-8")
                 (entry / "cmdline").write_bytes(argv)
                 (entry / "exe").symlink_to(exe)
 
@@ -108,10 +108,10 @@ class SteamClientActivationTests(unittest.TestCase):
             game.mkdir(parents=True)
             (game / "SkyrimSE.exe").write_bytes(b"fixture")
             (game.parent.parent / "appmanifest_489830.acf").write_text(
-                '"AppState"\\n{\\n'
-                '    "appid" "489830"\\n'
-                '    "installdir" "Skyrim Special Edition"\\n'
-                '}\\n',
+                '"AppState"\n{\n'
+                '    "appid" "489830"\n'
+                '    "installdir" "Skyrim Special Edition"\n'
+                '}\n',
                 encoding="utf-8",
             )
             prefix = steam_root / "steamapps/compatdata/489830"
