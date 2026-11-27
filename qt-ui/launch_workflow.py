@@ -13,11 +13,6 @@ from pathlib import Path
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from process_monitor import _proc_start_time
-from mo2_targets import inspect_skyrim_launch_targets
-from steam_mo2_discovery import (
-    inspect_skyrim_prefix_mo2_installation,
-    inspect_external_skyrim_prefix_mo2_installation,
-)
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
 
@@ -142,15 +137,6 @@ class LaunchWorkflowMixin:
         target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
         steam_root: Path | None = None,
     ) -> None:
-        discovery = getattr(self, "mo2_discovery_state", None)
-        if not discovery or not discovery.get("ok"):
-            QMessageBox.warning(
-                self, "MO2 game discovery is not verified",
-                "Wyrd has not verified the dynamically derived Skyrim Proton game path. "
-                "The modded launch is blocked until a successful refresh.\\n\\n"
-                + (discovery or {}).get("message", "No verified Steam discovery result is available."),
-            )
-            return
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
