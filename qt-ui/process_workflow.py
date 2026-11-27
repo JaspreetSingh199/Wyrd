@@ -114,13 +114,14 @@ class ProcessMonitorWorkflowMixin:
             self._stop_launch_monitor("no launch session is active")
             return
         self.launch_session.poll_count += 1
-        if self.launch_session.poll_count > self._launch_poll_limit:
+        if self.launch_session.poll_count >= self._launch_poll_limit:
             self.launch_session.state = "timeout"
-            self._stop_launch_monitor("monitoring time limit reached")
+            self._stop_launch_monitor("five-minute launch confirmation deadline reached")
             message = "Skyrim/SKSE was not detected within five minutes. Check the launch log before retrying."
             self.progress_label.setText(message)
             self._close_launch_loader("Game launch not confirmed", message)
             self._log(message)
+            self._refresh_session_ui_status()
             return
         wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
         result = launch_process_status(
@@ -255,6 +256,7 @@ class ProcessMonitorWorkflowMixin:
                 "MO2/Skyrim launch failed",
                 "The Proton wrapper exited and no MO2 or Skyrim process remains in AppID 489830. Check the launch log.",
             )
+            self._refresh_session_ui_status()
             return
         if result["state"] == "unknown":
             self.progress_label.setText(
