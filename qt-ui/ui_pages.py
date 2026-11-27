@@ -149,12 +149,8 @@ class MainWindowPagesMixin:
         launch_actions = QHBoxLayout()
         launch_actions.addWidget(self.launch_direct_button, 1)
         launch_layout.addLayout(launch_actions)
-        self.launch_mo2_button = QPushButton("Launch MO2")
-        self.launch_mo2_button.setObjectName("secondaryAction")
-        self.launch_mo2_button.clicked.connect(self.launch_mo2_gui)
         utility_actions = QHBoxLayout()
         utility_actions.addWidget(self.install_button)
-        utility_actions.addWidget(self.launch_mo2_button)
         utility_actions.addStretch(1)
         setup_layout.addLayout(utility_actions)
 
