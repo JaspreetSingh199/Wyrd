@@ -316,9 +316,9 @@ class EnvironmentWorkflowMixin:
             for item, reason in launch_reasons if reason
         ]
         if blocked:
-            detail += "\\nLaunch readiness: " + " | ".join(blocked)
+            detail += "\nLaunch readiness: " + " | ".join(blocked)
         elif ready:
-            detail += "\\nAt least one Skyrim instance has a verified launch target."
+            detail += "\nAt least one Skyrim instance has a verified launch target."
         self.active_instance_label.setText(detail)
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
