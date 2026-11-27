@@ -1,0 +1,88 @@
+name: Build standalone Wyrd executable
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "qt-ui/**"
+      - "packaging/**"
+      - ".github/workflows/standalone.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Linux x86_64 executable
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out Wyrd
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: qt-ui/requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes patchelf file zip
+          python -m pip install --upgrade pip
+          python -m pip install -r qt-ui/requirements.txt pyinstaller
+
+      - name: Build standalone executable
+        working-directory: qt-ui
+        run: pyinstaller --noconfirm --clean Wyrd.spec
+
+      - name: Assemble distributable archive
+        run: |
+          set -euo pipefail
+          mkdir -p Wyrd-linux-x86_64
+          install -m 0755 qt-ui/dist/Wyrd Wyrd-linux-x86_64/Wyrd
+          install -m 0644 packaging/wyrd.svg Wyrd-linux-x86_64/wyrd.svg
+          cat > Wyrd-linux-x86_64/README.txt <<'EOF'
+          Wyrd - standalone Linux x86_64 executable
+
+          Run:
+            chmod +x Wyrd
+            ./Wyrd
+
+          Wyrd bundles its Python, PySide6 and Qt application runtime.
+          It does not bundle Steam, Proton, Skyrim, MO2, or external archive
+          utilities. Those remain installed and managed by the user.
+
+          Wyrd uses the existing Steam libraries, MO2 data and Skyrim AppID
+          489830 compatdata prefix in their normal locations. It does not
+          relocate game data or saves.
+
+          This build targets x86_64 Linux with glibc. The host still needs
+          compatible graphics, display-server and system libraries.
+          EOF
+          chmod -R a+rX Wyrd-linux-x86_64
+          zip -9 -r Wyrd-linux-x86_64.zip Wyrd-linux-x86_64
+
+      - name: Verify executable and archive
+        run: |
+          set -euo pipefail
+          file Wyrd-linux-x86_64/Wyrd
+          test -x Wyrd-linux-x86_64/Wyrd
+          ldd Wyrd-linux-x86_64/Wyrd > ldd.txt || true
+          if grep -q "not found" ldd.txt; then
+            cat ldd.txt
+            exit 1
+          fi
+          unzip -t Wyrd-linux-x86_64.zip
+          test -s Wyrd-linux-x86_64.zip
+
+      - name: Upload standalone executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyrd-linux-x86_64
+          path: Wyrd-linux-x86_64.zip
+          if-no-files-found: error
+          retention-days: 30
