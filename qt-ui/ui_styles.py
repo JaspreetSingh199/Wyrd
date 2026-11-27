@@ -297,8 +297,8 @@ QPushButton#navButton {
     border: 1px solid transparent; border-radius: 7px; padding: 14px 16px;
     font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 16px;
 }
-QPushButton#navButton:hover { background: #202d33; border-color: #5d5d50; color: #fff4df; }
-QPushButton#navButton:checked { background: #293a42; border: 1px solid #a18a60; color: #fff1d6; }
+QPushButton#navButton:hover { background: #263840; border-color: #8b8068; color: #fff4df; padding-left: 19px; }
+QPushButton#navButton:checked { background: #293a42; border: 1px solid #b49a6a; color: #fff1d6; padding-left: 19px; }
 QLabel#heroTitle {
     color: #e9dfcc; font-family: "Noto Serif", "DejaVu Serif", serif;
     font-size: 31px; font-weight: 700; padding: 8px 4px 0 4px;
@@ -309,13 +309,13 @@ QFrame#panel, QFrame#runtimePanel, QFrame#statusPanel {
 }
 QFrame#mo2InstancePicker { background: transparent; border: none; }
 QFrame#mo2InstanceRow { background: #19262d; border: 1px solid #59636a; border-radius: 9px; }
-QFrame#mo2InstanceRow:hover { border-color: #aa8b55; background: #202e34; }
+QFrame#mo2InstanceRow:hover { border-color: #c09b60; background: #22323a; }
 QPushButton#primaryAction {
     background: #715632; border: 1px solid #c19c5d; border-radius: 6px;
     color: #fff1d6; padding: 10px 18px;
     font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 14px;
 }
-QPushButton#primaryAction:hover { background: #8a6a3c; border-color: #dfbb79; }
+QPushButton#primaryAction:hover { background: #8a6a3c; border-color: #dfbb79; color: #fff8e9; }
 QPushButton#secondaryAction { background: #202f36; border: 1px solid #879096; color: #e6dfd1; }
 QListWidget#mo2Instances { background: transparent; border: none; outline: none; }
 QListWidget#mo2Instances::item { border: none; padding: 4px 0; }
