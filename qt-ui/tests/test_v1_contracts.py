@@ -19,6 +19,7 @@ import steam_mo2_launch
 import steam_game_registry
 import steam_client
 import mo2_management_workflow
+from mo2_library_dialog import Mo2LibraryDialog
 import launch_workflow
 import process_workflow
 from launch_models import LaunchSession
@@ -95,6 +96,37 @@ class OpenMo2ActionTests(unittest.TestCase):
         self.assertFalse(window._mo2_session_loader_active)
         window._close_launch_loader.assert_called_once()
         self.assertEqual(window._close_launch_loader.call_args.args[0], "MO2 opened")
+
+
+class OpenMo2HeaderActionTests(unittest.TestCase):
+    def test_header_action_delegates_to_established_main_window_workflow(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        owner = SimpleNamespace(_log=Mock(), open_mo2_instance=Mock())
+        widget = SimpleNamespace(_owner_window=owner, setup_status=SimpleNamespace(
+            setText=Mock(), show=Mock(),
+        ))
+
+        Mo2LibraryDialog._open_selected_mo2(widget)
+
+        owner._log.assert_called_once_with("Open MO2 header action clicked.")
+        owner.open_mo2_instance.assert_called_once_with()
+
+    def test_header_action_reports_missing_main_window_handler(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        owner = SimpleNamespace(_log=Mock())
+        widget = SimpleNamespace(_owner_window=owner, setup_status=SimpleNamespace(
+            setText=Mock(), show=Mock(),
+        ))
+
+        Mo2LibraryDialog._open_selected_mo2(widget)
+
+        widget.setup_status.setText.assert_called_once()
+        widget.setup_status.show.assert_called_once()
+        owner._log.assert_called_once()
 
 
 class SteamClientActivationTests(unittest.TestCase):
