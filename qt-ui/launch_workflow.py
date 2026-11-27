@@ -105,53 +105,35 @@ class LaunchWorkflowMixin:
             )
             return
 
-        game_path = Path(self.game_state["game_dir"]).expanduser()
-        # Use the exact installation discovered by the live inventory scan.
-        # This may be an external/read-only installation in Skyrim's prefix.
-        discovered_installation = self.instance_state.get("installation", {}) or {}
-        if not discovered_installation.get("installed"):
-            mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
-            if not mo2_state.get("installed"):
-                mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
-            discovered_installation = mo2_state
-        discovery = getattr(self, "mo2_discovery_state", None)
-        if not discovery or not discovery.get("ok"):
-            QMessageBox.warning(
-                self, "MO2 game discovery is not verified",
-                "Wyrd could not verify MO2's dynamically derived Proton game path. "
-                "The modded launch is blocked to avoid using a stale game location.\\n\\n"
-                + (discovery or {}).get("message", "Unknown Steam discovery mapping error."),
+        preflight_getter = getattr(self, "mo2_launch_preflight", None)
+        if not callable(preflight_getter):
+            message = "The canonical MO2 launch preflight is unavailable; launch was refused."
+            self._log(message)
+            QMessageBox.warning(self, "Launch preflight unavailable", message)
+            return
+        preflight = preflight_getter(selected_instance, profile_name=profile_name)
+        if not preflight.get("ok"):
+            message = preflight.get("reason", "MO2 launch preflight failed without a reason.")
+            self._log(
+                f"Modded launch blocked [{preflight.get('failed_check', 'unknown')}]: {message}"
             )
+            QMessageBox.warning(self, "Skyrim launch blocked", message)
             return
-        if (
-            not discovered_installation.get("installed")
-            or not discovered_installation.get("prefix")
-            or not discovered_installation.get("install")
-            or not discovered_installation.get("executable")
-        ):
-            message = (
-                self.instance_state.get("installation_message")
-                or discovered_installation.get("message")
-                or "MO2 installation could not be safely verified."
-            )
-            self._log("Modded launch blocked: " + message)
-            QMessageBox.warning(self, "MO2 executable unavailable", message)
-            return
-        proton_value = self.proton_combo.currentData()
-        if not proton_value:
-            QMessageBox.warning(self, "Proton unavailable", "Select a valid Proton runtime before launching.")
-            return
-        prefix = Path(discovered_installation["prefix"])
-        install_root = Path(discovered_installation["install"])
-        target_state = inspect_skyrim_launch_targets(
-            prefix, game_path, instance_name=instance_name,
-            install_root=install_root,
-            require_managed=bool(discovered_installation.get("managed", True)),
+
+        self._log(
+            f"MO2 launch preflight passed for instance={instance_name!r}, "
+            f"profile={profile_name or 'MO2 saved selection'!r}; "
+            f"{len(preflight.get('targets', {}).get('targets', []))} target(s) verified."
         )
         self._launch_skyrim_target_from_inventory(
-            instance_name, target_state, game_path, prefix, install_root,
-            Path(proton_value), bool(discovered_installation.get("managed", True)),
-            Path(discovered_installation["steam_root"]) if discovered_installation.get("steam_root") else None,
+            instance_name,
+            preflight["targets"],
+            Path(preflight["game_path"]),
+            Path(preflight["prefix"]),
+            Path(preflight["install_root"]),
+            Path(preflight["proton_path"]),
+            bool(preflight["installation"].get("managed", False)),
+            Path(preflight["steam_root"]),
             profile_name=profile_name,
         )
 
@@ -185,15 +167,6 @@ class LaunchWorkflowMixin:
         prefix: Path, install_root: Path, proton: Path, require_managed: bool,
         steam_root: Path | None = None, profile_name: str | None = None,
     ) -> None:
-        discovery = getattr(self, "mo2_discovery_state", None)
-        if not discovery or not discovery.get("ok"):
-            QMessageBox.warning(
-                self, "MO2 game discovery is not verified",
-                "Wyrd has not verified the dynamically derived Skyrim Proton game path. "
-                "The modded launch is blocked until a successful refresh.\\n\\n"
-                + (discovery or {}).get("message", "No verified Steam discovery result is available."),
-            )
-            return
         if not target_state.get("ok") or not target_state.get("targets"):
             QMessageBox.warning(
                 self, "Skyrim launch unavailable",
