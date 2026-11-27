@@ -380,7 +380,7 @@ class LaunchWorkflowMixin:
             started = self._launch_progress_started_at
         elapsed = max(0, int(time.monotonic() - started))
         minutes, seconds = divmod(elapsed, 60)
-        return f"{message}\\n\\nElapsed: {minutes:02d}:{seconds:02d}"
+        return f"{message}\n\nElapsed: {minutes:02d}:{seconds:02d}"
 
     def _show_launch_loader(self, title: str, message: str) -> None:
         """Show a non-cancellable busy dialog until this launch's game is detected."""
@@ -431,6 +431,7 @@ class LaunchWorkflowMixin:
         self._mo2_launch_wait_attempts = 0
         self._mo2_launch_wait_seen = False
         self._mo2_launch_wait_last_message = ""
+        self._mo2_launch_visibility_logged = False
         if not hasattr(self, "_mo2_launch_wait_timer"):
             self._mo2_launch_wait_timer = QTimer(self)
             self._mo2_launch_wait_timer.setInterval(1000)
@@ -451,15 +452,14 @@ class LaunchWorkflowMixin:
             self._mo2_launch_wait_seen = True
             pids = ", ".join(str(item["pid"]) for item in processes)
             message = (
-                f"Mod Organizer is running (PID {pids}). Its handoff is active; "
-                f"Wyrd is waiting for Skyrim/SKSE ({self._mo2_launch_wait_attempts}/300 seconds)."
+                f"Mod Organizer is running (PID {pids}). Waiting for "
+                f"{pending.get('selected_title', 'Skyrim/SKSE')} "
+                f"({self._mo2_launch_wait_attempts}/300 seconds)."
             )
             self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE to launch.")
-            self._log_once = getattr(self, "_log_once", set())
-            if "mo2-visible-after-launch" not in self._log_once:
+            if not self._mo2_launch_visibility_logged:
                 self._log("MO2 process detected. Keeping the launch loader open until Skyrim/SKSE is detected.")
-                self._log_once.add("mo2-visible-after-launch")
-                self._log_once = self._log_once
+                self._mo2_launch_visibility_logged = True
         elif self._mo2_launch_wait_seen:
             message = (
                 "MO2 was detected but is no longer visible. Waiting for the selected Skyrim/SKSE "
