@@ -32,29 +32,6 @@ QFrame#launchPanel {
     border: 1px solid #746348;
     border-radius: 7px;
 }
-QFrame#launchLoaderPanel {
-    background: #202a2d;
-    border: 1px solid #88714d;
-    border-left: 4px solid #b49a69;
-    border-radius: 7px;
-}
-QFrame#launchLoaderPanel QLabel#section {
-    color: #ead7ad;
-    font-size: 14px;
-    font-weight: 750;
-    letter-spacing: .8px;
-}
-QFrame#launchLoaderPanel QProgressBar {
-    background: #101719;
-    border: none;
-    border-radius: 4px;
-    min-height: 8px;
-    max-height: 8px;
-}
-QFrame#launchLoaderPanel QProgressBar::chunk {
-    background: #b49a69;
-    border-radius: 4px;
-}
 QFrame#mo2InstanceRow {
     background: #22282b;
     border: 1px solid #41494a;
