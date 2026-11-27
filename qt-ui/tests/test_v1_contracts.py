@@ -40,9 +40,9 @@ class WyrdV1ContractTests(unittest.TestCase):
         dosdevices.mkdir(parents=True, exist_ok=True)
         (dosdevices / "s:").symlink_to(steam_root, target_is_directory=True)
         (install / "ModOrganizer.ini").write_text(
-            "[General]\\n"
-            "gameName=Skyrim Special Edition\\n"
-            r"gamePath=S:\\steamapps\\common\\Skyrim Special Edition" + "\\n",
+            "[General]\n"
+            "gameName=Skyrim Special Edition\n"
+            r"gamePath=S:\\steamapps\\common\\Skyrim Special Edition" + "\n",
             encoding="utf-8",
         )
 
