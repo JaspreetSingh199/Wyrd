@@ -75,6 +75,9 @@ class MainWindow(
         self._mo2_session_prefix: Path | None = None
         self._mo2_session_seen = False
         self._mo2_session_polls = 0
+        self._logs_refresh_timer = QTimer(self)
+        self._logs_refresh_timer.setInterval(1000)
+        self._logs_refresh_timer.timeout.connect(self.refresh_launch_log_view)
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         # Startup restoration is asynchronous: keep persistence suppressed until
@@ -176,6 +179,9 @@ class MainWindow(
             self.refresh_application_log_view()
             self.refresh_launch_log_view()
             self.refresh_system_log_view()
+            self._logs_refresh_timer.start()
+        else:
+            self._logs_refresh_timer.stop()
 
     def _log(self, message: str) -> None:
         """Append to the visible session and bounded persistent application log."""
