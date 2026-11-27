@@ -197,7 +197,7 @@ class MainWindow(
             if path.is_file() and path.stat().st_size > 2 * 1024 * 1024:
                 os.replace(path, rotated)
             with path.open("a", encoding="utf-8") as stream:
-                stream.write(entry + "\\n")
+                stream.write(entry + "\n")
         except OSError:
             # Logging must never interrupt launch, detection or recovery workflows.
             pass
