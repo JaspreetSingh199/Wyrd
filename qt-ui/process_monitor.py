@@ -26,7 +26,6 @@ def detect_mo2_processes(
             continue
         try:
             raw_argv = (entry / "cmdline").read_bytes()
-            raw_env = (entry / "environ").read_bytes()
         except OSError:
             continue
         argv = [
@@ -46,6 +45,13 @@ def detect_mo2_processes(
         except OSError:
             comm_name = ""
         if first_arg_name != "modorganizer.exe" and comm_name != "modorganizer.exe":
+            continue
+        # Environment data is comparatively expensive to read. Only inspect it
+        # after the process identity matches ModOrganizer.exe, not for every
+        # process on the host; this keeps periodic UI polling lightweight.
+        try:
+            raw_env = (entry / "environ").read_bytes()
+        except OSError:
             continue
         # A Wine process can remain briefly as a zombie after its GUI exits.
         # Its old cmdline/environment still look like MO2, so treating it as
@@ -218,32 +224,34 @@ def detect_skyrim_processes(
             comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip().lower()
         except OSError:
             comm = ""
-        try:
-            exe_path = os.readlink(entry / "exe")
-        except OSError:
-            exe_path = ""
+        argv = [part.decode("utf-8", errors="replace") for part in
+                argv_data.split(bytes([0])) if part]
+        normalize = lambda value: value.replace(chr(92), "/")
+        names = {Path(normalize(arg)).name.lower() for arg in argv}
+        names.add(comm)
+        matches = sorted(names.intersection(expected))
+        exe_path = ""
+        if not matches:
+            # Resolve /proc/<pid>/exe only for processes whose command line and
+            # comm did not already identify Skyrim/SKSE.
+            try:
+                exe_path = os.readlink(entry / "exe")
+            except OSError:
+                exe_path = ""
+            names.add(Path(normalize(exe_path)).name.lower())
+            matches = sorted(names.intersection(expected))
+        if not matches:
+            continue
+        # Read environment and memory maps only for confirmed candidate
+        # binaries. Most host processes are discarded before these I/O calls.
         env_readable = True
         env_error = None
         try:
             env_data = (entry / "environ").read_bytes()
         except OSError as error:
-            # /proc/<pid>/environ may be restricted by ptrace/Yama or process
-            # ownership. Do not misreport an inspection failure as an unset
-            # variable.
             env_data = b""
             env_readable = False
             env_error = str(error)
-        argv = [part.decode("utf-8", errors="replace") for part in
-                argv_data.split(bytes([0])) if part]
-        if not argv and not comm and not exe_path:
-            continue
-        normalize = lambda value: value.replace(chr(92), "/")
-        names = {Path(normalize(arg)).name.lower() for arg in argv}
-        names.add(Path(normalize(exe_path)).name.lower())
-        names.add(comm)
-        matches = sorted(names.intersection(expected))
-        if not matches:
-            continue
         env_parts = [part.decode("utf-8", errors="replace") for part in env_data.split(bytes([0])) if part]
         # A failed /proc/<pid>/environ read is unknown, not evidence that a
         # process belongs to Wyrd or that a launch marker is absent. Keep
