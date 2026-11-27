@@ -122,11 +122,15 @@ class Mo2LibraryDialog(QFrame):
             launch = QPushButton("Launch Modded")
             launch.setObjectName("primaryAction")
             launch.setMinimumHeight(38)
-            launch.setEnabled(bool(instance.get("is_skyrim_se") and self._launch_ready))
+            reason_getter = getattr(self._owner_window, "mo2_launch_block_reason", None)
+            block_reason = (
+                reason_getter(instance) if callable(reason_getter)
+                else (None if self._launch_ready and instance.get("is_skyrim_se")
+                      else "Wyrd's environment checks have not marked modded launch ready.")
+            )
+            launch.setEnabled(block_reason is None)
             launch.setToolTip(
-                "Launch Skyrim through this MO2 instance's virtual filesystem."
-                if instance.get("is_skyrim_se")
-                else "This instance is not configured for the detected Skyrim SE installation."
+                block_reason or "Launch Skyrim through this MO2 instance's virtual filesystem."
             )
             row_layout.addWidget(launch)
 
@@ -142,6 +146,10 @@ class Mo2LibraryDialog(QFrame):
             details.setWordWrap(True)
             details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             row_layout.addWidget(details, 1)
+            readiness = QLabel("READY" if block_reason is None else "BLOCKED")
+            readiness.setObjectName("launchReady" if block_reason is None else "launchBlocked")
+            readiness.setToolTip(block_reason or "All launch preflight checks currently pass.")
+            row_layout.addWidget(readiness)
 
             profile_picker = QComboBox()
             profile_picker.setObjectName("profilePicker")
@@ -228,8 +236,8 @@ class Mo2LibraryDialog(QFrame):
             diagnostics = managed_paths(Path.home())["root"] / "logs" / "skyrim-launch.log"
             diagnostics.parent.mkdir(parents=True, exist_ok=True)
             with diagnostics.open("a", encoding="utf-8") as log:
-                log.write("\\n=== WYRD UI ACTION ===\\n")
-                log.write(message + "\\n")
+                log.write("\n=== WYRD UI ACTION ===\n")
+                log.write(message + "\n")
         except (OSError, KeyError, TypeError) as error:
             warning = f"[WYRD] Could not append click event to launch log: {error}"
             print(warning, flush=True)
