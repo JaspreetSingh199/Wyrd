@@ -75,14 +75,14 @@ class Mo2LibraryDialog(QFrame):
         self.instances = QListWidget()
         self.instances.setObjectName("mo2Instances")
         self.instances.setMinimumHeight(90)
-        self.instances.setSpacing(6)
+        self.instances.setSpacing(4)
         self.instances.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self.instances, 1)
         unmodded_panel = QFrame()
         unmodded_panel.setObjectName("unmoddedLaunchPanel")
         unmodded_row = QHBoxLayout(unmodded_panel)
-        unmodded_row.setContentsMargins(18, 14, 18, 14)
+        unmodded_row.setContentsMargins(14, 9, 14, 9)
         steam_mark = QLabel("◉")
         steam_mark.setObjectName("steamMark")
         unmodded_row.addWidget(steam_mark)
@@ -130,12 +130,12 @@ class Mo2LibraryDialog(QFrame):
             row = QFrame()
             row.setObjectName("mo2InstanceRow")
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(10, 8, 10, 8)
+            row_layout.setContentsMargins(9, 6, 9, 6)
             row_layout.setSpacing(12)
 
 
             details_column = QVBoxLayout()
-            details_column.setSpacing(6)
+            details_column.setSpacing(4)
             name = QLabel(instance.get("name") or "Unnamed MO2 instance")
             name.setObjectName("instanceName")
             details_column.addWidget(name)
@@ -148,7 +148,7 @@ class Mo2LibraryDialog(QFrame):
             action_row = QHBoxLayout()
             launch = QPushButton("▶  Launch Modded Skyrim")
             launch.setObjectName("primaryAction")
-            launch.setMinimumHeight(36)
+            launch.setMinimumHeight(34)
             reason_getter = getattr(self._owner_window, "mo2_launch_block_reason", None)
             block_reason = (
                 reason_getter(instance) if callable(reason_getter)
@@ -160,7 +160,7 @@ class Mo2LibraryDialog(QFrame):
             action_row.addWidget(launch)
 
             open_mo2 = QPushButton("Open MO2 Mod List")
-            open_mo2.setMinimumHeight(36)
+            open_mo2.setMinimumHeight(34)
             open_mo2.setToolTip(
                 "Open MO2 in Skyrim's existing Proton prefix to review or change the selected instance's mod list."
             )
@@ -171,7 +171,7 @@ class Mo2LibraryDialog(QFrame):
             action_row.addWidget(open_mo2)
 
             open_folder = QPushButton("▱  Open Folder")
-            open_folder.setMinimumHeight(42)
+            open_folder.setMinimumHeight(34)
             open_folder.clicked.connect(
                 lambda _checked=False, record=dict(instance): self._open_instance_folder(record)
             )
