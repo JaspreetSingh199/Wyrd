@@ -51,6 +51,35 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["processes"], [])
 
+    def test_closed_mo2_session_stops_timer_and_refreshes_inventory(self):
+        class Timer:
+            def __init__(self):
+                self.stopped = False
+            def stop(self):
+                self.stopped = True
+
+        window = SimpleNamespace(
+            _mo2_session_prefix=Path("/steam/steamapps/compatdata/489830"),
+            _mo2_session_timer=Timer(),
+            _mo2_session_polls=4,
+            _mo2_session_launch_token=None,
+            _mo2_session_seen=True,
+            _log=Mock(),
+            progress_label=SimpleNamespace(setText=Mock()),
+            refresh_all=Mock(),
+        )
+        with patch.object(
+            mo2_management_workflow,
+            "detect_mo2_processes",
+            return_value={"ok": True, "processes": []},
+        ):
+            mo2_management_workflow.Mo2ManagementWorkflowMixin._poll_mo2_session(window)
+
+        self.assertTrue(window._mo2_session_timer.stopped)
+        self.assertIsNone(window._mo2_session_prefix)
+        self.assertFalse(window._mo2_session_seen)
+        window.refresh_all.assert_called_once_with()
+
     def test_live_mo2_process_is_still_detected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
