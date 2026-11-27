@@ -239,7 +239,7 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     env["WYRD_LAUNCH_ID"] = launch_token
     command = [
         str(proton / "proton"), "run", str(executable),
-        "--instance", instance_name,
+        "--logs", "--instance", instance_name,
     ]
     if profile_name is not None:
         command.extend(["--profile", profile_name])
