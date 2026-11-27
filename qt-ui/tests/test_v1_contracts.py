@@ -18,11 +18,83 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import steam_mo2_launch
 import steam_game_registry
 import steam_client
+import mo2_management_workflow
 import launch_workflow
 import process_workflow
 from launch_models import LaunchSession
 from steam_prefix import steam_compat_prefix
 from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
+
+
+class OpenMo2ActionTests(unittest.TestCase):
+    def test_environment_open_mo2_uses_the_only_discovered_skyrim_instance(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        window = SimpleNamespace(
+            instance_state={"skyrim_instances": [{"name": "Skyrim SE"}]},
+            mo2_library_widget=SimpleNamespace(preferred_instance_id=""),
+            launch_mo2_gui=Mock(),
+        )
+
+        mo2_management_workflow.Mo2ManagementWorkflowMixin.open_mo2_instance(window)
+
+        window.launch_mo2_gui.assert_called_once_with(instance_name="Skyrim SE")
+
+    def test_environment_open_mo2_prompts_when_multiple_instances_exist(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        window = SimpleNamespace(
+            instance_state={"skyrim_instances": [
+                {"name": "Skyrim SE"},
+                {"name": "Skyrim Test"},
+            ]},
+            mo2_library_widget=SimpleNamespace(preferred_instance_id=""),
+            launch_mo2_gui=Mock(),
+        )
+        with patch.object(
+            mo2_management_workflow.QInputDialog,
+            "getItem",
+            return_value=("Skyrim Test", True),
+        ) as picker:
+            mo2_management_workflow.Mo2ManagementWorkflowMixin.open_mo2_instance(window)
+
+        picker.assert_called_once()
+        window.launch_mo2_gui.assert_called_once_with(instance_name="Skyrim Test")
+
+    def test_open_mo2_loader_closes_when_mo2_process_is_detected(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Timer:
+            def __init__(self):
+                self.stopped = False
+            def stop(self):
+                self.stopped = True
+
+        window = SimpleNamespace(
+            _mo2_session_prefix=Path("/existing/skyrim-prefix"),
+            _mo2_session_timer=Timer(),
+            _mo2_session_polls=0,
+            _mo2_session_launch_token=None,
+            _mo2_session_seen=False,
+            _mo2_session_loader_active=True,
+            _log=Mock(),
+            progress_label=SimpleNamespace(setText=Mock()),
+            _close_launch_loader=Mock(),
+        )
+        with patch.object(
+            mo2_management_workflow,
+            "detect_mo2_processes",
+            return_value={"ok": True, "processes": [{"pid": 4321}]},
+        ):
+            mo2_management_workflow.Mo2ManagementWorkflowMixin._poll_mo2_session(window)
+
+        self.assertTrue(window._mo2_session_seen)
+        self.assertFalse(window._mo2_session_loader_active)
+        window._close_launch_loader.assert_called_once()
+        self.assertEqual(window._close_launch_loader.call_args.args[0], "MO2 opened")
 
 
 class SteamClientActivationTests(unittest.TestCase):
