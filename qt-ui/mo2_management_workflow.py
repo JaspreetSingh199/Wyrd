@@ -146,20 +146,19 @@ class Mo2ManagementWorkflowMixin:
             getattr(self, "_mo2_session_timer", None) is not None
             and self._mo2_session_timer.isActive()
         )
-        # Reconcile the process table on every click, including sessions where
-        # MO2 was never detected. The old guard only handled _seen=True, leaving
-        # an undetected launch pending for the full 120-second startup timeout.
+        # A successful process scan is authoritative for whether MO2 is
+        # currently open. Do not require _mo2_session_seen or a polling grace
+        # count: both caused a closed/undetected MO2 window to leave a stale
+        # active timer that blocked every subsequent Open MO2 request.
         if active_session:
             previous_prefix = getattr(self, "_mo2_session_prefix", None)
-            if previous_prefix is not None:
+            if previous_prefix is None:
+                self._mo2_session_timer.stop()
+                active_session = False
+                self._log("Cleared MO2 session with no registered prefix before reopening.")
+            else:
                 current = detect_mo2_processes(previous_prefix)
-                seen = getattr(self, "_mo2_session_seen", False)
-                polls = int(getattr(self, "_mo2_session_polls", 0) or 0)
-                # Give Proton up to 45 seconds to start MO2. After that, an
-                # empty, successfully-read process scan is stale regardless of
-                # whether the detector ever observed the GUI process.
-                stale_undetected_start = not seen and polls >= 30
-                if current.get("ok") and not current.get("processes") and (seen or stale_undetected_start):
+                if current.get("ok") and not current.get("processes"):
                     self._mo2_session_timer.stop()
                     self._mo2_session_prefix = None
                     self._mo2_session_seen = False
@@ -167,9 +166,13 @@ class Mo2ManagementWorkflowMixin:
                     self._mo2_session_loader_active = False
                     self._mo2_session_launch_token = None
                     self._mo2_session_wrapper_pid = None
-                    reason = "MO2 process exited" if seen else "MO2 process was never detected after startup grace period"
-                    self._log(f"{reason}; cleared stale session state before a new Open MO2 request.")
+                    self._log("No live MO2 process found in Skyrim's prefix; cleared stale session before reopening.")
                     active_session = False
+                elif not current.get("ok"):
+                    self._log(
+                        "Could not verify MO2 process state before reopening: "
+                        + str(current.get("message") or "process scan failed")
+                    )
         if active_session:
             QMessageBox.information(
                 self, "MO2 already opening",
