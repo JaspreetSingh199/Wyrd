@@ -60,7 +60,7 @@ class LaunchWorkflowMixin:
         """Launch the active Skyrim MO2 instance from the live filesystem scan."""
         self.start_skyrim()
 
-    def start_skyrim(self) -> None:
+    def start_skyrim(self, instance_name: str | None = None) -> None:
         """Launch Skyrim from the live MO2 inventory; no Wyrd registration is required."""
         if not self.game_state.get("found"):
             QMessageBox.warning(self, "Skyrim unavailable", "Skyrim Special Edition was not detected.")
@@ -82,15 +82,22 @@ class LaunchWorkflowMixin:
                 self.instance_state.get("message", "Create a Skyrim Special Edition instance in MO2, then refresh Wyrd."),
             )
             return
-        if len(instances) == 1:
-            instance_name = instances[0]["name"]
-        else:
-            instance_name, accepted = QInputDialog.getItem(
-                self, "Select MO2 instance", "Skyrim Special Edition instance:",
-                [item["name"] for item in instances], 0, False,
+        if instance_name is None:
+            if len(instances) == 1:
+                instance_name = instances[0]["name"]
+            else:
+                instance_name, accepted = QInputDialog.getItem(
+                    self, "Select MO2 instance", "Skyrim Special Edition instance:",
+                    [item["name"] for item in instances], 0, False,
+                )
+                if not accepted or not instance_name:
+                    return
+        elif not any(item.get("name") == instance_name for item in instances):
+            QMessageBox.warning(
+                self, "MO2 instance unavailable",
+                f"The selected MO2 instance '{instance_name}' is no longer in the latest scan. Refresh instances and try again.",
             )
-            if not accepted or not instance_name:
-                return
+            return
 
         game_path = Path(self.game_state["game_dir"]).expanduser()
         mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
