@@ -17,7 +17,7 @@ class EnvironmentWorkflowMixin:
     def refresh_all(self) -> None:
         self.startup_checks_complete = False
         self._set_scan_progress(2, "Starting environment scan…")
-        self.launch_game_button.setEnabled(False)
+        self.active_launch_ready = False
         self._reset_precheck()
         selected = self.proton_combo.currentData()
         # Suppress currentIndexChanged while rebuilding the combo. Otherwise
@@ -150,7 +150,6 @@ class EnvironmentWorkflowMixin:
             self.launch_mo2_button.setEnabled(
                 bool(self.mo2_state.get("executable") and self.proton_combo.currentData())
             )
-            self.launch_game_button.setEnabled(False)
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
@@ -185,7 +184,7 @@ class EnvironmentWorkflowMixin:
         self.startup_checks_complete = True
         # Live MO2 inventory is authoritative; Wyrd registration is not required.
         self._update_active_instance_from_scan()
-        active_ready = self.launch_game_button.isEnabled()
+        active_ready = bool(getattr(self, 'active_launch_ready', False))
         self._update_precheck(
             4, "Detected MO2 environment", active_ready,
             self.active_instance_label.text(),
@@ -328,7 +327,8 @@ class EnvironmentWorkflowMixin:
             and not busy
         )
         self.active_instance_label.setText(detail)
-        self.launch_game_button.setEnabled(ready)
+        self.active_launch_ready = ready
+        self.mo2_library_widget.set_launch_ready(ready)
         self.launch_direct_button.setEnabled(bool(self.game_state.get("found") and not busy))
 
     def manage_mo2_library(self) -> None:
