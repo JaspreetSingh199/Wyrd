@@ -332,13 +332,18 @@ class EnvironmentWorkflowMixin:
         if not self.game_state.get("found"):
             return "Skyrim Special Edition was not detected."
         installation = self.instance_state.get("installation", {}) or {}
-        executable_verified = bool(
-            (self.mo2_state.get("installed") and self.mo2_state.get("executable"))
-            or (installation.get("installed") and installation.get("executable"))
+        # The discovery service already identifies the exact MO2 installation
+        # in Skyrim's AppID prefix, including installations outside the old
+        # conventional path. Use that result consistently for launch checks.
+        launch_installation = (
+            installation if installation.get("installed")
+            else self.mo2_state
         )
-        if not executable_verified:
-            return self.mo2_state.get("message") or installation.get(
-                "message", "A verified ModOrganizer.exe was not found."
+        if not launch_installation.get("installed") or not launch_installation.get("executable"):
+            return (
+                self.instance_state.get("installation_message")
+                or launch_installation.get("message")
+                or "A verified ModOrganizer.exe was not found in Skyrim's existing prefix."
             )
         if not self.proton_combo.currentData():
             return "No compatible Proton runtime is selected."
@@ -352,12 +357,12 @@ class EnvironmentWorkflowMixin:
         try:
             from mo2_targets import inspect_skyrim_launch_targets
             game_path = Path(self.game_state["game_dir"]).expanduser()
-            prefix = Path(self.mo2_state["prefix"])
-            install_root = Path(self.mo2_state["install"])
+            prefix = Path(launch_installation["prefix"])
+            install_root = Path(launch_installation["install"])
             targets = inspect_skyrim_launch_targets(
                 prefix, game_path, instance_name=instance.get("name"),
                 install_root=install_root,
-                require_managed=bool(self.mo2_state.get("managed", True)),
+                require_managed=bool(launch_installation.get("managed", True)),
             )
             if not targets.get("ok") or not targets.get("targets"):
                 return targets.get(
