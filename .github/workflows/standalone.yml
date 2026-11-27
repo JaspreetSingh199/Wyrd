@@ -31,7 +31,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes patchelf file zip
+          sudo apt-get install --yes patchelf file zip libegl1 libgl1 libpulse0 libxkbcommon0 libxcb-cursor0
           python -m pip install --upgrade pip
           python -m pip install -r qt-ui/requirements.txt pyinstaller
 
