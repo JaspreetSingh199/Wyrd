@@ -326,6 +326,9 @@ class MainWindow(
         self._game_watch_timer.stop()
         self._mo2_session_timer.stop()
         self._session_ui_timer.stop()
+        mo2_steam_timer = getattr(self, "_mo2_steam_wait_timer", None)
+        if mo2_steam_timer is not None:
+            mo2_steam_timer.stop()
         if self.worker and self.worker.isRunning():
             QMessageBox.information(
                 self, "Setup is running",
