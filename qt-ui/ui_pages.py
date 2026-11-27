@@ -18,12 +18,18 @@ class MainWindowPagesMixin:
         setup_layout.setContentsMargins(8, 12, 8, 12)
         setup_layout.setSpacing(12)
 
+        hero_banner = QFrame()
+        hero_banner.setObjectName("heroBanner")
+        hero_layout = QVBoxLayout(hero_banner)
+        hero_layout.setContentsMargins(20, 18, 20, 18)
+        hero_layout.setSpacing(4)
         hero_title = QLabel("Your Skyrim Environment")
         hero_title.setObjectName("heroTitle")
-        setup_layout.addWidget(hero_title)
-        hero_subtitle = QLabel("Manage Skyrim Special Edition, Proton and your MO2 environments.")
-        hero_subtitle.setObjectName("muted")
-        setup_layout.addWidget(hero_subtitle)
+        hero_layout.addWidget(hero_title)
+        hero_subtitle = QLabel("Manage Skyrim SE, Proton and Mod Organizer 2 instances.")
+        hero_subtitle.setObjectName("heroSubtitle")
+        hero_layout.addWidget(hero_subtitle)
+        setup_layout.addWidget(hero_banner)
 
         self.precheck_panel = QFrame()
         self.precheck_panel.setObjectName("statusPanel")
@@ -120,7 +126,6 @@ class MainWindowPagesMixin:
         setup_layout.addLayout(configuration_grid)
 
         self.mo2_panel = panel("MOD ORGANIZER 2", "Checking the installation…")
-        setup_layout.addWidget(self.mo2_panel)
 
         prefix_path, install_path, game_path = initial_mo2_dialog_paths(
             self.mo2_state
