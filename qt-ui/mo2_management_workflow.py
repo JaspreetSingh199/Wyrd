@@ -12,7 +12,7 @@ from steam_mo2_discovery import (
     inspect_external_skyrim_prefix_mo2_installation,
 )
 from steam_mo2_management import reset_wyrd_mo2
-from steam_prefix import steam_compat_prefix
+from steam_prefix import APP_ID, steam_compat_prefix
 from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
 from process_monitor import detect_mo2_processes
@@ -141,6 +141,12 @@ class Mo2ManagementWorkflowMixin:
             if not steam_root:
                 raise RuntimeError("Could not identify the Steam library containing Skyrim.")
             env = _runtime_environment(proton, Path(steam_root), prefix)
+            env.update({
+                "SteamAppId": APP_ID,
+                "SteamGameId": APP_ID,
+                "STEAM_COMPAT_APP_ID": APP_ID,
+                "STEAM_COMPAT_DATA_PATH": str(prefix.resolve()),
+            })
             # MO2's own --pick option opens its native instance selector.
             # This deliberately avoids Wyrd registration and does not depend
             # on Wyrd's read-only inventory being able to classify an instance.
