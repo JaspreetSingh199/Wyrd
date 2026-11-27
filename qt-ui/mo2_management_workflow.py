@@ -24,8 +24,8 @@ from steam_client import activate_steam_client, steam_client_status
 
 
 class Mo2ManagementWorkflowMixin:
-    def open_mo2_instance(self) -> None:
-        """Open one discovered Skyrim MO2 instance from the Environment page."""
+    def open_mo2_instance(self, instance_name: str | None = None) -> None:
+        """Start Steam if needed, then open a discovered Skyrim MO2 instance."""
         instances = list(self.instance_state.get("skyrim_instances", []))
         if not instances:
             QMessageBox.warning(
@@ -36,7 +36,15 @@ class Mo2ManagementWorkflowMixin:
                 ),
             )
             return
-        if len(instances) == 1:
+        available_names = {str(item.get("name") or "") for item in instances}
+        if instance_name:
+            if instance_name not in available_names:
+                QMessageBox.warning(
+                    self, "MO2 instance unavailable",
+                    "That instance is no longer in the current discovery results. Refresh the environment and try again.",
+                )
+                return
+        elif len(instances) == 1:
             instance_name = str(instances[0].get("name") or "")
         else:
             names = [str(item.get("name") or "Unnamed instance") for item in instances]
