@@ -60,7 +60,8 @@ class LaunchWorkflowMixin:
         """Launch the active Skyrim MO2 instance from the live filesystem scan."""
         self.start_skyrim()
 
-    def start_skyrim(self, instance_name: str | None = None) -> None:
+    def start_skyrim(self, instance_name: str | None = None,
+                     profile_name: str | None = None) -> None:
         """Launch Skyrim from the live MO2 inventory; no Wyrd registration is required."""
         if not self.game_state.get("found"):
             QMessageBox.warning(self, "Skyrim unavailable", "Skyrim Special Edition was not detected.")
@@ -99,6 +100,19 @@ class LaunchWorkflowMixin:
             )
             return
 
+        selected_instance = next(
+            (item for item in instances if item.get("name") == instance_name), None
+        )
+        if selected_instance is None:
+            QMessageBox.warning(self, "MO2 instance unavailable", "The selected MO2 instance is no longer in the latest scan.")
+            return
+        if profile_name is not None and profile_name not in selected_instance.get("profiles", []):
+            QMessageBox.warning(
+                self, "MO2 profile unavailable",
+                "The selected profile is no longer present in the verified profile list for this instance. Refresh instances and try again.",
+            )
+            return
+
         game_path = Path(self.game_state["game_dir"]).expanduser()
         mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
         if not mo2_state.get("installed"):
@@ -129,12 +143,13 @@ class LaunchWorkflowMixin:
             instance_name, target_state, game_path, prefix, install_root,
             Path(proton_value), bool(mo2_state.get("managed", True)),
             Path(mo2_state["steam_root"]) if mo2_state.get("steam_root") else None,
+            profile_name=profile_name,
         )
 
     def _launch_registered_skyrim_target(
         self, record: dict, game: dict, installation: dict, runtime: dict,
         target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
-        steam_root: Path | None = None,
+        steam_root: Path | None = None, profile_name: str | None = None,
     ) -> None:
         discovery = getattr(self, "mo2_discovery_state", None)
         if not discovery or not discovery.get("ok"):
@@ -214,6 +229,7 @@ class LaunchWorkflowMixin:
             prefix_path=prefix, install_root=install_root,
             steam_root_path=steam_root,
             xaudio2_compat=(audio_mode == "xaudio2_compat"),
+            profile_name=profile_name,
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
         if result.get("ok"):
