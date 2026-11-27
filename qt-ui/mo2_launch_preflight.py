@@ -86,6 +86,9 @@ def inspect_instance_launch(
         install = install.resolve(strict=True)
         executable = executable.resolve(strict=True)
         executable.relative_to(install)
+        install.relative_to(prefix)
+        if executable.name.casefold() != "modorganizer.exe":
+            return fail("mo2_executable", "The discovered MO2 executable is not ModOrganizer.exe.")
         steam_root = _steam_root_for_game(game, Path.home()).resolve(strict=True)
         expected_prefix = steam_compat_prefix(steam_root).resolve(strict=True)
         if prefix != expected_prefix:
