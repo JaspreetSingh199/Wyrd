@@ -7,9 +7,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
-    QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
     QVBoxLayout, QWidget, QTabWidget, QFrame,
 )
 
@@ -195,6 +195,25 @@ class MainWindow(
 
     def _select_page(self, index: int) -> None:
         self.tabs.setCurrentIndex(index)
+        # Short, restrained page fade; it changes presentation only and never
+        # delays or blocks the launch/session workflows.
+        page = self.tabs.widget(index)
+        if page is not None:
+            effect = getattr(page, "_wyrd_page_opacity", None)
+            if effect is None:
+                effect = QGraphicsOpacityEffect(page)
+                page.setGraphicsEffect(effect)
+                page._wyrd_page_opacity = effect
+            previous = getattr(self, "_page_transition_animation", None)
+            if previous is not None and previous.state() == QPropertyAnimation.State.Running:
+                previous.stop()
+            effect.setOpacity(0.90)
+            animation = QPropertyAnimation(effect, b"opacity", self)
+            animation.setDuration(170)
+            animation.setStartValue(0.90)
+            animation.setEndValue(1.0)
+            self._page_transition_animation = animation
+            animation.start()
         self.environment_nav.setChecked(index == 0)
         self.maintenance_nav.setChecked(index == 1)
         self.logs_nav.setChecked(index == 2)
