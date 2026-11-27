@@ -64,6 +64,12 @@ class MainWindow(
         self._game_watch_timer = QTimer(self)
         self._game_watch_timer.setInterval(self._launch_poll_interval_ms)
         self._game_watch_timer.timeout.connect(self._revalidate_detected_game_processes)
+        self._mo2_session_timer = QTimer(self)
+        self._mo2_session_timer.setInterval(1500)
+        self._mo2_session_timer.timeout.connect(self._poll_mo2_session)
+        self._mo2_session_prefix: Path | None = None
+        self._mo2_session_seen = False
+        self._mo2_session_polls = 0
         self._saved_settings = read_settings()
         self._saved_game_path = self._saved_settings.get("game_path")
         # Startup restoration is asynchronous: keep persistence suppressed until
@@ -223,6 +229,7 @@ class MainWindow(
     def closeEvent(self, event) -> None:
         self._stop_launch_monitor("application is closing")
         self._game_watch_timer.stop()
+        self._mo2_session_timer.stop()
         if self.worker and self.worker.isRunning():
             QMessageBox.information(
                 self, "Setup is running",
