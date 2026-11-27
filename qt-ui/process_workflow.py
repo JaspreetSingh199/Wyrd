@@ -6,8 +6,8 @@ from pathlib import Path
 from launch_models import GameProcess
 from ui_path_helpers import _steam_prefix_for_game_path
 from process_monitor import (
-    launch_process_status, detect_skyrim_processes, _proc_identity,
-    _is_descendant_process,
+    launch_process_status, detect_skyrim_processes, detect_mo2_processes,
+    _proc_identity, _is_descendant_process,
 )
 from launch_log_diagnostics import read_launch_diagnostics, classify_launch_diagnostics
 
@@ -29,9 +29,10 @@ class ProcessMonitorWorkflowMixin:
         if self.launch_session.poll_count > self._launch_poll_limit:
             self.launch_session.state = "timeout"
             self._stop_launch_monitor("monitoring time limit reached")
-            self.progress_label.setText(
-                "Launch monitoring timed out; use Check launch status or inspect diagnostics."
-            )
+            message = "Skyrim/SKSE was not detected within five minutes. Check the launch log before retrying."
+            self.progress_label.setText(message)
+            self._close_launch_loader("Game launch not confirmed", message)
+            self._log(message)
             return
         wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
         result = launch_process_status(
@@ -116,9 +117,28 @@ class ProcessMonitorWorkflowMixin:
                 if self.launch_session.app_id == "489830"
                 else "registered game executable detected"
             )
+            self._close_launch_loader(
+                "Skyrim launched",
+                "Detected " + detected + ". The game process is running.",
+            )
+            self._log("Launch loader dismissed after the Skyrim/SKSE process was verified.")
             self._start_game_process_watch()
             return
         if result["state"] in {"exited", "invalid"}:
+            # Proton's short-lived wrapper can exit after it has successfully
+            # spawned the MO2 GUI. Do not dismiss the loader or declare failure
+            # while ModOrganizer.exe is still running in Skyrim's exact prefix.
+            mo2_scan = detect_mo2_processes(scan_prefix)
+            mo2_processes = mo2_scan.get("processes", []) if mo2_scan.get("ok") else []
+            if mo2_processes:
+                pids = ", ".join(str(item["pid"]) for item in mo2_processes)
+                self.launch_session.state = "waiting"
+                self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE to launch.")
+                self._update_launch_loader(
+                    "MO2 is running — waiting for Skyrim",
+                    f"Mod Organizer is still active (PID {pids}). Waiting for the selected Skyrim/SKSE executable.",
+                )
+                return
             self.progress_label.setText(
                 "Proton wrapper exited before Skyrim was detected; review launch diagnostics."
                 if self.launch_session.app_id == "489830"
@@ -143,6 +163,10 @@ class ProcessMonitorWorkflowMixin:
                     self._log("Launch diagnostics: " + diagnostics.get("message", "Unavailable."))
             self.launch_session.state = "failed"
             self._stop_launch_monitor("wrapper exited without detected game process")
+            self._close_launch_loader(
+                "MO2/Skyrim launch failed",
+                "The Proton wrapper exited and no MO2 or Skyrim process remains in AppID 489830. Check the launch log.",
+            )
             return
         if result["state"] == "unknown":
             self.progress_label.setText(
@@ -160,6 +184,12 @@ class ProcessMonitorWorkflowMixin:
                          f"(check {self.launch_session.poll_count}/{self._launch_poll_limit})"
                 )
             )
+            if self.launch_session.app_id == "489830":
+                self._update_launch_loader(
+                    "MO2 handoff active — waiting for Skyrim",
+                    f"Checking for {self.launch_session.target_binary or 'Skyrim/SKSE'} "
+                    f"({self.launch_session.poll_count}/{self._launch_poll_limit}).",
+                )
 
     def _start_game_process_watch(self) -> None:
         """Keep watching detected game PIDs after the Proton wrapper has exited."""
