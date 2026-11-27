@@ -237,4 +237,51 @@ QGroupBox {
     color: #c8b995;
 }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
+
+/* Nordic Wyrd shell: carved slate, worn parchment and restrained brass. */
+QWidget#appRoot { background: #10191d; }
+QWidget#contentRoot { background: #111a1e; }
+QFrame#sidebar { background: #0b1419; border-right: 1px solid #6f6048; }
+QLabel#sidebarCrest {
+    color: #d6c5a5; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 64px; padding: 12px 0 4px 0;
+}
+QLabel#sidebarBrand {
+    color: #e7ddc8; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 30px; font-weight: 700; letter-spacing: 3px; padding-top: 5px;
+}
+QLabel#sidebarSubtitle {
+    color: #b8ae9a; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 12px; letter-spacing: 1px; padding-bottom: 14px;
+}
+QFrame#sidebarDivider { background: #62563f; max-height: 1px; }
+QLabel#sidebarVersion { color: #9d9b91; font-family: "Noto Serif", serif; padding-top: 12px; }
+QPushButton#navButton {
+    text-align: left; background: transparent; color: #d0c8b8;
+    border: 1px solid transparent; border-radius: 7px; padding: 14px 16px;
+    font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 16px;
+}
+QPushButton#navButton:hover { background: #202d33; border-color: #5d5d50; color: #fff4df; }
+QPushButton#navButton:checked { background: #293a42; border: 1px solid #a18a60; color: #fff1d6; }
+QLabel#heroTitle {
+    color: #e9dfcc; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 31px; font-weight: 700; padding: 8px 4px 0 4px;
+}
+QLabel#muted { color: #b0b0a7; }
+QFrame#panel, QFrame#runtimePanel, QFrame#statusPanel {
+    background: #19252b; border: 1px solid #536068; border-radius: 10px;
+}
+QFrame#mo2InstancePicker { background: transparent; border: none; }
+QFrame#mo2InstanceRow { background: #19262d; border: 1px solid #59636a; border-radius: 9px; }
+QFrame#mo2InstanceRow:hover { border-color: #aa8b55; background: #202e34; }
+QPushButton#primaryAction {
+    background: #715632; border: 1px solid #c19c5d; border-radius: 6px;
+    color: #fff1d6; padding: 10px 18px;
+    font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 14px;
+}
+QPushButton#primaryAction:hover { background: #8a6a3c; border-color: #dfbb79; }
+QPushButton#secondaryAction { background: #202f36; border: 1px solid #879096; color: #e6dfd1; }
+QListWidget#mo2Instances { background: transparent; border: none; outline: none; }
+QListWidget#mo2Instances::item { border: none; padding: 4px 0; }
+QTabWidget::pane { border: none; background: transparent; }
 """
