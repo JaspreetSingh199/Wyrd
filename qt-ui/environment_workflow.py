@@ -11,6 +11,7 @@ from steam_mo2_discovery import (
     inspect_any_skyrim_prefix_mo2_instances,
 )
 from ui_path_helpers import _same_filesystem_path, _steam_prefix_for_game_path
+from mo2_launch_preflight import inspect_instance_launch
 
 
 class EnvironmentWorkflowMixin:
@@ -327,54 +328,38 @@ class EnvironmentWorkflowMixin:
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
 
-    def mo2_launch_block_reason(self, instance: dict) -> str | None:
-        """Explain the first failed safety/readiness check for one instance."""
-        if not instance.get("is_skyrim_se"):
-            return "This MO2 instance is not configured for the detected Skyrim SE installation."
-        if not self.startup_checks_complete:
-            return "Environment scan is still running. Wait for it to finish or refresh."
-        if not self.game_state.get("found"):
-            return "Skyrim Special Edition was not detected."
+    def mo2_launch_preflight(self, instance: dict, profile_name: str | None = None) -> dict:
+        """Return the canonical read-only launch preflight for one MO2 instance."""
         installation = self.instance_state.get("installation", {}) or {}
-        # The discovery service already identifies the exact MO2 installation
-        # in Skyrim's AppID prefix, including installations outside the old
-        # conventional path. Use that result consistently for launch checks.
-        launch_installation = (
-            installation if installation.get("installed")
-            else self.mo2_state
-        )
-        if not launch_installation.get("installed") or not launch_installation.get("executable"):
-            return (
-                self.instance_state.get("installation_message")
-                or launch_installation.get("message")
-                or "A verified ModOrganizer.exe was not found in Skyrim's existing prefix."
-            )
-        if not self.proton_combo.currentData():
-            return "No compatible Proton runtime is selected."
-        discovery = getattr(self, "mo2_discovery_state", None)
-        if not discovery or not discovery.get("ok"):
-            return (discovery or {}).get(
-                "message", "MO2's Skyrim Steam-drive mapping has not been verified. Refresh the environment."
-            )
+        if not installation.get("installed"):
+            installation = self.mo2_state or {}
+        if not self.game_state.get("found"):
+            return {
+                "ok": False, "reason": "Skyrim Special Edition was not detected.",
+                "failed_check": "game_directory", "checks": [],
+            }
+        if not self.startup_checks_complete:
+            return {
+                "ok": False, "reason": "Environment scan is still running.",
+                "failed_check": "environment_scan", "checks": [],
+            }
         if self.worker and self.worker.isRunning():
-            return "Another Wyrd setup or installation task is running."
-        try:
-            from mo2_targets import inspect_skyrim_launch_targets
-            game_path = Path(self.game_state["game_dir"]).expanduser()
-            prefix = Path(launch_installation["prefix"])
-            install_root = Path(launch_installation["install"])
-            targets = inspect_skyrim_launch_targets(
-                prefix, game_path, instance_name=instance.get("name"),
-                install_root=install_root,
-                require_managed=bool(launch_installation.get("managed", True)),
-            )
-            if not targets.get("ok") or not targets.get("targets"):
-                return targets.get(
-                    "message", "No verified Skyrim/SKSE executable is configured in this MO2 instance."
-                )
-        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as error:
-            return f"Could not verify this instance's launch target: {error}"
-        return None
+            return {
+                "ok": False, "reason": "Another Wyrd setup or installation task is running.",
+                "failed_check": "background_task", "checks": [],
+            }
+        return inspect_instance_launch(
+            instance,
+            Path(self.game_state["game_dir"]),
+            self.proton_combo.currentData(),
+            installation,
+            profile_name=profile_name,
+        )
+
+    def mo2_launch_block_reason(self, instance: dict) -> str | None:
+        """Expose the canonical preflight's first failure to the instance row."""
+        result = self.mo2_launch_preflight(instance)
+        return result.get("reason") if not result.get("ok") else None
 
     def manage_mo2_library(self) -> None:
         """Refresh the read-only MO2 inventory widgets from the current scan."""
