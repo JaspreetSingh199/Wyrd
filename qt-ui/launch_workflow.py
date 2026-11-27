@@ -67,15 +67,6 @@ class LaunchWorkflowMixin:
         if not self.game_state.get("found"):
             QMessageBox.warning(self, "Skyrim unavailable", "Skyrim Special Edition was not detected.")
             return
-        discovery = getattr(self, "mo2_discovery_state", None)
-        if not discovery or not discovery.get("ok"):
-            QMessageBox.warning(
-                self, "MO2 game discovery is not verified",
-                "Wyrd could not verify MO2's dynamically derived Proton game path. "
-                "The modded launch is blocked to avoid using a stale game location.\\n\\n"
-                + discovery.get("message", "Unknown Steam discovery mapping error."),
-            )
-            return
 
         instances = self.instance_state.get("skyrim_instances", [])
         if not instances:
@@ -123,6 +114,15 @@ class LaunchWorkflowMixin:
             if not mo2_state.get("installed"):
                 mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
             discovered_installation = mo2_state
+        discovery = getattr(self, "mo2_discovery_state", None)
+        if not discovery or not discovery.get("ok"):
+            QMessageBox.warning(
+                self, "MO2 game discovery is not verified",
+                "Wyrd could not verify MO2's dynamically derived Proton game path. "
+                "The modded launch is blocked to avoid using a stale game location.\\n\\n"
+                + (discovery or {}).get("message", "Unknown Steam discovery mapping error."),
+            )
+            return
         if (
             not discovered_installation.get("installed")
             or not discovered_installation.get("prefix")
