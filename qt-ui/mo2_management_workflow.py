@@ -169,10 +169,14 @@ class Mo2ManagementWorkflowMixin:
                     self._log("No live MO2 process found in Skyrim's prefix; cleared stale session before reopening.")
                     active_session = False
                 elif not current.get("ok"):
-                    self._log(
-                        "Could not verify MO2 process state before reopening: "
-                        + str(current.get("message") or "process scan failed")
+                    detail = str(current.get("message") or "process scan failed")
+                    self._log("Could not verify MO2 process state before reopening: " + detail)
+                    QMessageBox.warning(
+                        self, "Cannot verify MO2 process state",
+                        "Wyrd could not inspect the MO2 process table, so it cannot safely "
+                        "decide whether another MO2 launch is already running.\n\n" + detail,
                     )
+                    return
         if active_session:
             QMessageBox.information(
                 self, "MO2 already opening",
