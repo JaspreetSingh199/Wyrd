@@ -7,6 +7,70 @@ from pathlib import Path
 from launch_log_diagnostics import read_launch_diagnostics, classify_launch_diagnostics
 
 
+def detect_mo2_processes(
+    prefix_root: Path | str,
+    proc_root: Path = Path("/proc"),
+) -> dict:
+    """Find ModOrganizer.exe processes belonging to the selected Steam prefix."""
+    try:
+        expected_prefix = os.path.normcase(
+            str(Path(prefix_root).expanduser().resolve(strict=True))
+        )
+        entries = list(Path(proc_root).iterdir())
+    except (OSError, RuntimeError) as error:
+        return {"ok": False, "processes": [], "message": f"Could not inspect MO2 processes: {error}"}
+
+    found = []
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            raw_argv = (entry / "cmdline").read_bytes()
+            raw_env = (entry / "environ").read_bytes()
+        except OSError:
+            continue
+        argv = [
+            value.decode("utf-8", errors="replace")
+            for value in raw_argv.split(bytes([0])) if value
+        ]
+        names = {
+            Path(value.replace("\\\\", "/").replace("\\", "/").strip('"')).name.casefold()
+            for value in argv if value.strip()
+        }
+        if "modorganizer.exe" not in names:
+            continue
+        variables = {}
+        for item in raw_env.split(bytes([0])):
+            if b"=" not in item:
+                continue
+            key, value = item.split(b"=", 1)
+            variables[key.decode("utf-8", errors="replace")] = value.decode(
+                "utf-8", errors="replace"
+            )
+        compat_path = variables.get("STEAM_COMPAT_DATA_PATH")
+        if not compat_path:
+            continue
+        try:
+            actual_prefix = os.path.normcase(
+                str(Path(compat_path).expanduser().resolve(strict=True))
+            )
+        except (OSError, RuntimeError):
+            continue
+        if actual_prefix != expected_prefix:
+            continue
+        identity = _proc_identity(int(entry.name), proc_root)
+        found.append({
+            "pid": int(entry.name),
+            "start_time": identity.get("start_time"),
+            "command": argv[:4],
+        })
+    found.sort(key=lambda item: item["pid"])
+    return {
+        "ok": True, "processes": found,
+        "message": f"Found {len(found)} MO2 process(es) in Skyrim's Steam prefix.",
+    }
+
+
 def detect_game_processes(
     ancestor_pid: int, expected_binary: Path | str,
     prefix_root: Path | str | None = None,
