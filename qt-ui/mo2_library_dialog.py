@@ -148,7 +148,11 @@ class Mo2LibraryDialog(QFrame):
             row_layout.addWidget(details, 1)
             readiness = QLabel("READY" if block_reason is None else "BLOCKED")
             readiness.setObjectName("launchReady" if block_reason is None else "launchBlocked")
-            readiness.setToolTip(block_reason or "All launch preflight checks currently pass.")
+            detail_getter = getattr(self._owner_window, "mo2_launch_status_detail", None)
+            readiness.setToolTip(
+                detail_getter(instance) if callable(detail_getter)
+                else block_reason or "All required launch preflight checks currently pass."
+            )
             row_layout.addWidget(readiness)
 
             profile_picker = QComboBox()
