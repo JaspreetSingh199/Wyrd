@@ -64,6 +64,12 @@ class Mo2LibraryDialog(QFrame):
         self.refresh_button.setToolTip("Rescan the detected MO2 installation and known instance locations.")
         self.refresh_button.clicked.connect(self.discover)
         actions.addWidget(self.refresh_button)
+        self.launch_mo2_button = QPushButton("Open MO2")
+        self.launch_mo2_button.setToolTip(
+            "Open MO2's native instance manager in Skyrim's existing Proton prefix."
+        )
+        self.launch_mo2_button.clicked.connect(self._open_mo2)
+        actions.addWidget(self.launch_mo2_button)
         actions.addStretch(1)
         layout.addLayout(actions)
 
@@ -181,6 +187,11 @@ class Mo2LibraryDialog(QFrame):
             if errors:
                 message += "\\n\\nRead errors:\\n" + "\\n".join(errors[:6])
             self.setup_status.setText(message)
+
+    def _open_mo2(self) -> None:
+        launch = getattr(self._owner_window, "launch_mo2_gui", None)
+        if callable(launch):
+            launch()
 
     def _launch_instance(self, instance: dict, profile_name: str | None = None) -> None:
         if not instance.get("is_skyrim_se"):
