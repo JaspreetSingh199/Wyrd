@@ -178,10 +178,11 @@ class MainWindow(
         overlay_layout.addStretch(1)
         overlay_card = QFrame()
         overlay_card.setObjectName("interactionOverlayCard")
-        overlay_card.setMaximumWidth(520)
+        overlay_card.setMaximumWidth(560)
+        overlay_card.setMinimumHeight(164)
         card_layout = QVBoxLayout(overlay_card)
-        card_layout.setContentsMargins(28, 24, 28, 24)
-        card_layout.setSpacing(10)
+        card_layout.setContentsMargins(30, 26, 30, 26)
+        card_layout.setSpacing(14)
         self._interaction_overlay_title = QLabel("Wyrd is busy")
         self._interaction_overlay_title.setObjectName("interactionOverlayTitle")
         self._interaction_overlay_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -222,8 +223,12 @@ class MainWindow(
                 else "Wyrd is managing an active session"
             )
             self._interaction_overlay_detail.setText(
-                self._interaction_lock_reason + "\n\nYour Skyrim and MO2 session is safe. "
-                "Workspace controls will return when this operation finishes."
+                "Wyrd is checking Skyrim, Proton and MO2.\n"
+                "Workspace controls will return when the checks finish."
+                if "check" in self._interaction_lock_reason.lower()
+                or "scan" in self._interaction_lock_reason.lower()
+                else "Your MO2 or Skyrim session is active.\n"
+                     "Workspace controls will return when the session ends."
             )
             overlay.setGeometry(root.rect())
             overlay.show()
