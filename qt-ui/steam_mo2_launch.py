@@ -147,7 +147,7 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     executable_title: str, expected_binary: Path | str,
     *, prefix_path: Path | None = None, install_root: Path | None = None,
     steam_root_path: Path | None = None, xaudio2_compat: bool = False,
-    home: Path | None = None,
+    profile_name: str | None = None, home: Path | None = None,
 ) -> dict:
     """Launch a verified MO2 Skyrim target using the established Steam-prefix context.
 
@@ -187,6 +187,15 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     except (OSError, ValueError, RuntimeError) as error:
         return {"ok": False, "message": f"Steam compatibility paths could not be verified: {error}"}
 
+    selected_instance = next(
+        (item for item in inventory.get("skyrim_instances", [])
+         if item.get("name") == instance_name), None
+    )
+    if selected_instance is None:
+        return {"ok": False, "message": "The selected MO2 instance is no longer present in the verified inventory."}
+    if profile_name is not None and profile_name not in selected_instance.get("profiles", []):
+        return {"ok": False, "message": "The selected MO2 profile is no longer present in the verified profile list."}
+
     targets = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance_name, install_root=install,
         require_managed=False,
@@ -220,8 +229,11 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     env["WYRD_LAUNCH_ID"] = launch_token
     command = [
         str(proton / "proton"), "run", str(executable),
-        "--instance", instance_name, "run", "--executable", executable_title,
+        "--instance", instance_name,
     ]
+    if profile_name is not None:
+        command.extend(["--profile", profile_name])
+    command.extend(["run", "--executable", executable_title])
     diagnostics = managed_paths(home)["root"] / "logs" / "skyrim-launch.log"
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
@@ -243,7 +255,7 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
         return {"ok": False, "message": f"Could not start MO2 through SteamCompat: {error}"}
     return {
         "ok": True, "pid": process.pid, "prefix": str(prefix.resolve()),
-        "instance": instance_name, "launch_token": launch_token,
+        "instance": instance_name, "profile": profile_name, "launch_token": launch_token,
         "log_path": str(diagnostics),
         "message": f"Started '{executable_title}' through MO2 instance '{instance_name}' using Skyrim's SteamCompat environment.",
     }
