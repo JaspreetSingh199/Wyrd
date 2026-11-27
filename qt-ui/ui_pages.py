@@ -30,7 +30,7 @@ class MainWindowPagesMixin:
         precheck_layout = QVBoxLayout(self.precheck_panel)
         precheck_layout.setContentsMargins(14, 10, 14, 10)
         precheck_top = QHBoxLayout()
-        precheck_heading = QLabel("SYSTEM READINESS")
+        precheck_heading = QLabel("ENVIRONMENT CHECKS")
         precheck_heading.setObjectName("section")
         precheck_top.addWidget(precheck_heading)
         precheck_top.addStretch(1)
