@@ -363,7 +363,7 @@ class EnvironmentWorkflowMixin:
                 return targets.get(
                     "message", "No verified Skyrim/SKSE executable is configured in this MO2 instance."
                 )
-        except (KeyError, OSError, TypeError, ValueError) as error:
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as error:
             return f"Could not verify this instance's launch target: {error}"
         return None
 
