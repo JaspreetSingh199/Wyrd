@@ -277,19 +277,6 @@ class EnvironmentWorkflowMixin:
     def _update_active_instance_from_scan(self) -> None:
         """Derive launch readiness exclusively from current Steam/MO2 filesystem scans."""
         instances = self.instance_state.get("skyrim_instances", [])
-        installation = self.instance_state.get("installation", {}) or {}
-        discovered_executable = (
-            installation.get("executable")
-            if installation.get("installed") else None
-        )
-        discovered_installation = (
-            installation if installation.get("installed")
-            else self.mo2_state
-        )
-        launch_executable_verified = bool(
-            discovered_installation.get("installed")
-            and discovered_installation.get("executable")
-        )
         # The row-level check also verifies that this exact instance has a
         # resolvable Skyrim/SKSE executable. A global environment pass alone
         # is not enough to enable a particular instance's launch button.
