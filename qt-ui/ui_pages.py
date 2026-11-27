@@ -18,6 +18,13 @@ class MainWindowPagesMixin:
         setup_layout.setContentsMargins(8, 12, 8, 12)
         setup_layout.setSpacing(12)
 
+        hero_title = QLabel("Your Skyrim Environment")
+        hero_title.setObjectName("heroTitle")
+        setup_layout.addWidget(hero_title)
+        hero_subtitle = QLabel("Manage Skyrim Special Edition, Proton and your MO2 environments.")
+        hero_subtitle.setObjectName("muted")
+        setup_layout.addWidget(hero_subtitle)
+
         self.precheck_panel = QFrame()
         self.precheck_panel.setObjectName("statusPanel")
         precheck_layout = QVBoxLayout(self.precheck_panel)
