@@ -284,4 +284,32 @@ QPushButton#secondaryAction { background: #202f36; border: 1px solid #879096; co
 QListWidget#mo2Instances { background: transparent; border: none; outline: none; }
 QListWidget#mo2Instances::item { border: none; padding: 4px 0; }
 QTabWidget::pane { border: none; background: transparent; }
+
+QLabel#instanceSectionTitle {
+    color: #e6ddca; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 24px; font-weight: 700; padding: 6px 2px;
+}
+QLabel#instanceCount {
+    color: #e0d8c8; background: #202c32; border: 1px solid #83775e;
+    border-radius: 6px; padding: 6px 14px; font-family: "Noto Serif", serif;
+}
+QFrame#instanceArtwork {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #425563, stop:0.48 #233b49, stop:1 #101a20);
+    border: 1px solid #8b8b7b; border-radius: 7px;
+}
+QLabel#instanceArtworkMark {
+    color: #e3d5b8; font-family: "Noto Serif", serif; font-size: 46px;
+}
+QLabel#instanceArtworkCaption { color: #e6ddc9; font-size: 9px; letter-spacing: 2px; }
+QLabel#instanceName {
+    color: #eee5d3; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 20px; font-weight: 700;
+}
+QLabel#instanceMeta { color: #c2bcad; font-family: "Noto Serif", serif; font-size: 12px; }
+QFrame#unmoddedLaunchPanel { background: #18242a; border: 1px solid #77684f; border-radius: 9px; }
+QLabel#steamMark { color: #d4d7d5; font-size: 27px; padding: 0 8px; }
+QLabel#unmoddedTitle {
+    color: #e8dfce; font-family: "Noto Serif", serif; font-size: 17px; font-weight: 700;
+    padding-right: 10px;
+}
 """
