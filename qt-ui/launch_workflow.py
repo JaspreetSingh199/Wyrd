@@ -480,9 +480,12 @@ class LaunchWorkflowMixin:
             )
 
         if self._mo2_launch_wait_attempts >= 300:
-            self._close_launch_loader(
-                "Game launch not confirmed",
-                "No Skyrim/SKSE process was detected within five minutes. Check the launch log before retrying.",
+            # This timer only presents MO2 visibility. The process monitor is
+            # the single authority for the five-minute launch deadline and
+            # terminal session state; do not close the loader or clear pending
+            # state here because that can race its final process check.
+            self._mo2_launch_wait_timer.stop()
+            self._log(
+                "MO2 visibility timer reached five minutes; waiting for the "
+                "process monitor to record the launch timeout."
             )
-            self.progress_label.setText("Skyrim/SKSE launch was not confirmed; inspect launch diagnostics.")
-            self._log("Timed out waiting for Skyrim/SKSE process detection after MO2 handoff.")
