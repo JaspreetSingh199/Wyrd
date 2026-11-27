@@ -76,7 +76,6 @@ class MainWindowPagesMixin:
         self.progress_label = QLabel("Ready")
         self.progress_label.setObjectName("section")
         progress_header.addWidget(self.progress_label, 1)
-        progress_header.addWidget(self.check_mo2_button)
         progress_layout.addLayout(progress_header)
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -84,6 +83,8 @@ class MainWindowPagesMixin:
         self.progress.setMinimumHeight(30)
         self.progress.setMinimumWidth(260)
         progress_layout.addWidget(self.progress)
+        self.progress_panel = progress_panel
+        progress_panel.hide()
         setup_layout.addWidget(progress_panel)
 
         configuration_grid = QGridLayout()
@@ -155,6 +156,7 @@ class MainWindowPagesMixin:
         maintenance_layout.setContentsMargins(12, 16, 12, 12)
         maintenance_layout.setSpacing(12)
         maintenance_layout.addWidget(self.precheck_panel)
+        maintenance_layout.addWidget(self.check_mo2_button)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(12)
         diagnostics_grid.setVerticalSpacing(12)
