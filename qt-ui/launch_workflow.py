@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMessageBox, QInputDialog, QProgressDialog
 
-from process_monitor import _proc_start_time, detect_mo2_processes, detect_skyrim_processes
+from process_monitor import _proc_start_time, detect_mo2_processes
 from proton_runtime import managed_paths
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
@@ -372,10 +372,21 @@ class LaunchWorkflowMixin:
             )
             QMessageBox.warning(self, "Skyrim launch failed", result.get("message", "Could not launch Skyrim through MO2."))
 
+    def _launch_loader_label(self, message: str) -> str:
+        """Append elapsed time so the busy dialog never looks frozen."""
+        started = getattr(self, "_launch_progress_started_at", None)
+        if started is None:
+            self._launch_progress_started_at = time.monotonic()
+            started = self._launch_progress_started_at
+        elapsed = max(0, int(time.monotonic() - started))
+        minutes, seconds = divmod(elapsed, 60)
+        return f"{message}\\n\\nElapsed: {minutes:02d}:{seconds:02d}"
+
     def _show_launch_loader(self, title: str, message: str) -> None:
-        """Show a non-cancellable busy dialog while the explicit launch proceeds."""
+        """Show a non-cancellable busy dialog until this launch's game is detected."""
         dialog = getattr(self, "_launch_progress_dialog", None)
         if dialog is None:
+            self._launch_progress_started_at = time.monotonic()
             dialog = QProgressDialog(message, "", 0, 0, self)
             dialog.setWindowTitle("Launching Skyrim")
             dialog.setWindowModality(Qt.WindowModality.WindowModal)
@@ -383,9 +394,9 @@ class LaunchWorkflowMixin:
             dialog.setMinimumDuration(0)
             dialog.setAutoClose(False)
             dialog.setAutoReset(False)
-            dialog.setMinimumWidth(420)
+            dialog.setMinimumWidth(460)
             self._launch_progress_dialog = dialog
-        dialog.setLabelText(message)
+        dialog.setLabelText(self._launch_loader_label(message))
         dialog.setWindowTitle(title)
         dialog.setRange(0, 0)
         dialog.show()
@@ -397,7 +408,7 @@ class LaunchWorkflowMixin:
             self._show_launch_loader(title, message)
             return
         dialog.setWindowTitle(title)
-        dialog.setLabelText(message)
+        dialog.setLabelText(self._launch_loader_label(message))
         if not dialog.isVisible():
             dialog.show()
         dialog.raise_()
@@ -405,17 +416,21 @@ class LaunchWorkflowMixin:
     def _close_launch_loader(self, title: str, message: str) -> None:
         dialog = getattr(self, "_launch_progress_dialog", None)
         if dialog is not None:
-            dialog.setLabelText(message)
+            dialog.setLabelText(self._launch_loader_label(message))
             dialog.setWindowTitle(title)
             dialog.close()
             self._launch_progress_dialog = None
+        self._launch_progress_started_at = None
+        self._mo2_launch_wait_pending = None
         if getattr(self, "_mo2_launch_wait_timer", None) is not None:
             self._mo2_launch_wait_timer.stop()
 
     def _start_mo2_launch_wait(self, pending: dict) -> None:
-        """Wait until MO2 or Skyrim is visible in the selected AppID prefix."""
+        """Watch MO2 startup while the game-process monitor waits for Skyrim/SKSE."""
         self._mo2_launch_wait_pending = pending
         self._mo2_launch_wait_attempts = 0
+        self._mo2_launch_wait_seen = False
+        self._mo2_launch_wait_last_message = ""
         if not hasattr(self, "_mo2_launch_wait_timer"):
             self._mo2_launch_wait_timer = QTimer(self)
             self._mo2_launch_wait_timer.setInterval(1000)
@@ -423,47 +438,51 @@ class LaunchWorkflowMixin:
         self._mo2_launch_wait_timer.start()
 
     def _poll_mo2_launch_visibility(self) -> None:
+        """Keep the loader open after MO2 appears; only game detection closes it."""
         pending = getattr(self, "_mo2_launch_wait_pending", None)
         if not pending:
-            self._close_launch_loader("Launch monitoring stopped", "No pending MO2 launch.")
+            if getattr(self, "_mo2_launch_wait_timer", None) is not None:
+                self._mo2_launch_wait_timer.stop()
             return
         self._mo2_launch_wait_attempts += 1
-        prefix = pending["prefix"]
-        mo2 = detect_mo2_processes(prefix)
-        if mo2.get("ok") and mo2.get("processes"):
-            pids = ", ".join(str(item["pid"]) for item in mo2["processes"])
-            self._mo2_launch_wait_pending = None
-            self._close_launch_loader(
-                "MO2 launched",
-                f"Mod Organizer is running (PID {pids}). Skyrim will continue launching through MO2.",
+        mo2 = detect_mo2_processes(pending["prefix"])
+        processes = mo2.get("processes", []) if mo2.get("ok") else []
+        if processes:
+            self._mo2_launch_wait_seen = True
+            pids = ", ".join(str(item["pid"]) for item in processes)
+            message = (
+                f"Mod Organizer is running (PID {pids}). Its handoff is active; "
+                f"Wyrd is waiting for Skyrim/SKSE ({self._mo2_launch_wait_attempts}/300 seconds)."
             )
-            self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE detection.")
-            self._log("MO2 process detected after Steam startup: PID " + pids)
-            return
-
-        game = detect_skyrim_processes(prefix)
-        if game.get("ok") and game.get("processes"):
-            pids = ", ".join(str(item["pid"]) for item in game["processes"])
-            self._mo2_launch_wait_pending = None
-            self._close_launch_loader(
-                "Skyrim launched",
-                f"Skyrim/SKSE process detected (PID {pids}).",
+            self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE to launch.")
+            self._log_once = getattr(self, "_log_once", set())
+            if "mo2-visible-after-launch" not in self._log_once:
+                self._log("MO2 process detected. Keeping the launch loader open until Skyrim/SKSE is detected.")
+                self._log_once.add("mo2-visible-after-launch")
+                self._log_once = self._log_once
+        elif self._mo2_launch_wait_seen:
+            message = (
+                "MO2 was detected but is no longer visible. Waiting for the selected Skyrim/SKSE "
+                f"process or a launch failure ({self._mo2_launch_wait_attempts}/300 seconds)."
             )
-            self.progress_label.setText("Skyrim/SKSE process detected.")
-            self._log("Skyrim/SKSE process detected while waiting for MO2: PID " + pids)
-            return
+        else:
+            message = (
+                "Steam is ready. Waiting for Mod Organizer 2 to start through Proton, "
+                f"then Skyrim/SKSE ({self._mo2_launch_wait_attempts}/300 seconds)."
+            )
 
-        if self._mo2_launch_wait_attempts % 5 == 0:
+        # Refresh the visible phase every few seconds without spamming logs.
+        if self._mo2_launch_wait_attempts == 1 or self._mo2_launch_wait_attempts % 5 == 0:
             self._update_launch_loader(
-                "Launching MO2…",
-                f"Waiting for MO2 or Skyrim to appear in the verified prefix "
-                f"({self._mo2_launch_wait_attempts}/120 seconds).",
+                "MO2 is running — waiting for Skyrim" if self._mo2_launch_wait_seen
+                else "Starting MO2 through Proton…",
+                message,
             )
-        if self._mo2_launch_wait_attempts >= 120:
-            self._mo2_launch_wait_pending = None
+
+        if self._mo2_launch_wait_attempts >= 300:
             self._close_launch_loader(
-                "Launch still unconfirmed",
-                "No MO2 or Skyrim process was detected after 120 seconds. Check the launch log.",
+                "Game launch not confirmed",
+                "No Skyrim/SKSE process was detected within five minutes. Check the launch log before retrying.",
             )
-            self.progress_label.setText("MO2/Skyrim launch was not confirmed; inspect launch diagnostics.")
-            self._log("Timed out waiting for MO2 or Skyrim process detection.")
+            self.progress_label.setText("Skyrim/SKSE launch was not confirmed; inspect launch diagnostics.")
+            self._log("Timed out waiting for Skyrim/SKSE process detection after MO2 handoff.")
