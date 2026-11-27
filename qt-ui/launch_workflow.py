@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMessageBox, QInputDialog, QProgressDialog
+from PySide6.QtWidgets import QApplication, QMessageBox, QInputDialog, QProgressDialog
 
 from process_monitor import _proc_start_time, detect_mo2_processes
 from proton_runtime import managed_paths
@@ -382,8 +382,27 @@ class LaunchWorkflowMixin:
         minutes, seconds = divmod(elapsed, 60)
         return f"{message}\n\nElapsed: {minutes:02d}:{seconds:02d}"
 
+    def _restore_launch_loader_on_activation(self, state) -> None:
+        """Restore the active launch indicator when the user returns to Wyrd."""
+        if state != Qt.ApplicationState.ApplicationActive:
+            return
+        dialog = getattr(self, "_launch_progress_dialog", None)
+        launch_active = bool(
+            getattr(self, "_steam_launch_pending", None)
+            or getattr(self, "_mo2_launch_wait_pending", None)
+            or (getattr(self, "_launch_monitor", None) is not None
+                and self._launch_monitor.isActive())
+        )
+        if dialog is not None and launch_active and not dialog.isVisible():
+            dialog.show()
+            dialog.raise_()
+
     def _show_launch_loader(self, title: str, message: str) -> None:
         """Show a non-cancellable busy dialog until this launch's game is detected."""
+        app = QApplication.instance()
+        if app is not None and not getattr(self, "_launch_activation_hooked", False):
+            app.applicationStateChanged.connect(self._restore_launch_loader_on_activation)
+            self._launch_activation_hooked = True
         dialog = getattr(self, "_launch_progress_dialog", None)
         if dialog is None:
             self._launch_progress_started_at = time.monotonic()
