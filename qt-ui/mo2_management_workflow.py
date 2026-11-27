@@ -141,7 +141,24 @@ class Mo2ManagementWorkflowMixin:
 
 
     def launch_mo2_gui(self, instance_name: str | None = None) -> None:
-        """Open the requested MO2 instance directly, without showing the instance picker."""
+        """Open the requested MO2 instance directly, without showing MO2's picker."""
+        active_session = (
+            getattr(self, "_mo2_session_timer", None) is not None
+            and self._mo2_session_timer.isActive()
+        )
+        if active_session:
+            QMessageBox.information(
+                self, "MO2 already opening",
+                "Wyrd is already opening or monitoring an MO2 window in Skyrim's prefix.",
+            )
+            return
+        existing_loader = getattr(self, "_launch_progress_dialog", None)
+        if existing_loader is not None and existing_loader.isVisible():
+            QMessageBox.information(
+                self, "Another launch is in progress",
+                "Wait for the current launch to finish before opening another MO2 window.",
+            )
+            return
         try:
             installation = self.instance_state.get("installation", {}) or {}
             executable_value = (
@@ -216,6 +233,11 @@ class Mo2ManagementWorkflowMixin:
             self._mo2_session_peak_rss = 0
             self._mo2_session_peak_processes = 0
             self._mo2_session_warned = set()
+            self._mo2_session_loader_active = True
+            self._show_launch_loader(
+                "Opening MO2…",
+                f"Starting MO2 instance '{instance_name}' through Proton. Waiting for Mod Organizer to appear.",
+            )
             self._mo2_session_timer.start()
             self._log(
                 f"MO2 instance '{instance_name}' opened directly (PID {process.pid}); "
@@ -223,6 +245,9 @@ class Mo2ManagementWorkflowMixin:
             )
             self.progress_label.setText(f"Opening MO2 mod list for {instance_name}…")
         except Exception as error:
+            if getattr(self, "_mo2_session_loader_active", False):
+                self._mo2_session_loader_active = False
+                self._close_launch_loader("MO2 launch failed", str(error))
             self._log(f"MO2 mod-list launch failed: {error}")
             QMessageBox.warning(self, "Open MO2 Mod List", str(error))
 
@@ -282,20 +307,46 @@ class Mo2ManagementWorkflowMixin:
         if scan.get("ok") and scan.get("processes"):
             if not self._mo2_session_seen:
                 self._mo2_session_seen = True
-                self._log("MO2 process detected in Skyrim's Steam prefix; monitoring until it closes.")
+                processes = scan.get("processes", [])
+                pids = ", ".join(str(item.get("pid")) for item in processes)
+                self._log(
+                    "MO2 process detected in Skyrim's Steam prefix"
+                    + (f" (PID {pids})" if pids else "")
+                    + "; monitoring until it closes."
+                )
                 self.progress_label.setText("MO2 is open. Wyrd will refresh instances and profiles when it closes.")
+                if getattr(self, "_mo2_session_loader_active", False):
+                    self._mo2_session_loader_active = False
+                    self._close_launch_loader(
+                        "MO2 opened",
+                        "Mod Organizer is running in Skyrim's existing Proton prefix."
+                        + (f" Detected PID(s): {pids}." if pids else ""),
+                    )
             return
 
         if not self._mo2_session_seen:
+            if (
+                getattr(self, "_mo2_session_loader_active", False)
+                and self._mo2_session_polls % 3 == 0
+            ):
+                self._update_launch_loader(
+                    "Opening MO2…",
+                    f"Waiting for Mod Organizer in Skyrim's Proton prefix "
+                    f"({self._mo2_session_polls}/80 checks).",
+                )
             # Proton may take a few seconds to start Wine/MO2. Stop after a
             # bounded startup window rather than silently polling forever.
             if self._mo2_session_polls >= 80:
                 self._mo2_session_timer.stop()
                 self._mo2_session_prefix = None
-                self._log(
-                    "MO2 did not appear in the Skyrim prefix within 120 seconds. "
+                message = (
+                    "MO2 did not appear in Skyrim's existing Proton prefix within 120 seconds. "
                     "No automatic inventory refresh was triggered."
                 )
+                self._log(message)
+                if getattr(self, "_mo2_session_loader_active", False):
+                    self._mo2_session_loader_active = False
+                    self._close_launch_loader("MO2 startup not detected", message + " Check the MO2 launch log.")
                 self.progress_label.setText("MO2 startup was not detected. Check the MO2 launch log.")
             return
 
