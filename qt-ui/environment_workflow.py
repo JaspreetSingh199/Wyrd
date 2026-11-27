@@ -152,7 +152,6 @@ class EnvironmentWorkflowMixin:
             self.install_button.setText("Install MO2")
             self.install_button.show()
             self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
-            self.launch_direct_button.setEnabled(bool(self.game_state.get("found")))
 
     def _finalize_environment_readiness(self) -> None:
         """Restore selection, refresh panels, and derive final launch readiness."""
@@ -323,7 +322,6 @@ class EnvironmentWorkflowMixin:
         self.active_instance_label.setText(detail)
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
-        self.launch_direct_button.setEnabled(bool(self.game_state.get("found") and not busy))
 
     def manage_mo2_library(self) -> None:
         """Refresh the read-only MO2 inventory widgets from the current scan."""
