@@ -83,7 +83,7 @@ class WyrdV1ContractTests(unittest.TestCase):
             command = popen.call_args.args[0]
             self.assertEqual(command, [
                 str(proton / "proton"), "run", str(install / "ModOrganizer.exe"),
-                "--instance", "Skyrim SE", "run", "--executable", "SKSE",
+                "--logs", "--instance", "Skyrim SE", "run", "--executable", "SKSE",
             ])
             env = popen.call_args.kwargs["env"]
             self.assertEqual(env["SteamAppId"], "489830")
