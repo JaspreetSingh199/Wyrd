@@ -14,6 +14,7 @@ from proton_runtime import (
 )
 from steam_prefix import APP_ID, steam_compat_prefix
 from steam_mo2_discovery import inspect_skyrim_prefix_mo2_installation
+from wine_process_guard import wait_for_wine_process
 
 
 def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
@@ -96,11 +97,22 @@ def install_mo2_into_skyrim_prefix(proton_path: Path, game_path: Path,
                                stdin=subprocess.DEVNULL, start_new_session=True)
     if callback:
         callback(45, "MO2 installer opened. Complete its wizard; Wyrd will verify the installation when it closes.")
+    if callback:
+        callback(
+            46,
+            "Wine memory guard active: 6 GiB process-group RSS limit and 256-process limit. "
+            "This guard applies only to the installer launched by Wyrd.",
+        )
     try:
-        return_code = process.wait(timeout=1800)
-    except subprocess.TimeoutExpired:
-        process.terminate()
-        raise RuntimeError("MO2 installer did not finish within 30 minutes.")
+        return_code = wait_for_wine_process(
+            process,
+            timeout_seconds=1800,
+            max_rss_bytes=6 * 1024 ** 3,
+            max_processes=256,
+            on_warning=(lambda message: callback(47, message)) if callback else None,
+        )
+    except (TimeoutError, RuntimeError):
+        raise
     if return_code != 0:
         raise RuntimeError(f"MO2 installer exited with status {return_code}.")
     if not executable.is_file() or executable.is_symlink():
