@@ -70,6 +70,11 @@ QPushButton#primaryAction:hover {
     background: #8a704e;
     border-color: #c0a477;
 }
+QPushButton#primaryAction:disabled {
+    background: #292d2d;
+    color: #858983;
+    border-color: #4a504e;
+}
 QPushButton#secondaryAction {
     background: #293235;
     border-color: #626c6d;
