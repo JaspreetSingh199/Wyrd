@@ -10,13 +10,17 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import steam_mo2_launch
 import steam_game_registry
 import steam_client
+import launch_workflow
+import process_workflow
+from launch_models import LaunchSession
 from steam_prefix import steam_compat_prefix
 from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
 
@@ -135,6 +139,74 @@ class SteamClientActivationTests(unittest.TestCase):
 
             self.assertFalse(result["ok"])
             self.assertIn("app manifest", result["message"].casefold())
+
+
+class LaunchLoaderWorkflowTests(unittest.TestCase):
+    def test_loader_stays_open_after_mo2_appears_until_game_detection(self):
+        window = SimpleNamespace(
+            _mo2_launch_wait_pending={
+                "prefix": Path("/steam/steamapps/compatdata/489830"),
+                "selected_title": "SKSE",
+            },
+            _mo2_launch_wait_attempts=0,
+            _mo2_launch_wait_seen=False,
+            _mo2_launch_visibility_logged=False,
+            progress_label=SimpleNamespace(setText=Mock()),
+            _log=Mock(),
+            _update_launch_loader=Mock(),
+            _close_launch_loader=Mock(),
+        )
+        with patch.object(
+            launch_workflow,
+            "detect_mo2_processes",
+            return_value={"ok": True, "processes": [{"pid": 456}]},
+        ):
+            launch_workflow.LaunchWorkflowMixin._poll_mo2_launch_visibility(window)
+
+        self.assertTrue(window._mo2_launch_wait_seen)
+        self.assertIsNotNone(window._mo2_launch_wait_pending)
+        window._close_launch_loader.assert_not_called()
+        window._update_launch_loader.assert_called_once()
+        self.assertIn("waiting for Skyrim", window._update_launch_loader.call_args.args[0].casefold())
+
+    def test_exited_proton_wrapper_is_not_failure_while_mo2_gui_is_running(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            window = SimpleNamespace(
+                launch_session=LaunchSession(
+                    wrapper_pid=321, wrapper_start_time=100,
+                    app_id="489830", prefix_root=tmp,
+                    target_binary="skse64_loader.exe", launch_token="launch-token",
+                ),
+                _launch_poll_limit=150,
+                _launch_monitor=SimpleNamespace(isActive=Mock(return_value=True), stop=Mock()),
+                game_state={"game_dir": str(Path(tmp) / "Skyrim")},
+                progress_label=SimpleNamespace(setText=Mock()),
+                _log=Mock(),
+                _update_launch_loader=Mock(),
+                _close_launch_loader=Mock(),
+                _start_game_process_watch=Mock(),
+            )
+            with (
+                patch.object(process_workflow, "_proc_identity", return_value={"start_time": 99}),
+                patch.object(
+                    process_workflow, "launch_process_status",
+                    return_value={"state": "exited", "message": "Proton wrapper exited"},
+                ),
+                patch.object(
+                    process_workflow, "detect_skyrim_processes",
+                    return_value={"ok": True, "processes": [], "wyrd_processes": []},
+                ),
+                patch.object(
+                    process_workflow, "detect_mo2_processes",
+                    return_value={"ok": True, "processes": [{"pid": 654}]},
+                ),
+            ):
+                process_workflow.ProcessMonitorWorkflowMixin._poll_launch_status(window)
+
+            self.assertEqual(window.launch_session.state, "waiting")
+            window._close_launch_loader.assert_not_called()
+            window._update_launch_loader.assert_called_once()
+            self.assertIn("MO2 is running", window.progress_label.setText.call_args.args[0])
 
 
 class WyrdV1ContractTests(unittest.TestCase):
