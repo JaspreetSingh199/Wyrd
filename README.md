@@ -1,25 +1,91 @@
 # Wyrd
 
-Wyrd is a focused Qt6 Linux GUI for setting up and launching Skyrim Special Edition through Mod Organizer 2 and Proton.
+Wyrd is a focused Qt 6 desktop application for Linux that helps configure and launch **The Elder Scrolls V: Skyrim Special Edition** through **Mod Organizer 2 (MO2)** and Steam **Proton**.
 
-## Scope
+V1 focuses on one job: discover the installed Skyrim/Proton environment, verify the MO2 instance and executable, and launch modded Skyrim through the game's existing Steam AppID `489830` compatibility context.
 
-- Detect Skyrim Special Edition installations in Steam libraries.
-- Discover compatible Proton runtimes.
-- Install and verify official Mod Organizer 2.
-- Configure Skyrim-specific MO2 integration safely.
-- Launch MO2 and work toward launching Skyrim through MO2.
+## What Wyrd does
 
-Wyrd is a standalone project and is not a SteamTinkerLaunch fork in its development direction.
+- Detects Skyrim Special Edition from Steam libraries, including libraries registered in Steam's `libraryfolders.vdf`.
+- Discovers compatible Proton runtimes and remembers the user's selected runtime.
+- Installs the official MO2 Windows installer into Skyrim's existing Proton prefix.
+- Discovers MO2 instances, profiles, and configured Skyrim/SKSE executables.
+- Verifies paths and the MO2-to-Skyrim drive mapping before launch.
+- Launches MO2 and modded Skyrim through the existing Steam AppID `489830` context.
+- Offers a direct Steam launch for an unmodded baseline.
+- Monitors launch/session state and provides application and launch diagnostics.
 
-## Safety
+MO2 remains responsible for profiles, mods, downloads, load order, and its virtual filesystem. Wyrd is an environment and launch companion, not a replacement mod manager.
 
-Wyrd avoids overwriting user-owned files, MO2 instances, prefixes, and Steam configuration. It uses ownership markers for managed resources and requires user confirmation for destructive actions.
+## Requirements
 
-## Status
+Wyrd targets **Linux x86_64**. A working desktop session is required.
 
-The Qt6 GUI and setup tooling are under active development. Actual Skyrim/MO2/Proton runtime behavior must be tested on a Linux desktop.
+- Python 3.10+ with `venv` and `pip` for the source launcher, or use the standalone release.
+- Steam for Linux, with Skyrim Special Edition installed and launched through Steam at least once so AppID `489830` has an initialized Proton prefix.
+- A compatible Steam Proton runtime.
+- Network access for first-run Python dependency installation and the official MO2 installer download.
+- Compatible host graphics, display-server, and Qt system libraries.
 
-## Development
+See [Dependencies](docs/DEPENDENCIES.md) for distro package examples and the exact Python requirement.
 
-See [qt-ui/README.md](qt-ui/README.md).
+## Install and run from source
+
+Clone the repository, then run:
+
+```bash
+git clone https://github.com/JaspreetSingh199/Wyrd.git
+cd Wyrd
+bash qt-ui/run.sh
+```
+
+The launcher creates `qt-ui/.venv` and installs the Python requirements on first run. To add Wyrd to your desktop application menu:
+
+```bash
+bash qt-ui/install-desktop-launcher.sh
+```
+
+The desktop entry points to the checkout's `qt-ui/run.sh`; keep the repository in place after installing the launcher.
+
+See [Installation and configuration](qt-ui/README.md) for first-run setup and operating instructions.
+
+## Standalone release
+
+The GitHub Actions workflow builds a standalone Linux x86_64 executable and packages it as `Wyrd-linux-x86_64.zip`.
+
+- Download the ZIP from the repository's [Actions artifacts](https://github.com/JaspreetSingh199/Wyrd/actions) for a successful build, or from the Assets section of a versioned [GitHub Release](https://github.com/JaspreetSingh199/Wyrd/releases).
+- Extract the ZIP.
+- Run `./Wyrd` from the extracted `Wyrd-linux-x86_64` directory.
+
+The standalone bundle includes Python, PySide6, and the Qt application runtime. It does **not** bundle Steam, Proton, Skyrim, MO2, or host graphics/display libraries.
+
+## Safety boundaries
+
+- Wyrd uses Skyrim's existing Steam AppID `489830` compatdata prefix for MO2 integration; it does not create or reset that Steam prefix.
+- Wyrd does not migrate, copy, or symlink saves.
+- Wyrd does not silently change the selected Proton runtime.
+- MO2 discovery is read-only. Wyrd verifies the selected instance and launch target again at the launch boundary.
+- Destructive MO2 removal is restricted to a verified Wyrd-managed MO2 program directory; MO2 instances and user data are preserved.
+- Wyrd settings reset does not uninstall MO2 or touch Skyrim/Steam data.
+
+## Known limitations and troubleshooting
+
+See [Known limitations and troubleshooting](docs/TROUBLESHOOTING.md). In particular, Wyrd depends on Steam's local library metadata, a usable Proton runtime, and a correctly configured MO2 Skyrim instance.
+
+## Development and verification
+
+The Qt application is in `qt-ui/`. The source test/validation workflow is `.github/workflows/ci.yml`; the standalone build and release workflow is `.github/workflows/standalone.yml`.
+
+Run the local validation suite from the repository root:
+
+```bash
+python3 -m pip install -r qt-ui/requirements.txt
+QT_QPA_PLATFORM=offscreen python3 -m unittest discover -v -s qt-ui/tests -p 'test_*.py'
+python3 -m compileall -q qt-ui
+bash -n qt-ui/run.sh
+bash -n qt-ui/install-desktop-launcher.sh
+```
+
+## License
+
+See [LICENSE](LICENSE).
