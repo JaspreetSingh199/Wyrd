@@ -187,6 +187,16 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     except (OSError, ValueError, RuntimeError) as error:
         return {"ok": False, "message": f"Steam compatibility paths could not be verified: {error}"}
 
+    # Re-read the instance inventory at the launch boundary. The caller's
+    # UI scan can become stale while the user chooses an executable or confirms.
+    inventory = inspect_mo2_instances(
+        prefix, install, require_managed=False, detected_game_path=game,
+    )
+    if not inventory.get("ok"):
+        return {
+            "ok": False,
+            "message": inventory.get("message", "Could not re-verify MO2 instances before launch."),
+        }
     selected_instance = next(
         (item for item in inventory.get("skyrim_instances", [])
          if item.get("name") == instance_name), None
