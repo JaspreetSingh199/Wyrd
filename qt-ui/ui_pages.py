@@ -135,6 +135,12 @@ class MainWindowPagesMixin:
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget, 1)
+        self.open_mo2_button = QPushButton("Open MO2")
+        self.open_mo2_button.setObjectName("secondaryAction")
+        self.open_mo2_button.setToolTip(
+            "Open a discovered Skyrim Special Edition MO2 instance to review its mods and profiles."
+        )
+        self.open_mo2_button.clicked.connect(self.open_mo2_instance)
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
@@ -143,6 +149,7 @@ class MainWindowPagesMixin:
         self.launch_status_button = QPushButton("Check launch status")
         self.launch_status_button.clicked.connect(self.check_launch_status)
         utility_actions = QHBoxLayout()
+        utility_actions.addWidget(self.open_mo2_button)
         utility_actions.addWidget(self.install_button)
         utility_actions.addStretch(1)
         setup_layout.addLayout(utility_actions)
