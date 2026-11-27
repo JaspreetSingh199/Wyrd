@@ -388,13 +388,15 @@ class LaunchWorkflowMixin:
         if dialog is None:
             self._launch_progress_started_at = time.monotonic()
             dialog = QProgressDialog(message, "", 0, 0, self)
+            dialog.setObjectName("launchLoader")
             dialog.setWindowTitle("Launching Skyrim")
             dialog.setWindowModality(Qt.WindowModality.WindowModal)
             dialog.setCancelButton(None)
             dialog.setMinimumDuration(0)
             dialog.setAutoClose(False)
             dialog.setAutoReset(False)
-            dialog.setMinimumWidth(460)
+            dialog.setMinimumWidth(500)
+            dialog.setMinimumHeight(112)
             self._launch_progress_dialog = dialog
         dialog.setLabelText(self._launch_loader_label(message))
         dialog.setWindowTitle(title)
