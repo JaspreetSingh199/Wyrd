@@ -379,6 +379,12 @@ def _resolve_windows_path(value: str, prefix_root: Path,
     and the resolved target is treated as that drive's root.
     """
     raw = value.strip().strip('"')
+    # QSettings may serialize Windows paths as @ByteArray(path). Unwrap
+    # that representation before resolving the Wine drive mapping.
+    if raw.startswith("@ByteArray(") and raw.endswith(")"):
+        raw = raw[len("@ByteArray("):-1].strip().strip('"')
+    if raw.startswith("@String(") and raw.endswith(")"):
+        raw = raw[len("@String("):-1].strip().strip('"')
     if len(raw) < 2 or raw[1] != ":" or not raw[0].isalpha():
         return None
     drive_letter = raw[0].casefold()
