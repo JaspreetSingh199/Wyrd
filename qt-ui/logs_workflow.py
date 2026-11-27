@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
 from pathlib import Path
 
 from PySide6.QtGui import QTextCursor
@@ -31,10 +32,19 @@ class LogsWorkflowMixin:
             if path.is_symlink() or not path.is_file():
                 self.launch_log_view.setPlainText("No Skyrim launch log has been created yet.")
                 return
-            with path.open("r", encoding="utf-8", errors="replace") as stream:
-                lines = stream.readlines()[-3000:]
-            self.launch_log_view.setPlainText("".join(lines) or "The launch log is empty.")
-            self.launch_log_view.moveCursor(QTextCursor.MoveOperation.End)
+            # Read a bounded tail: Proton/Wine can be extremely verbose and
+            # the launch log may grow for the lifetime of the game.
+            with path.open("rb") as stream:
+                stream.seek(0, os.SEEK_END)
+                size = stream.tell()
+                stream.seek(max(0, size - 512 * 1024))
+                content = stream.read().decode("utf-8", errors="replace")
+            scrollbar = self.launch_log_view.verticalScrollBar()
+            was_at_bottom = scrollbar.value() >= scrollbar.maximum() - 2
+            if self.launch_log_view.toPlainText() != content:
+                self.launch_log_view.setPlainText(content or "The launch log is empty.")
+                if was_at_bottom:
+                    self.launch_log_view.moveCursor(QTextCursor.MoveOperation.End)
         except OSError as error:
             self.launch_log_view.setPlainText(f"Could not read launch log: {error}")
 
