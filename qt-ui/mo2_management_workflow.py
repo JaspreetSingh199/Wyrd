@@ -6,7 +6,7 @@ import time
 import uuid
 from pathlib import Path
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from proton_runtime import _steam_root_for_game, _runtime_environment
 from steam_mo2_discovery import (
@@ -22,6 +22,34 @@ from proton_runtime import managed_paths
 
 
 class Mo2ManagementWorkflowMixin:
+    def open_mo2_instance(self) -> None:
+        """Open one discovered Skyrim MO2 instance from the Environment page."""
+        instances = list(self.instance_state.get("skyrim_instances", []))
+        if not instances:
+            QMessageBox.warning(
+                self, "MO2 unavailable",
+                self.instance_state.get(
+                    "message",
+                    "No Skyrim Special Edition MO2 instance was discovered. Refresh the environment and try again.",
+                ),
+            )
+            return
+        if len(instances) == 1:
+            instance_name = str(instances[0].get("name") or "")
+        else:
+            names = [str(item.get("name") or "Unnamed instance") for item in instances]
+            preferred = getattr(self.mo2_library_widget, "preferred_instance_id", "")
+            initial = next((i for i, item in enumerate(instances)
+                            if str(item.get("path") or "") == preferred
+                            or str(item.get("name") or "") == preferred), 0)
+            instance_name, accepted = QInputDialog.getItem(
+                self, "Open Mod Organizer 2", "Choose a Skyrim SE MO2 instance:",
+                names, initial, False,
+            )
+            if not accepted or not instance_name:
+                return
+        self.launch_mo2_gui(instance_name=instance_name)
+
     def reset_managed_mo2(self) -> None:
         """Remove only Wyrd-owned MO2 files; never reset Steam's Skyrim prefix."""
         if self.worker and self.worker.isRunning():
