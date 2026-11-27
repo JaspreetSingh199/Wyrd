@@ -284,14 +284,6 @@ class EnvironmentWorkflowMixin:
             (item, self.mo2_launch_block_reason(item)) for item in instances
         ]
         ready = any(reason is None for _item, reason in launch_reasons)
-        blocked = [
-            f"{item.get('name', 'Unnamed instance')}: {reason}"
-            for item, reason in launch_reasons if reason
-        ]
-        if blocked:
-            detail += "\nLaunch readiness: " + " | ".join(blocked)
-        elif ready:
-            detail += "\nAt least one Skyrim instance has a verified launch target."
         self._active_instance_summary = (
             f"{len(instances)} Skyrim instance(s) discovered; "
             + ("at least one has a verified launch target." if ready
