@@ -18,7 +18,8 @@ from steam_mo2_discovery import (
     inspect_skyrim_prefix_mo2_installation,
     inspect_external_skyrim_prefix_mo2_installation,
 )
-from steam_mo2_launch import launch_skyrim_via_mo2_in_skyrim_prefix
+# Keep Skyrim launches routed through the established SteamCompat facade.
+from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
 
 
 class LaunchWorkflowMixin:
