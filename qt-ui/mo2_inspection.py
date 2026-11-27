@@ -7,26 +7,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from skyrim_detection import find_steam_roots
+
 APP_ID = "489830"
-STEAM_CANDIDATES = (
-    ".steam/steam",
-    ".local/share/Steam",
-    ".steam/root",
-    ".var/app/com.valvesoftware.Steam/.local/share/Steam",
-)
-
-
-def find_steam_roots(home: Path | None = None) -> list[Path]:
-    """Return both lexical and canonical Steam roots; do not lose install-layout identity."""
-    home = home or Path.home()
-    roots: list[Path] = []
-    for relative in STEAM_CANDIDATES:
-        path = home / relative
-        if (path / "steamapps").is_dir():
-            for candidate in (path, path.resolve()):
-                if candidate not in roots:
-                    roots.append(candidate)
-    return roots
 
 
 def find_mo2_installations(home: Path | None = None) -> list[Path]:
@@ -40,7 +23,7 @@ def find_mo2_installations(home: Path | None = None) -> list[Path]:
         home / ".local/share/ModOrganizer",
         home / ".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/compatdata/489830/pfx/drive_c/Modding/MO2",
     ]
-    for root in find_steam_roots(home):
+    for root in find_steam_roots(home, include_aliases=True):
         candidates.append(root / "steamapps/compatdata/489830/pfx/drive_c/Modding/MO2")
     found: list[Path] = []
     for candidate in candidates:

@@ -3,7 +3,7 @@ import unittest
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from skyrim_detection import detect_skyrim, _parse_vdf_paths
+from skyrim_detection import detect_skyrim, _parse_vdf_paths, find_steam_roots
 
 class DetectionTests(unittest.TestCase):
     def test_parse_vdf_path(self):
@@ -12,6 +12,21 @@ class DetectionTests(unittest.TestCase):
     def test_no_steam_roots(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertFalse(detect_skyrim(Path(tmp))["found"])
+
+    def test_steam_roots_are_canonical_by_default_and_can_preserve_aliases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            canonical = home / ".local/share/Steam"
+            (canonical / "steamapps").mkdir(parents=True)
+            alias = home / ".steam/steam"
+            alias.parent.mkdir(parents=True)
+            alias.symlink_to(canonical, target_is_directory=True)
+
+            self.assertEqual(find_steam_roots(home), [canonical.resolve()])
+            self.assertEqual(
+                find_steam_roots(home, include_aliases=True),
+                [alias, canonical.resolve()],
+            )
 
     def test_default_library_detection(self):
         with tempfile.TemporaryDirectory() as tmp:

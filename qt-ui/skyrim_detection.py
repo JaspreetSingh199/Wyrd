@@ -16,15 +16,22 @@ def _parse_vdf_paths(text: str) -> list[str]:
     # Steam libraryfolders VDF: extract values associated with the "path" key.
     return [p.replace("\\\\", "\\") for p in re.findall(r'"path"\s+"([^"]+)"', text)]
 
-def find_steam_roots(home: Path | None = None) -> list[Path]:
-    home = home or Path.home()
+def find_steam_roots(home: Path | None = None, *, include_aliases: bool = False) -> list[Path]:
+    """Discover Steam roots once, optionally preserving lexical symlink aliases.
+
+    Detection normally uses canonical paths. MO2 installation lookup can request
+    aliases as well because a Steam library may be exposed through either path.
+    """
+    home = (home or Path.home()).expanduser()
     roots: list[Path] = []
     for relative in STEAM_CANDIDATES:
-        path = (home / relative).expanduser()
-        if (path / "steamapps").is_dir():
-            resolved = path.resolve()
-            if resolved not in roots:
-                roots.append(resolved)
+        path = home / relative
+        if not (path / "steamapps").is_dir():
+            continue
+        candidates = (path, path.resolve()) if include_aliases else (path.resolve(),)
+        for candidate in candidates:
+            if candidate not in roots:
+                roots.append(candidate)
     return roots
 
 def steam_libraries(steam_root: Path) -> list[Path]:

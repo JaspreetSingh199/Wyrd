@@ -6,7 +6,6 @@ if [[ ! -x "${SCRIPT_DIR}/.venv/bin/python" ]]; then
   echo "Python 3 is required." >&2
   exit 1
 fi
-if ! "${SCRIPT_DIR}/.venv/bin/python" -c 'import PySide6' >/dev/null 2>&1; then
-  "${SCRIPT_DIR}/.venv/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
-fi
+# Python dependencies are managed separately from the extracted MO2 application.
+bash "${SCRIPT_DIR}/install-requirements.sh"
 exec "${SCRIPT_DIR}/.venv/bin/python" "${SCRIPT_DIR}/main.py"

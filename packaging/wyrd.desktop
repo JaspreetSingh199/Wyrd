@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Wyrd
+Comment=Manage Skyrim Special Edition and Mod Organizer 2
+Exec=AppRun
+Icon=wyrd
+Terminal=false
+Categories=Game;Utility;
+StartupNotify=true
