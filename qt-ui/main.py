@@ -7,10 +7,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QThread, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
-    QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
     QVBoxLayout, QWidget, QTabWidget, QFrame,
 )
 
@@ -240,28 +240,8 @@ class MainWindow(
             overlay.setGeometry(root.rect())
             overlay.raise_()
 
-    def _fade_widget_in(self, page: QWidget | None) -> None:
-        if page is None:
-            return
-        effect = getattr(page, "_wyrd_page_opacity", None)
-        if effect is None:
-            effect = QGraphicsOpacityEffect(page)
-            page.setGraphicsEffect(effect)
-            page._wyrd_page_opacity = effect
-        previous = getattr(self, "_page_transition_animation", None)
-        if previous is not None and previous.state() == QPropertyAnimation.State.Running:
-            previous.stop()
-        effect.setOpacity(0.0)
-        animation = QPropertyAnimation(effect, b"opacity", self)
-        animation.setDuration(260)
-        animation.setStartValue(0.0)
-        animation.setEndValue(1.0)
-        self._page_transition_animation = animation
-        animation.start()
-
     def _select_page(self, index: int) -> None:
         self.tabs.setCurrentIndex(index)
-        self._fade_widget_in(self.tabs.widget(index))
         self.environment_nav.setChecked(index == 0)
         self.maintenance_nav.setChecked(index == 1)
         self.logs_nav.setChecked(index == 2)
