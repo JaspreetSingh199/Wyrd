@@ -110,6 +110,26 @@ QLabel#section {
     letter-spacing: .45px;
 }
 QLabel#muted { color: #a8aaa3; }
+QLabel#launchReady {
+    color: #a8d58c;
+    background: #26352a;
+    border: 1px solid #52764d;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+}
+QLabel#launchBlocked {
+    color: #e3c27c;
+    background: #3a3325;
+    border: 1px solid #8c7140;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+}
 
 QComboBox, QLineEdit {
     background: #1b2225;
