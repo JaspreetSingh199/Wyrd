@@ -225,6 +225,29 @@ QProgressBar {
     font-weight: 600;
 }
 QProgressBar::chunk { background: #88714d; border-radius: 4px; }
+QProgressDialog#launchLoader {
+    background: #111a1e;
+    color: #e9dfcc;
+    border: 1px solid #a18a60;
+}
+QProgressDialog#launchLoader QLabel {
+    color: #e8dfce;
+    font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 13px;
+    padding: 8px 4px;
+}
+QProgressDialog#launchLoader QProgressBar {
+    background: #10191d;
+    border: 1px solid #746348;
+    border-radius: 4px;
+    min-height: 9px;
+    max-height: 9px;
+    text-align: center;
+}
+QProgressDialog#launchLoader QProgressBar::chunk {
+    background: #b18a4d;
+    border-radius: 3px;
+}
 QPlainTextEdit {
     background: #13191b;
     color: #d1d0c8;
