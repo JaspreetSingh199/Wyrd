@@ -116,10 +116,6 @@ class Mo2LibraryDialog(QFrame):
                 if instance.get("is_skyrim_se")
                 else "This instance is not configured for the detected Skyrim SE installation."
             )
-            launch.clicked.connect(
-                lambda _checked=False, record=dict(instance), picker=profile_picker:
-                    self._launch_instance(record, picker.currentText() if picker.isEnabled() else None)
-            )
             row_layout.addWidget(launch)
 
             open_folder = QPushButton("Open folder")
@@ -154,6 +150,10 @@ class Mo2LibraryDialog(QFrame):
                 )
             profile_picker.setMinimumWidth(150)
             row_layout.addWidget(profile_picker)
+            launch.clicked.connect(
+                lambda _checked=False, record=dict(instance), picker=profile_picker:
+                    self._launch_instance(record, picker.currentText() if picker.isEnabled() else None)
+            )
 
             item.setSizeHint(row.sizeHint())
             item.setData(Qt.ItemDataRole.UserRole, instance)
