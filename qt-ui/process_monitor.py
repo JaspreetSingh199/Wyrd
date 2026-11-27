@@ -33,11 +33,19 @@ def detect_mo2_processes(
             value.decode("utf-8", errors="replace")
             for value in raw_argv.split(bytes([0])) if value
         ]
-        names = {
-            Path(value.replace("\\\\", "/").replace("\\", "/").strip('"')).name.casefold()
-            for value in argv if value.strip()
-        }
-        if "modorganizer.exe" not in names:
+        # Match the process identity, not any argument in its command line.
+        # Proton's wrapper is invoked as: proton run ModOrganizer.exe ...;
+        # searching every argv entry incorrectly classifies that wrapper (and
+        # sometimes its helpers) as the MO2 GUI even after the GUI has closed.
+        first_arg_name = (
+            Path(argv[0].replace("\\\\", "/").replace("\\", "/").strip('"')).name.casefold()
+            if argv and argv[0].strip() else ""
+        )
+        try:
+            comm_name = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip().casefold()
+        except OSError:
+            comm_name = ""
+        if first_arg_name != "modorganizer.exe" and comm_name != "modorganizer.exe":
             continue
         # A Wine process can remain briefly as a zombie after its GUI exits.
         # Its old cmdline/environment still look like MO2, so treating it as
