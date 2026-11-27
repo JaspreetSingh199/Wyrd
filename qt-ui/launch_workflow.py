@@ -134,16 +134,36 @@ class LaunchWorkflowMixin:
         if not proton_value:
             QMessageBox.warning(self, "Proton unavailable", "Select a valid Proton runtime before launching.")
             return
-        prefix = Path(mo2_state["prefix"])
-        install_root = Path(mo2_state["install"])
+        # Match the installation selected by the live inventory scan. It
+        # may be external/read-only rather than Wyrd-managed.
+        discovered_installation = self.instance_state.get("installation", {}) or {}
+        if not discovered_installation.get("installed"):
+            discovered_installation = mo2_state
+        if (
+            not discovered_installation.get("installed")
+            or not discovered_installation.get("prefix")
+            or not discovered_installation.get("install")
+            or not discovered_installation.get("executable")
+        ):
+            message = (
+                self.instance_state.get("installation_message")
+                or discovered_installation.get("message")
+                or "MO2 installation could not be safely verified."
+            )
+            self._log("Modded launch blocked: " + message)
+            QMessageBox.warning(self, "MO2 executable unavailable", message)
+            return
+        prefix = Path(discovered_installation["prefix"])
+        install_root = Path(discovered_installation["install"])
         target_state = inspect_skyrim_launch_targets(
             prefix, game_path, instance_name=instance_name,
-            install_root=install_root, require_managed=bool(mo2_state.get("managed", True)),
+            install_root=install_root,
+            require_managed=bool(discovered_installation.get("managed", True)),
         )
         self._launch_skyrim_target_from_inventory(
             instance_name, target_state, game_path, prefix, install_root,
-            Path(proton_value), bool(mo2_state.get("managed", True)),
-            Path(mo2_state["steam_root"]) if mo2_state.get("steam_root") else None,
+            Path(proton_value), bool(discovered_installation.get("managed", True)),
+            Path(discovered_installation["steam_root"]) if discovered_installation.get("steam_root") else None,
             profile_name=profile_name,
         )
 
