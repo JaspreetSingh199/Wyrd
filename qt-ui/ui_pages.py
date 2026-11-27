@@ -214,21 +214,6 @@ class MainWindowPagesMixin:
         diagnostics_grid.setColumnStretch(1, 1)
         maintenance_layout.addLayout(diagnostics_grid)
 
-        logs_panel = panel(
-            "SETUP LOG",
-            "Recent detection, installation and launch messages."
-        )
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setMaximumBlockCount(400)
-        self.log_view.setPlaceholderText("Detection and installation progress will appear here.")
-        self.log_view.setMinimumHeight(180)
-        self.log_view.setMaximumHeight(260)
-        logs_panel.layout().addWidget(self.log_view)
-        maintenance_layout.addWidget(logs_panel)
-
-
-
         recovery_panel = panel(
             "RECOVERY & MAINTENANCE",
             "Rarely needed actions. Wyrd's Python packages are separate from MO2's Proton installation; reset actions do not remove Skyrim saves or Steam files."
@@ -259,3 +244,26 @@ class MainWindowPagesMixin:
         maintenance_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         maintenance_scroll.setWidget(maintenance_page)
         self.tabs.addTab(maintenance_scroll, "MAINTENANCE")
+
+        logs_page = QWidget()
+        logs_layout = QVBoxLayout(logs_page)
+        logs_layout.setContentsMargins(12, 16, 12, 12)
+        logs_layout.setSpacing(12)
+        logs_panel = panel(
+            "WYRD LOGS",
+            "Live detection, installation and launch messages. Entries are kept for this application session."
+        )
+        self.log_view = QPlainTextEdit()
+        self.log_view.setReadOnly(True)
+        self.log_view.setMaximumBlockCount(400)
+        self.log_view.setPlaceholderText("Wyrd messages will appear here as you use the application.")
+        self.log_view.setMinimumHeight(300)
+        logs_panel.layout().addWidget(self.log_view, 1)
+        logs_layout.addWidget(logs_panel, 1)
+        logs_scroll = QScrollArea()
+        logs_scroll.setWidgetResizable(True)
+        logs_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        logs_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        logs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        logs_scroll.setWidget(logs_page)
+        self.tabs.addTab(logs_scroll, "LOGS")
