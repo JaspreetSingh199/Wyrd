@@ -90,6 +90,15 @@ class ProcessMonitorWorkflowMixin:
         self.session_status_label.style().unpolish(self.session_status_label)
         self.session_status_label.style().polish(self.session_status_label)
 
+        # While Steam/MO2 is starting, MO2 is open, or Skyrim/SKSE is running,
+        # make the main Wyrd screen read-only. The process/session timers remain
+        # active and will release the lock after the session exits.
+        active_session = state_name in {"active", "running"}
+        self._set_interaction_locked(
+            active_session,
+            "A MO2/game session is active." if active_session else "",
+        )
+
     def _stop_launch_monitor(self, reason: str | None = None) -> None:
         if self._launch_monitor.isActive():
             self._launch_monitor.stop()
