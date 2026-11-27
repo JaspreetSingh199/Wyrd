@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
-    QVBoxLayout, QWidget, QTabWidget,
+    QVBoxLayout, QWidget, QTabWidget, QFrame,
 )
 
 from wyrd_settings import read_settings, write_settings, reset_wyrd_settings
@@ -97,7 +97,7 @@ class MainWindow(
         brand.setObjectName("sidebarBrand")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(brand)
-        brand_subtitle = QLabel("SKYRIM MODDING\\nENVIRONMENT")
+        brand_subtitle = QLabel("SKYRIM MODDING\nENVIRONMENT")
         brand_subtitle.setObjectName("sidebarSubtitle")
         brand_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(brand_subtitle)
