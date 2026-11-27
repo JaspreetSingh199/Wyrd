@@ -4,10 +4,26 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtGui import QTextCursor
+
 from proton_runtime import managed_paths
 
 
 class LogsWorkflowMixin:
+    def refresh_application_log_view(self) -> None:
+        """Load the persistent Wyrd application activity log."""
+        path = managed_paths()["root"] / "logs" / "application.log"
+        try:
+            if path.is_symlink() or not path.is_file():
+                self.log_view.setPlainText("No application log has been created yet.")
+                return
+            with path.open("r", encoding="utf-8", errors="replace") as stream:
+                lines = stream.readlines()[-1000:]
+            self.log_view.setPlainText("".join(lines) or "The application log is empty.")
+            self.log_view.moveCursor(QTextCursor.MoveOperation.End)
+        except OSError as error:
+            self.log_view.setPlainText(f"Could not read application log: {error}")
+
     def refresh_launch_log_view(self) -> None:
         """Load the persistent SteamCompat launch log without modifying it."""
         path = managed_paths()["root"] / "logs" / "skyrim-launch.log"
@@ -18,7 +34,7 @@ class LogsWorkflowMixin:
             with path.open("r", encoding="utf-8", errors="replace") as stream:
                 lines = stream.readlines()[-3000:]
             self.launch_log_view.setPlainText("".join(lines) or "The launch log is empty.")
-            self.launch_log_view.moveCursor(self.launch_log_view.textCursor().MoveOperation.End)
+            self.launch_log_view.moveCursor(QTextCursor.MoveOperation.End)
         except OSError as error:
             self.launch_log_view.setPlainText(f"Could not read launch log: {error}")
 
@@ -45,7 +61,7 @@ class LogsWorkflowMixin:
         except OSError as error:
             output.append(f"Host memory unavailable: {error}")
 
-        output.extend(["", "Wine / Proton related processes (largest RSS first):"])
+        output.extend(["", "Wine guard policy: MO2 installer only; 6 GiB RSS / 256-process hard limits.", "Persistent Skyrim game sessions are never automatically terminated by this guard.", "", "Wine / Proton related processes (largest RSS first):"])
         processes = []
         try:
             entries = Path("/proc").iterdir()
@@ -89,4 +105,4 @@ class LogsWorkflowMixin:
             if len(processes) > 100:
                 output.append(f"... {len(processes) - 100} additional matching processes omitted.")
         self.system_log_view.setPlainText("\n".join(output))
-        self.system_log_view.moveCursor(self.system_log_view.textCursor().MoveOperation.Start)
+        self.system_log_view.moveCursor(QTextCursor.MoveOperation.Start)
