@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QListWidget,
-    QListWidgetItem, QPushButton, QVBoxLayout, QWidget, QFrame,
+    QListWidgetItem, QPushButton, QVBoxLayout, QWidget, QFrame, QComboBox,
 )
 
 
@@ -117,7 +117,8 @@ class Mo2LibraryDialog(QFrame):
                 else "This instance is not configured for the detected Skyrim SE installation."
             )
             launch.clicked.connect(
-                lambda _checked=False, record=dict(instance): self._launch_instance(record)
+                lambda _checked=False, record=dict(instance), picker=profile_picker:
+                    self._launch_instance(record, picker.currentText() if picker.isEnabled() else None)
             )
             row_layout.addWidget(launch)
 
@@ -133,6 +134,26 @@ class Mo2LibraryDialog(QFrame):
             details.setWordWrap(True)
             details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             row_layout.addWidget(details, 1)
+
+            profile_picker = QComboBox()
+            profile_picker.setObjectName("profilePicker")
+            profile_names = list(instance.get("profiles") or [])
+            if profile_names:
+                profile_picker.addItems(profile_names)
+                current_profile = instance.get("selected_profile") or ""
+                if current_profile in profile_names:
+                    profile_picker.setCurrentText(current_profile)
+                profile_picker.setToolTip(
+                    "Choose the MO2 profile to use for this launch. This does not change MO2's saved profile."
+                )
+            else:
+                profile_picker.addItem("No verified profiles")
+                profile_picker.setEnabled(False)
+                profile_picker.setToolTip(
+                    "No profile folders could be safely verified for this instance. MO2's current profile will be used."
+                )
+            profile_picker.setMinimumWidth(150)
+            row_layout.addWidget(profile_picker)
 
             item.setSizeHint(row.sizeHint())
             item.setData(Qt.ItemDataRole.UserRole, instance)
@@ -158,12 +179,12 @@ class Mo2LibraryDialog(QFrame):
                 message += "\\n\\nRead errors:\\n" + "\\n".join(errors[:6])
             self.setup_status.setText(message)
 
-    def _launch_instance(self, instance: dict) -> None:
+    def _launch_instance(self, instance: dict, profile_name: str | None = None) -> None:
         if not instance.get("is_skyrim_se"):
             return
         launch = getattr(self._owner_window, "start_skyrim", None)
         if callable(launch):
-            launch(instance_name=instance.get("name"))
+            launch(instance_name=instance.get("name"), profile_name=profile_name)
 
     def _open_instance_folder(self, instance: dict) -> None:
         raw_path = instance.get("path")
