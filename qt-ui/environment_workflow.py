@@ -304,12 +304,6 @@ class EnvironmentWorkflowMixin:
             detail = f"Automatically discovered {len(instances)} Skyrim MO2 instance(s): {names}"
         else:
             detail = "MO2 is installed, but no Skyrim Special Edition instance was found. Create one in MO2, then refresh."
-        proton = bool(self.proton_combo.currentData())
-        mapping_ok = bool(
-            self.mo2_discovery_state
-            and self.mo2_discovery_state.get("ok")
-        )
-        busy = bool(self.worker and self.worker.isRunning())
         # The row-level check also verifies that this exact instance has a
         # resolvable Skyrim/SKSE executable. A global environment pass alone
         # is not enough to enable a particular instance's launch button.
