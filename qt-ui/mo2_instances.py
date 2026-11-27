@@ -250,7 +250,10 @@ def inspect_mo2_instances(prefix_root: Path, install_root: Path | None = None,
             profiles_root = Path(profiles_value).expanduser()
             if not profiles_root.is_absolute():
                 profiles_root = Path(base_value).expanduser() / profiles_root
-            profile_scope = Path(install_root).expanduser() if install_root is not None else prefix_root
+            # Global instances live outside the MO2 program directory but remain
+            # inside Skyrim's validated Proton prefix. Never follow profile roots
+            # outside that prefix.
+            profile_scope = prefix_root
             profiles_verified = False
             profile_names: list[str] = []
             try:
