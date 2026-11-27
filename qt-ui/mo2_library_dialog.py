@@ -59,6 +59,13 @@ class Mo2LibraryDialog(QFrame):
         self.instance_count.setObjectName("instanceCount")
         heading_row.addWidget(self.instance_count)
         heading_row.addStretch(1)
+        self.open_mo2_button = QPushButton("Open MO2")
+        self.open_mo2_button.setObjectName("secondaryAction")
+        self.open_mo2_button.setToolTip(
+            "Open a discovered Skyrim Special Edition MO2 instance to review its mods and profiles."
+        )
+        self.open_mo2_button.clicked.connect(self._open_selected_mo2)
+        heading_row.addWidget(self.open_mo2_button, 0, Qt.AlignmentFlag.AlignRight)
         layout.addLayout(heading_row)
         self.setup_status = QLabel("MO2 instances are discovered automatically.")
         self.setup_status.setObjectName("muted")
@@ -229,6 +236,28 @@ class Mo2LibraryDialog(QFrame):
             if errors:
                 message += "\n\nRead errors:\n" + "\n".join(errors[:6])
             self.setup_status.setText(message)
+
+    def _open_selected_mo2(self) -> None:
+        instances = list((getattr(self._owner_window, "instance_state", {}) or {}).get("skyrim_instances", []))
+        if not instances:
+            self.setup_status.setText("No Skyrim Special Edition MO2 instance is available to open.")
+            self.setup_status.show()
+            return
+        if len(instances) == 1:
+            self._open_mo2(str(instances[0].get("name") or ""))
+            return
+        from PySide6.QtWidgets import QInputDialog
+        names = [str(item.get("name") or "Unnamed instance") for item in instances]
+        preferred = self.preferred_instance_id
+        initial = next((i for i, item in enumerate(instances)
+                        if str(item.get("path") or "") == preferred
+                        or str(item.get("name") or "") == preferred), 0)
+        instance_name, accepted = QInputDialog.getItem(
+            self, "Open Mod Organizer 2", "Choose a Skyrim SE MO2 instance:",
+            names, initial, False,
+        )
+        if accepted and instance_name:
+            self._open_mo2(instance_name)
 
     def _open_mo2(self, instance_name: str) -> None:
         launch = getattr(self._owner_window, "launch_mo2_gui", None)
