@@ -42,7 +42,7 @@ class WyrdV1ContractTests(unittest.TestCase):
         (install / "ModOrganizer.ini").write_text(
             "[General]\\n"
             "gameName=Skyrim Special Edition\\n"
-            "gamePath=S:\\\\steamapps\\\\common\\\\Skyrim Special Edition\\n",
+            r"gamePath=S:\\steamapps\\common\\Skyrim Special Edition" + "\\n",
             encoding="utf-8",
         )
 
