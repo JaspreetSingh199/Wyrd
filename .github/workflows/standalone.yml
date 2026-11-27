@@ -66,6 +66,18 @@ jobs:
           chmod -R a+rX Wyrd-linux-x86_64
           zip -9 -r Wyrd-linux-x86_64.zip Wyrd-linux-x86_64
 
+      - name: Smoke-test packaged Qt application
+        run: |
+          set +e
+          timeout 10s env QT_QPA_PLATFORM=offscreen ./Wyrd-linux-x86_64/Wyrd > smoke.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 124 ]; then
+            cat smoke.log
+            echo "Packaged Wyrd exited before the smoke-test timeout (status $status)"
+            exit 1
+          fi
+
       - name: Verify executable and archive
         run: |
           set -euo pipefail
