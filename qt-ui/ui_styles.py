@@ -96,6 +96,13 @@ QLabel#heading {
     letter-spacing: 1px;
     padding: 2px 0;
 }
+QLabel#heroTitle {
+    color: #eee7d8;
+    font-size: 25px;
+    font-weight: 650;
+    letter-spacing: .35px;
+    padding: 8px 2px 0 2px;
+}
 QLabel#section {
     color: #e0d7c5;
     font-size: 14px;
