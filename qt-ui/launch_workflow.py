@@ -10,13 +10,14 @@ import subprocess
 import time
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from process_monitor import _proc_start_time
 from proton_runtime import managed_paths
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
-from steam_client import activate_steam_client
+from steam_client import activate_steam_client, steam_client_status, verify_skyrim_launch_context
 
 
 class LaunchWorkflowMixin:
@@ -202,27 +203,124 @@ class LaunchWorkflowMixin:
             return
 
         # Steam is intentionally not started during Wyrd startup or discovery.
-        # Activate the desktop client only after the user confirms this explicit
-        # modded-game launch. Do not use -applaunch here: Skyrim must still start
-        # through MO2 in the existing AppID 489830 Proton context below.
+        # After confirmation, open Steam and wait for its main process plus UI
+        # helper before rechecking Skyrim and handing off to MO2. Do not use
+        # -applaunch: Skyrim must still start through MO2/SteamCompat.
+        if getattr(self, "_steam_launch_pending", None):
+            QMessageBox.information(
+                self, "Steam is starting",
+                "Wyrd is already waiting for Steam to become ready for a Skyrim launch.",
+            )
+            return
         steam_result = activate_steam_client()
         if not steam_result.get("ok"):
             message = steam_result.get("message", "Could not open Steam.")
             self._log("Modded Skyrim launch blocked: " + message)
             QMessageBox.warning(self, "Steam unavailable", message)
             return
+
+        self._steam_launch_pending = {
+            "instance_name": instance_name,
+            "selected_target": dict(selected_target),
+            "selected_title": selected,
+            "game_path": Path(game_path),
+            "prefix": Path(prefix),
+            "install_root": Path(install_root),
+            "proton": Path(proton),
+            "steam_root": Path(steam_root) if steam_root else None,
+            "profile_name": profile_name,
+            "xaudio2_compat": self.xaudio_override_checkbox.isChecked(),
+            "attempts": 0,
+            "ready_streak": 0,
+            "last_status": None,
+        }
+        if not hasattr(self, "_steam_launch_wait_timer"):
+            self._steam_launch_wait_timer = QTimer(self)
+            self._steam_launch_wait_timer.setInterval(1000)
+            self._steam_launch_wait_timer.timeout.connect(self._poll_steam_before_modded_launch)
         self._log(
             "Steam client activation requested for modded Skyrim launch "
-            f"(PID {steam_result.get('pid', 'unknown')}); continuing through MO2/SteamCompat."
+            f"(bootstrap PID {steam_result.get('pid', 'unknown')}); waiting for Steam UI readiness."
         )
+        self.progress_label.setText("Opening Steam… waiting for its client and UI helper before checking Skyrim.")
+        self._steam_launch_wait_timer.start()
 
-        audio_mode = "xaudio2_compat" if self.xaudio_override_checkbox.isChecked() else "default"
+    def _poll_steam_before_modded_launch(self) -> None:
+        """Wait asynchronously for Steam, then revalidate Skyrim before MO2 launch."""
+        pending = getattr(self, "_steam_launch_pending", None)
+        if not pending:
+            self._steam_launch_wait_timer.stop()
+            return
+
+        pending["attempts"] += 1
+        status = steam_client_status()
+        if not status.get("ok"):
+            self._steam_launch_wait_timer.stop()
+            self._steam_launch_pending = None
+            message = status.get("message", "Could not inspect Steam client readiness.")
+            self._log("Modded Skyrim launch blocked: " + message)
+            QMessageBox.warning(self, "Steam status unavailable", message)
+            self.progress_label.setText("Steam status could not be verified; Skyrim was not launched.")
+            return
+
+        status_message = status.get("message", "Checking Steam client status.")
+        if status_message != pending["last_status"]:
+            self._log(status_message)
+            pending["last_status"] = status_message
+        if status.get("ready"):
+            pending["ready_streak"] += 1
+        else:
+            pending["ready_streak"] = 0
+
+        # Require two consecutive ready samples to avoid racing the first
+        # transient webhelper process during Steam's startup/restart cycle.
+        if pending["ready_streak"] < 2:
+            if pending["attempts"] >= 120:
+                self._steam_launch_wait_timer.stop()
+                self._steam_launch_pending = None
+                message = (
+                    "Steam did not become ready within 120 seconds. "
+                    "MO2 and Skyrim were not launched. Open Steam manually, wait for its Library "
+                    "to finish loading, then retry."
+                )
+                self._log(message)
+                QMessageBox.warning(self, "Steam startup timed out", message)
+                self.progress_label.setText("Steam startup timed out; Skyrim was not launched.")
+            return
+
+        self._steam_launch_wait_timer.stop()
+        self._steam_launch_pending = None
+        game_check = verify_skyrim_launch_context(
+            pending["game_path"], pending["steam_root"], pending["prefix"],
+        )
+        if not game_check.get("ok"):
+            message = game_check.get("message", "Skyrim could not be re-verified after Steam started.")
+            self._log("Post-Steam Skyrim check failed: " + message)
+            QMessageBox.warning(self, "Skyrim verification failed", message)
+            self.progress_label.setText("Skyrim verification failed; MO2 was not launched.")
+            return
+
+        self._log("Steam is ready. " + game_check.get("message", "Skyrim launch context verified."))
+        self.progress_label.setText("Steam is ready; Skyrim verified. Starting MO2…")
+        self._start_modded_skyrim_after_steam(pending)
+
+    def _start_modded_skyrim_after_steam(self, pending: dict) -> None:
+        """Start the existing MO2 -> Proton -> Skyrim SteamCompat chain."""
+        instance_name = pending["instance_name"]
+        selected_target = pending["selected_target"]
+        selected = pending["selected_title"]
+        game_path = pending["game_path"]
+        prefix = pending["prefix"]
+        install_root = pending["install_root"]
+        proton = pending["proton"]
+        steam_root = pending["steam_root"]
+        profile_name = pending["profile_name"]
         result = launch_skyrim_via_mo2_in_skyrim_prefix(
             proton, game_path, instance_name, selected,
             expected_binary=selected_target["binary"],
             prefix_path=prefix, install_root=install_root,
             steam_root_path=steam_root,
-            xaudio2_compat=(audio_mode == "xaudio2_compat"),
+            xaudio2_compat=pending["xaudio2_compat"],
             profile_name=profile_name,
         )
         self._log(result.get("message", "Skyrim launch handoff failed."))
