@@ -83,9 +83,11 @@ QPushButton#infoButton {
     background: #242c2e;
     color: #c8b995;
     border: 1px solid #756b56;
-    border-radius: 50%;
+    border-radius: 10px;
     padding: 0;
-    min-height: 22px;
+    min-height: 0;
+    min-width: 0;
+    font-size: 11px;
     font-weight: 700;
 }
 QPushButton#infoButton:hover {
@@ -196,23 +198,26 @@ QComboBox#profilePicker {
 QComboBox#profilePicker:disabled { color: #898d88; }
 
 QTabWidget::pane {
-    background: #1a2023;
-    border: 1px solid #41494b;
-    top: -1px;
+    background: #19252b;
+    border: 1px solid #536068;
+    border-radius: 8px;
+    top: 2px;
+    padding: 8px;
 }
 QTabBar::tab {
-    background: #20282b;
+    background: #202a2e;
     color: #aeb1aa;
-    border: 1px solid #41494b;
-    padding: 10px 19px;
-    margin-right: 3px;
+    border: 1px solid #536068;
+    border-radius: 8px;
+    padding: 9px 17px;
+    margin: 0 5px 3px 0;
 }
 QTabBar::tab:selected {
-    background: #303a3b;
+    background: #30414a;
     color: #eee8da;
-    border-bottom: 2px solid #a58b5c;
+    border: 1px solid #a58b5c;
 }
-QTabBar::tab:hover { color: #f0ecdf; }
+QTabBar::tab:hover { color: #f0ecdf; border-color: #8b8068; }
 
 QProgressBar {
     background: #111719;
@@ -342,7 +347,12 @@ QPushButton#primaryAction:hover { background: #8a6a3c; border-color: #dfbb79; co
 QPushButton#secondaryAction { background: #202f36; border: 1px solid #879096; color: #e6dfd1; }
 QListWidget#mo2Instances { background: transparent; border: none; outline: none; }
 QListWidget#mo2Instances::item { border: none; padding: 4px 0; }
-QTabWidget::pane { border: none; background: transparent; }
+QTabWidget#mainTabs::pane { border: none; background: transparent; padding: 0; }
+QTabWidget#logsTabs::pane { background: #19252b; border: 1px solid #536068; border-radius: 8px; padding: 8px; }
+QFrame#interactionOverlay { background: rgba(5, 10, 13, 188); border: none; }
+QFrame#interactionOverlayCard { background: #1b2a31; border: 1px solid #b09666; border-radius: 12px; }
+QLabel#interactionOverlayTitle { color: #f0e5ce; font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 21px; font-weight: 700; }
+QLabel#interactionOverlayDetail { color: #d0c9b9; font-size: 13px; line-height: 1.4; }
 
 QLabel#instanceSectionTitle {
     color: #e6ddca; font-family: "Noto Serif", "DejaVu Serif", serif;
