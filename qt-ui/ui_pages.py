@@ -256,8 +256,15 @@ class MainWindowPagesMixin:
         application_layout.setContentsMargins(8, 8, 8, 8)
         application_panel = panel(
             "APPLICATION ACTIVITY",
-            "Wyrd detection, installation, settings and application errors. Session-only, newest entries at the bottom."
+            "Wyrd detection, installation, settings and application errors. Persistent, newest entries at the bottom."
         )
+        application_header = QHBoxLayout()
+        application_header.addStretch(1)
+        self.refresh_application_logs_button = QPushButton("Refresh")
+        self.refresh_application_logs_button.setObjectName("secondaryAction")
+        self.refresh_application_logs_button.clicked.connect(self.refresh_application_log_view)
+        application_header.addWidget(self.refresh_application_logs_button)
+        application_panel.layout().addLayout(application_header)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(1000)
