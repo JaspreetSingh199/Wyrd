@@ -49,8 +49,8 @@ class Mo2LibraryDialog(QFrame):
         self.on_launch_requested = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(14)
         heading_row = QHBoxLayout()
         heading = QLabel("MO2 Instances")
         heading.setObjectName("instanceSectionTitle")
@@ -81,7 +81,7 @@ class Mo2LibraryDialog(QFrame):
         unmodded_panel = QFrame()
         unmodded_panel.setObjectName("unmoddedLaunchPanel")
         unmodded_row = QHBoxLayout(unmodded_panel)
-        unmodded_row.setContentsMargins(18, 12, 18, 12)
+        unmodded_row.setContentsMargins(18, 14, 18, 14)
         steam_mark = QLabel("◉")
         steam_mark.setObjectName("steamMark")
         unmodded_row.addWidget(steam_mark)
@@ -129,12 +129,12 @@ class Mo2LibraryDialog(QFrame):
             row = QFrame()
             row.setObjectName("mo2InstanceRow")
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(10, 8, 10, 8)
-            row_layout.setSpacing(14)
+            row_layout.setContentsMargins(14, 12, 14, 12)
+            row_layout.setSpacing(16)
 
 
             details_column = QVBoxLayout()
-            details_column.setSpacing(6)
+            details_column.setSpacing(9)
             name = QLabel(instance.get("name") or "Unnamed MO2 instance")
             name.setObjectName("instanceName")
             details_column.addWidget(name)
