@@ -108,21 +108,22 @@ class ProcessMonitorWorkflowMixin:
             if reason:
                 self._log("Launch monitoring stopped: " + reason)
 
+    def _finish_launch_timeout(self) -> None:
+        """Finish one launch after its five-minute game-confirmation deadline."""
+        self.launch_session.state = "timeout"
+        self._stop_launch_monitor("five-minute launch confirmation deadline reached")
+        message = "Skyrim/SKSE was not detected within five minutes. Check the launch log before retrying."
+        self.progress_label.setText(message)
+        self._close_launch_loader("Game launch not confirmed", message)
+        self._log(message)
+        self._refresh_session_ui_status()
+
     def _poll_launch_status(self) -> None:
         """Refresh launch status without modal dialogs until a terminal state is reached."""
         if not self.launch_session.wrapper_pid:
             self._stop_launch_monitor("no launch session is active")
             return
         self.launch_session.poll_count += 1
-        if self.launch_session.poll_count >= self._launch_poll_limit:
-            self.launch_session.state = "timeout"
-            self._stop_launch_monitor("five-minute launch confirmation deadline reached")
-            message = "Skyrim/SKSE was not detected within five minutes. Check the launch log before retrying."
-            self.progress_label.setText(message)
-            self._close_launch_loader("Game launch not confirmed", message)
-            self._log(message)
-            self._refresh_session_ui_status()
-            return
         wrapper_identity = _proc_identity(self.launch_session.wrapper_pid)
         result = launch_process_status(
             self.launch_session.wrapper_pid, self.launch_session.wrapper_start_time
@@ -220,6 +221,9 @@ class ProcessMonitorWorkflowMixin:
             mo2_scan = detect_mo2_processes(scan_prefix)
             mo2_processes = mo2_scan.get("processes", []) if mo2_scan.get("ok") else []
             if mo2_processes:
+                if self.launch_session.poll_count >= self._launch_poll_limit:
+                    self._finish_launch_timeout()
+                    return
                 pids = ", ".join(str(item["pid"]) for item in mo2_processes)
                 self.launch_session.state = "waiting"
                 self.progress_label.setText("MO2 is running; waiting for Skyrim/SKSE to launch.")
@@ -257,6 +261,9 @@ class ProcessMonitorWorkflowMixin:
                 "The Proton wrapper exited and no MO2 or Skyrim process remains in AppID 489830. Check the launch log.",
             )
             self._refresh_session_ui_status()
+            return
+        if self.launch_session.poll_count >= self._launch_poll_limit:
+            self._finish_launch_timeout()
             return
         if result["state"] == "unknown":
             self.progress_label.setText(
