@@ -13,7 +13,19 @@ from pathlib import Path
 
 
 def activate_steam_client() -> dict:
-    """Ask the Steam client to open without asking it to launch a game."""
+    """Ensure Steam is ready without restoring an already-running window."""
+    # Running Steam's command again activates/focuses its UI on many desktop
+    # setups. If the real client and its WebHelper are already present, leave
+    # the user's minimized/window state untouched.
+    status = steam_client_status()
+    if status.get("ok") and status.get("ready"):
+        return {
+            "ok": True,
+            "pid": None,
+            "already_running": True,
+            "message": "Steam is already ready; preserving its current window state.",
+        }
+
     steam = shutil.which("steam")
     if not steam:
         return {
