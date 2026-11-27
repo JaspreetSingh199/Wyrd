@@ -80,5 +80,19 @@ application executable, not a fully static Linux binary.
 
 The build is defined by `qt-ui/Wyrd.spec` and
 `.github/workflows/standalone.yml`. Pushes to `main` that change application
-or packaging files trigger a build; it can also be started manually from
-GitHub Actions. The workflow uploads the ZIP artifact for 30 days.
+or packaging files trigger a validation build; it can also be started manually
+from GitHub Actions. These runs upload a temporary ZIP artifact for 30 days.
+
+Versioned downloads are published through GitHub Releases. After the build and
+smoke test are green, create and push a version tag from `main`, for example:
+
+~~~bash
+git switch main
+git pull --ff-only origin main
+git tag -a v0.1.0 -m "Wyrd v0.1.0"
+git push origin v0.1.0
+~~~
+
+A tag matching `v*` runs the same executable build and validation, then creates
+a GitHub Release with generated release notes and attaches
+`Wyrd-linux-x86_64.zip`. Ordinary pushes do not publish releases.
