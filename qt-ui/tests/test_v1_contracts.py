@@ -46,6 +46,97 @@ class SteamClientActivationTests(unittest.TestCase):
         popen.assert_not_called()
 
 
+    def test_steam_client_waits_for_a_webhelper_bound_to_the_main_pid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proc = root / "proc"
+            bin_dir = root / "bin"
+            proc.mkdir()
+            bin_dir.mkdir()
+            steam_exe = bin_dir / "steam"
+            webhelper_exe = bin_dir / "steamwebhelper"
+            steam_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+            webhelper_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+
+            main = proc / "100"
+            main.mkdir()
+            (main / "comm").write_text("steam\\n", encoding="utf-8")
+            (main / "cmdline").write_bytes(b"/usr/bin/steam\\0")
+            (main / "exe").symlink_to(steam_exe)
+
+            status = steam_client.steam_client_status(proc)
+            self.assertFalse(status["ready"])
+
+            helper = proc / "101"
+            helper.mkdir()
+            (helper / "comm").write_text("steamwebhelper\\n", encoding="utf-8")
+            (helper / "cmdline").write_bytes(b"./steamwebhelper\\0-steampid=100\\0")
+            (helper / "exe").symlink_to(webhelper_exe)
+
+            status = steam_client.steam_client_status(proc)
+            self.assertTrue(status["ready"], status)
+            self.assertEqual(status["steam_pids"], [100])
+
+    def test_steam_webhelper_for_another_pid_does_not_mark_client_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proc = root / "proc"
+            bin_dir = root / "bin"
+            proc.mkdir()
+            bin_dir.mkdir()
+            steam_exe = bin_dir / "steam"
+            helper_exe = bin_dir / "steamwebhelper"
+            steam_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+            helper_exe.write_text("#!/bin/sh\\n", encoding="utf-8")
+            for pid, comm, argv, exe in (
+                (100, "steam", b"/usr/bin/steam\\0", steam_exe),
+                (101, "steamwebhelper", b"./steamwebhelper\\0-steampid=999\\0", helper_exe),
+            ):
+                entry = proc / str(pid)
+                entry.mkdir()
+                (entry / "comm").write_text(comm + "\\n", encoding="utf-8")
+                (entry / "cmdline").write_bytes(argv)
+                (entry / "exe").symlink_to(exe)
+
+            status = steam_client.steam_client_status(proc)
+            self.assertFalse(status["ready"])
+
+    def test_post_steam_skyrim_check_verifies_app_manifest_and_existing_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            steam_root = Path(tmp) / ".local/share/Steam"
+            game = steam_root / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            (game / "SkyrimSE.exe").write_bytes(b"fixture")
+            (game.parent.parent / "appmanifest_489830.acf").write_text(
+                '"AppState"\\n{\\n'
+                '    "appid" "489830"\\n'
+                '    "installdir" "Skyrim Special Edition"\\n'
+                '}\\n',
+                encoding="utf-8",
+            )
+            prefix = steam_root / "steamapps/compatdata/489830"
+            (prefix / "pfx/drive_c/users/steamuser").mkdir(parents=True)
+
+            result = steam_client.verify_skyrim_launch_context(game, steam_root, prefix)
+
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["prefix"], str(prefix.resolve()))
+
+    def test_post_steam_skyrim_check_refuses_missing_or_wrong_app_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            steam_root = Path(tmp) / ".local/share/Steam"
+            game = steam_root / "steamapps/common/Skyrim Special Edition"
+            game.mkdir(parents=True)
+            (game / "SkyrimSE.exe").write_bytes(b"fixture")
+            prefix = steam_root / "steamapps/compatdata/489830"
+            (prefix / "pfx/drive_c/users/steamuser").mkdir(parents=True)
+
+            result = steam_client.verify_skyrim_launch_context(game, steam_root, prefix)
+
+            self.assertFalse(result["ok"])
+            self.assertIn("app manifest", result["message"].casefold())
+
+
 class WyrdV1ContractTests(unittest.TestCase):
     def _launch_fixture(self, home: Path):
         steam_root = home / ".local/share/Steam"
