@@ -16,6 +16,7 @@ from process_monitor import _proc_start_time
 from proton_runtime import managed_paths
 # Keep Skyrim launches routed through the established SteamCompat facade.
 from steamcompat import launch_skyrim_via_mo2_in_skyrim_prefix
+from steam_client import activate_steam_client
 
 
 class LaunchWorkflowMixin:
@@ -199,6 +200,22 @@ class LaunchWorkflowMixin:
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
+
+        # Steam is intentionally not started during Wyrd startup or discovery.
+        # Activate the desktop client only after the user confirms this explicit
+        # modded-game launch. Do not use -applaunch here: Skyrim must still start
+        # through MO2 in the existing AppID 489830 Proton context below.
+        steam_result = activate_steam_client()
+        if not steam_result.get("ok"):
+            message = steam_result.get("message", "Could not open Steam.")
+            self._log("Modded Skyrim launch blocked: " + message)
+            QMessageBox.warning(self, "Steam unavailable", message)
+            return
+        self._log(
+            "Steam client activation requested for modded Skyrim launch "
+            f"(PID {steam_result.get('pid', 'unknown')}); continuing through MO2/SteamCompat."
+        )
+
         audio_mode = "xaudio2_compat" if self.xaudio_override_checkbox.isChecked() else "default"
         result = launch_skyrim_via_mo2_in_skyrim_prefix(
             proton, game_path, instance_name, selected,
