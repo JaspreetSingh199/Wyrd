@@ -295,6 +295,54 @@ def detect_skyrim_processes(
                if detected else "No Skyrim/SKSE process was detected.")
     return {"ok": True, "processes": detected, "wyrd_processes": associated, "message": message}
 
+
+def snapshot_wyrd_session(launch_token: str, root_pid: int | None = None, proc_root: Path = Path("/proc")) -> dict:
+    """Read-only resource snapshot for one uniquely marked Wyrd Proton session."""
+    processes = []
+    total_rss = total_threads = total_cpu_ticks = debugger_count = 0
+    try:
+        entries = list(Path(proc_root).iterdir())
+    except OSError as error:
+        return {"ok": False, "message": f"Could not inspect /proc: {error}"}
+    marker = b"WYRD_LAUNCH_ID=" + launch_token.encode()
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            env_data = (entry / "environ").read_bytes()
+            if marker not in env_data.split(bytes([0])):
+                continue
+            status = (entry / "status").read_text(encoding="utf-8", errors="replace")
+            stat = (entry / "stat").read_text(encoding="utf-8")
+            fields = stat[stat.rfind(")") + 2:].split()
+            if len(fields) < 15:
+                continue
+            rss_kib = threads = ppid = 0
+            for line in status.splitlines():
+                if line.startswith("VmRSS:"):
+                    rss_kib = int(line.split()[1])
+                elif line.startswith("Threads:"):
+                    threads = int(line.split()[1])
+                elif line.startswith("PPid:"):
+                    ppid = int(line.split()[1])
+            comm = (entry / "comm").read_text(encoding="utf-8", errors="replace").strip()
+            rss_bytes = rss_kib * 1024
+            total_rss += rss_bytes
+            total_threads += threads
+            total_cpu_ticks += int(fields[11]) + int(fields[12])
+            if "winedbg" in comm.casefold():
+                debugger_count += 1
+            processes.append({"pid": int(entry.name), "ppid": ppid, "name": comm,
+                               "rss_bytes": rss_bytes, "threads": threads, "state": fields[0]})
+        except (OSError, ValueError, IndexError):
+            continue
+    processes.sort(key=lambda item: item["rss_bytes"], reverse=True)
+    return {"ok": True, "root_pid": root_pid, "process_count": len(processes),
+            "thread_count": total_threads, "rss_bytes": total_rss,
+            "cpu_ticks": total_cpu_ticks, "winedbg_count": debugger_count,
+            "processes": processes}
+
+
 def _proc_identity(pid: int, proc_root: Path = Path("/proc")) -> dict:
     """Return stable Linux process identity fields from /proc/<pid>/stat."""
     try:
