@@ -184,7 +184,8 @@ class MainWindow(
         QCoreApplication.processEvents()
 
     def _set_scan_progress(self, value: int, message: str) -> None:
-        """Update the shared, prominent progress bar during environment discovery."""
+        """Show transient progress only while environment discovery is running."""
+        self.progress_panel.show()
         self.progress.setRange(0, 100)
         self.progress.setValue(max(0, min(100, int(value))))
         self.progress_label.setText(message)
