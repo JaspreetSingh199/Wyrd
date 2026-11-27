@@ -267,6 +267,7 @@ class LaunchWorkflowMixin:
             self._steam_launch_pending = None
             message = status.get("message", "Could not inspect Steam client readiness.")
             self._log("Modded Skyrim launch blocked: " + message)
+            self._close_launch_loader("Steam status unavailable", message)
             QMessageBox.warning(self, "Steam status unavailable", message)
             self.progress_label.setText("Steam status could not be verified; Skyrim was not launched.")
             return
@@ -296,6 +297,7 @@ class LaunchWorkflowMixin:
                     "to finish loading, then retry."
                 )
                 self._log(message)
+                self._close_launch_loader("Steam startup timed out", message)
                 QMessageBox.warning(self, "Steam startup timed out", message)
                 self.progress_label.setText("Steam startup timed out; Skyrim was not launched.")
             return
@@ -308,6 +310,7 @@ class LaunchWorkflowMixin:
         if not game_check.get("ok"):
             message = game_check.get("message", "Skyrim could not be re-verified after Steam started.")
             self._log("Post-Steam Skyrim check failed: " + message)
+            self._close_launch_loader("Skyrim verification failed", message)
             QMessageBox.warning(self, "Skyrim verification failed", message)
             self.progress_label.setText("Skyrim verification failed; MO2 was not launched.")
             return
@@ -361,7 +364,7 @@ class LaunchWorkflowMixin:
             self.launch_status_button.setEnabled(True)
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
-            QMessageBox.information(self, "MO2 launch handoff started", result.get("message", ""))
+            self._log("Waiting for MO2 or Skyrim process detection before dismissing launch loader.")
         else:
             self._close_launch_loader(
                 "MO2 launch failed",
