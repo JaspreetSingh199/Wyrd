@@ -16,6 +16,7 @@ from mo2_launch_preflight import inspect_instance_launch
 
 class EnvironmentWorkflowMixin:
     def refresh_all(self) -> None:
+        self._environment_scan_active = True
         self._set_interaction_locked(True, "Environment checks are running.")
         self.startup_checks_complete = False
         self._set_scan_progress(2, "Starting environment scan…")
@@ -43,8 +44,9 @@ class EnvironmentWorkflowMixin:
             self.proton_combo.blockSignals(False)
             if not scan_completed:
                 self._restoring_selection = True
-            # Keep the window locked if a game/MO2 session is already active;
-            # otherwise restore interaction even when a scan stage raises.
+            # Keep the scan lock authoritative until every stage has exited.
+            self._environment_scan_active = False
+            # Then derive the final lock from the live MO2/game session state.
             self._refresh_session_ui_status()
 
     def _inspect_mo2_installation_and_mapping(self) -> None:
