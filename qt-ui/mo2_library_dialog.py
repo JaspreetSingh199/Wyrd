@@ -62,22 +62,14 @@ class Mo2LibraryDialog(QFrame):
         self.refresh_button.setToolTip("Rescan the detected MO2 installation and known instance locations.")
         self.refresh_button.clicked.connect(self.discover)
         actions.addWidget(self.refresh_button)
-        self.open_profiles_button = QPushButton("Open profiles folder")
-        self.open_profiles_button.setToolTip(
-            "Open the profiles directory configured by the selected MO2 instance."
-        )
-        self.open_profiles_button.setEnabled(False)
-        self.open_profiles_button.clicked.connect(self._open_profiles_folder)
-        actions.addWidget(self.open_profiles_button)
         actions.addStretch(1)
         layout.addLayout(actions)
 
         self.instances = QListWidget()
-        self.instances.setMinimumHeight(55)
-        self.instances.setMaximumHeight(150)
-        self.instances.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.instances.currentRowChanged.connect(self._show_selected)
+        self.instances.setMinimumHeight(90)
+        self.instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self.instances)
+        self._launch_ready = False
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
         self.prefix_path = str(prefix_path or "")
@@ -92,6 +84,10 @@ class Mo2LibraryDialog(QFrame):
             refresh()
         self._show_inventory()
 
+    def set_launch_ready(self, ready: bool) -> None:
+        self._launch_ready = bool(ready)
+        self._show_inventory()
+
     def _show_inventory(self):
         inventory = getattr(self._owner_window, "instance_state", {}) or {}
         instances = inventory.get("instances", [])
@@ -99,73 +95,85 @@ class Mo2LibraryDialog(QFrame):
             self.selected_instance_record.get("path")
             if self.selected_instance_record else None
         )
-        self.instances.blockSignals(True)
         self.instances.clear()
-        selected_row = -1
+        self.selected_instance_record = None
         for instance in instances:
-            item = QListWidgetItem(_instance_label(instance))
+            item = QListWidgetItem()
+            row = QFrame()
+            row.setObjectName("mo2InstanceRow")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(8, 5, 8, 5)
+            row_layout.setSpacing(8)
+
+            launch = QPushButton("Launch Modded")
+            launch.setObjectName("primaryAction")
+            launch.setMinimumHeight(38)
+            launch.setEnabled(bool(instance.get("is_skyrim_se") and self._launch_ready))
+            launch.setToolTip(
+                "Launch Skyrim through this MO2 instance's virtual filesystem."
+                if instance.get("is_skyrim_se")
+                else "This instance is not configured for the detected Skyrim SE installation."
+            )
+            launch.clicked.connect(
+                lambda _checked=False, record=dict(instance): self._launch_instance(record)
+            )
+            row_layout.addWidget(launch)
+
+            open_folder = QPushButton("Open folder")
+            open_folder.setMinimumHeight(38)
+            open_folder.setToolTip("Open this MO2 instance's folder.")
+            open_folder.clicked.connect(
+                lambda _checked=False, record=dict(instance): self._open_instance_folder(record)
+            )
+            row_layout.addWidget(open_folder)
+
+            details = QLabel(_instance_label(instance))
+            details.setWordWrap(True)
+            details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            row_layout.addWidget(details, 1)
+
+            item.setSizeHint(row.sizeHint())
             item.setData(Qt.ItemDataRole.UserRole, instance)
             self.instances.addItem(item)
+            self.instances.setItemWidget(item, row)
             if selected_path and instance.get("path") == selected_path:
-                selected_row = self.instances.count() - 1
-        self.instances.blockSignals(False)
-        if selected_row >= 0:
-            self.instances.setCurrentRow(selected_row)
-        elif instances and self.instances.currentRow() < 0:
-            self.instances.setCurrentRow(0)
+                self.selected_instance_record = dict(instance)
+
         self.instances.setVisible(bool(instances))
         if instances:
             self.setup_status.setText(
                 f"Found {len(instances)} MO2 instance(s); "
                 f"{len(inventory.get('skyrim_instances', []))} match Skyrim SE. "
-                "This is a live, read-only scan—no registration step is needed."
+                "Each Skyrim instance has its own launch action."
             )
         else:
             message = inventory.get("message", "No MO2 instances were found in the known locations.")
             roots = inventory.get("scan_roots", [])
             errors = inventory.get("errors", [])
             if roots:
-                message += "\n\nLocations checked:\n" + "\n".join(roots)
+                message += "\\n\\nLocations checked:\\n" + "\\n".join(roots)
             if errors:
-                message += "\n\nRead errors:\n" + "\n".join(errors[:6])
+                message += "\\n\\nRead errors:\\n" + "\\n".join(errors[:6])
             self.setup_status.setText(message)
 
-    def _open_profiles_folder(self) -> None:
-        """Open the selected instance's configured MO2 profiles directory."""
-        instance = self.selected_instance_record or {}
-        profiles = instance.get("storage", {}).get("profiles", {})
-        raw_path = profiles.get("path")
-        if not raw_path:
-            self.setup_status.setText("The selected MO2 instance has no verified profiles directory.")
-            self.open_profiles_button.setEnabled(False)
+    def _launch_instance(self, instance: dict) -> None:
+        if not instance.get("is_skyrim_se"):
             return
+        launch = getattr(self._owner_window, "start_skyrim", None)
+        if callable(launch):
+            launch(instance_name=instance.get("name"))
+
+    def _open_instance_folder(self, instance: dict) -> None:
+        raw_path = instance.get("path")
         try:
+            if not raw_path:
+                raise OSError("The instance path is unavailable.")
             path = Path(raw_path).expanduser()
             if path.is_symlink() or not path.is_dir():
-                raise OSError("The configured profiles directory is missing or is a symlink.")
+                raise OSError("The instance folder is missing or is a symlink.")
             resolved = path.resolve(strict=True)
-            if not resolved.is_dir():
-                raise OSError("The configured profiles path is not a directory.")
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved))):
-                raise OSError("The desktop environment could not open the profiles directory.")
+                raise OSError("The desktop environment could not open the instance folder.")
         except (OSError, RuntimeError) as error:
-            self.setup_status.setText(f"Could not open profiles folder: {error}")
+            self.setup_status.setText(f"Could not open instance folder: {error}")
 
-    def _show_selected(self, row: int):
-        item = self.instances.item(row) if row >= 0 else None
-        instance = item.data(Qt.ItemDataRole.UserRole) if item else None
-        self.selected_instance_record = dict(instance) if isinstance(instance, dict) else None
-        profiles = (
-            (self.selected_instance_record or {}).get("storage", {}).get("profiles", {})
-        )
-        profiles_path = Path(profiles.get("path", "")) if profiles.get("path") else None
-        profiles_available = bool(
-            profiles_path and not profiles_path.is_symlink()
-            and profiles_path.is_dir()
-        )
-        self.open_profiles_button.setEnabled(profiles_available)
-        if self.selected_instance_record:
-            self.setup_status.setText(
-                f"Selected: {_instance_label(self.selected_instance_record)}. "
-                "Wyrd reads this instance directly and leaves its MO2 data in place."
-            )
