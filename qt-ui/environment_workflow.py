@@ -359,7 +359,17 @@ class EnvironmentWorkflowMixin:
     def mo2_launch_block_reason(self, instance: dict) -> str | None:
         """Expose the canonical preflight's first failure to the instance row."""
         result = self.mo2_launch_preflight(instance)
+        self._last_mo2_launch_preflight = result
         return result.get("reason") if not result.get("ok") else None
+
+    def mo2_launch_status_detail(self, instance: dict) -> str:
+        """Explain advisory launch warnings without turning them into blockers."""
+        result = getattr(self, "_last_mo2_launch_preflight", {}) or {}
+        if result.get("ok") and result.get("warnings"):
+            return "Launch checks passed. Advisory: " + " ".join(result["warnings"])
+        if result.get("ok"):
+            return "All required MO2 launch preflight checks pass."
+        return result.get("reason", "Launch readiness has not been verified.")
 
     def manage_mo2_library(self) -> None:
         """Refresh the read-only MO2 inventory widgets from the current scan."""
