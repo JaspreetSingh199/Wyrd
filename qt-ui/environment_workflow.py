@@ -282,9 +282,13 @@ class EnvironmentWorkflowMixin:
             installation.get("executable")
             if installation.get("installed") else None
         )
+        discovered_installation = (
+            installation if installation.get("installed")
+            else self.mo2_state
+        )
         launch_executable_verified = bool(
-            self.mo2_state.get("installed") and self.mo2_state.get("executable")
-            or discovered_executable
+            discovered_installation.get("installed")
+            and discovered_installation.get("executable")
         )
         if not self.game_state.get("found"):
             detail = "Skyrim Special Edition has not been detected."
