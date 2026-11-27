@@ -167,7 +167,7 @@ class LaunchLoaderWorkflowTests(unittest.TestCase):
         self.assertIsNotNone(window._mo2_launch_wait_pending)
         window._close_launch_loader.assert_not_called()
         window._update_launch_loader.assert_called_once()
-        self.assertIn("waiting for Skyrim", window._update_launch_loader.call_args.args[0].casefold())
+        self.assertIn("waiting for skyrim", window._update_launch_loader.call_args.args[0].casefold())
 
     def test_exited_proton_wrapper_is_not_failure_while_mo2_gui_is_running(self):
         with tempfile.TemporaryDirectory() as tmp:
