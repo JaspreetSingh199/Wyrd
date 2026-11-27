@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QThread, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QResizeEvent, QThread, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
     QVBoxLayout, QWidget, QTabWidget, QFrame,
@@ -167,6 +167,32 @@ class MainWindow(
         self.setCentralWidget(root)
         self._interaction_root = root
         self._interaction_lock_reason = None
+        # A real overlay communicates why the workspace is unavailable while
+        # keeping the underlying widgets enabled for status repainting/timers.
+        self._interaction_overlay = QFrame(root)
+        self._interaction_overlay.setObjectName("interactionOverlay")
+        self._interaction_overlay.setGeometry(root.rect())
+        overlay_layout = QVBoxLayout(self._interaction_overlay)
+        overlay_layout.setContentsMargins(24, 24, 24, 24)
+        overlay_layout.addStretch(1)
+        overlay_card = QFrame()
+        overlay_card.setObjectName("interactionOverlayCard")
+        overlay_card.setMaximumWidth(520)
+        card_layout = QVBoxLayout(overlay_card)
+        card_layout.setContentsMargins(28, 24, 28, 24)
+        card_layout.setSpacing(10)
+        self._interaction_overlay_title = QLabel("Wyrd is busy")
+        self._interaction_overlay_title.setObjectName("interactionOverlayTitle")
+        self._interaction_overlay_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._interaction_overlay_detail = QLabel("Please wait while the current operation finishes.")
+        self._interaction_overlay_detail.setObjectName("interactionOverlayDetail")
+        self._interaction_overlay_detail.setWordWrap(True)
+        self._interaction_overlay_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(self._interaction_overlay_title)
+        card_layout.addWidget(self._interaction_overlay_detail)
+        overlay_layout.addWidget(overlay_card, 0, Qt.AlignmentFlag.AlignHCenter)
+        overlay_layout.addStretch(1)
+        self._interaction_overlay.hide()
         self._update_active_instance_from_scan()
         self._restoring_selection = False
         # Let Qt paint the startup checklist before any filesystem/Steam scans
@@ -184,36 +210,57 @@ class MainWindow(
         or close Wyrd. Background process/session timers continue updating status.
         """
         root = getattr(self, "_interaction_root", None)
-        if root is None:
+        overlay = getattr(self, "_interaction_overlay", None)
+        if root is None or overlay is None:
             return
         if locked:
             self._interaction_lock_reason = reason or "A Wyrd operation is active."
-            root.setEnabled(False)
+            self._interaction_overlay_title.setText(
+                "Environment checks in progress" if "check" in self._interaction_lock_reason.lower()
+                or "scan" in self._interaction_lock_reason.lower()
+                else "Wyrd is managing an active session"
+            )
+            self._interaction_overlay_detail.setText(
+                self._interaction_lock_reason + "\n\nYour Skyrim and MO2 session is safe. "
+                "Workspace controls will return when this operation finishes."
+            )
+            overlay.setGeometry(root.rect())
+            overlay.show()
+            overlay.raise_()
         else:
             self._interaction_lock_reason = None
-            root.setEnabled(True)
+            overlay.hide()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        overlay = getattr(self, "_interaction_overlay", None)
+        root = getattr(self, "_interaction_root", None)
+        if overlay is not None and root is not None and overlay.isVisible():
+            overlay.setGeometry(root.rect())
+            overlay.raise_()
+
+    def _fade_widget_in(self, page: QWidget | None) -> None:
+        if page is None:
+            return
+        effect = getattr(page, "_wyrd_page_opacity", None)
+        if effect is None:
+            effect = QGraphicsOpacityEffect(page)
+            page.setGraphicsEffect(effect)
+            page._wyrd_page_opacity = effect
+        previous = getattr(self, "_page_transition_animation", None)
+        if previous is not None and previous.state() == QPropertyAnimation.State.Running:
+            previous.stop()
+        effect.setOpacity(0.0)
+        animation = QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(260)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        self._page_transition_animation = animation
+        animation.start()
 
     def _select_page(self, index: int) -> None:
         self.tabs.setCurrentIndex(index)
-        # Short, restrained page fade; it changes presentation only and never
-        # delays or blocks the launch/session workflows.
-        page = self.tabs.widget(index)
-        if page is not None:
-            effect = getattr(page, "_wyrd_page_opacity", None)
-            if effect is None:
-                effect = QGraphicsOpacityEffect(page)
-                page.setGraphicsEffect(effect)
-                page._wyrd_page_opacity = effect
-            previous = getattr(self, "_page_transition_animation", None)
-            if previous is not None and previous.state() == QPropertyAnimation.State.Running:
-                previous.stop()
-            effect.setOpacity(0.0)
-            animation = QPropertyAnimation(effect, b"opacity", self)
-            animation.setDuration(220)
-            animation.setStartValue(0.0)
-            animation.setEndValue(1.0)
-            self._page_transition_animation = animation
-            animation.start()
+        self._fade_widget_in(self.tabs.widget(index))
         self.environment_nav.setChecked(index == 0)
         self.maintenance_nav.setChecked(index == 1)
         self.logs_nav.setChecked(index == 2)
