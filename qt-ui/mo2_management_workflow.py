@@ -15,6 +15,7 @@ from steam_mo2_management import reset_wyrd_mo2
 from steam_prefix import steam_compat_prefix
 from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
+from process_monitor import detect_mo2_processes
 
 
 class Mo2ManagementWorkflowMixin:
@@ -148,12 +149,52 @@ class Mo2ManagementWorkflowMixin:
                 cwd=str(executable.parent), env=env, stdin=None, stdout=None,
                 stderr=None, start_new_session=True,
             )
-            self._log(f"MO2 native instance-picker handoff started (PID {process.pid}).")
+            self._mo2_session_prefix = prefix
+            self._mo2_session_seen = False
+            self._mo2_session_polls = 0
+            self._mo2_session_timer.start()
+            self._log(f"MO2 native instance-picker handoff started (PID {process.pid}); waiting for MO2 to open.")
             self.progress_label.setText("Opening MO2 instance picker…")
         except Exception as error:
             self._log(f"MO2 launch failed: {error}")
             QMessageBox.warning(self, "Launch MO2", str(error))
 
+
+    def _poll_mo2_session(self) -> None:
+        """Refresh MO2 instances and profiles after the launched MO2 process exits."""
+        prefix = getattr(self, "_mo2_session_prefix", None)
+        if prefix is None:
+            self._mo2_session_timer.stop()
+            return
+
+        self._mo2_session_polls += 1
+        scan = detect_mo2_processes(prefix)
+        if scan.get("ok") and scan.get("processes"):
+            if not self._mo2_session_seen:
+                self._mo2_session_seen = True
+                self._log("MO2 process detected in Skyrim's Steam prefix; monitoring until it closes.")
+                self.progress_label.setText("MO2 is open. Wyrd will refresh instances and profiles when it closes.")
+            return
+
+        if not self._mo2_session_seen:
+            # Proton may take a few seconds to start Wine/MO2. Stop after a
+            # bounded startup window rather than silently polling forever.
+            if self._mo2_session_polls >= 80:
+                self._mo2_session_timer.stop()
+                self._mo2_session_prefix = None
+                self._log(
+                    "MO2 did not appear in the Skyrim prefix within 120 seconds. "
+                    "No automatic inventory refresh was triggered."
+                )
+                self.progress_label.setText("MO2 startup was not detected. Check the MO2 launch log.")
+            return
+
+        self._mo2_session_timer.stop()
+        self._mo2_session_prefix = None
+        self._mo2_session_seen = False
+        self._log("MO2 has closed. Refreshing Skyrim instances and profiles…")
+        self.progress_label.setText("MO2 closed. Refreshing instances and profiles…")
+        self.refresh_all()
 
     def install_mo2(self, *, confirm: bool = True) -> None:
         if self.worker and self.worker.isRunning():
