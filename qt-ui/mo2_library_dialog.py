@@ -148,6 +148,9 @@ class Mo2LibraryDialog(QFrame):
                 profile_picker.setToolTip(
                     "No profile folders could be safely verified for this instance. MO2's current profile will be used."
                 )
+            profile_label = QLabel("Profile")
+            profile_label.setObjectName("muted")
+            row_layout.addWidget(profile_label)
             profile_picker.setMinimumWidth(150)
             row_layout.addWidget(profile_picker)
             launch.clicked.connect(
