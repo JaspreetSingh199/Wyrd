@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QListWidget,
-    QListWidgetItem, QPushButton, QVBoxLayout, QWidget, QFrame, QComboBox,
+    QListWidgetItem, QPushButton, QWidget, QFrame, QComboBox,
 )
 
 
