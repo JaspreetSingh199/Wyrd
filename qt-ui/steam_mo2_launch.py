@@ -73,8 +73,8 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
-            log.write("\\n=== Wyrd external MO2 launch (Steam AppID 489830) ===\\n")
-            log.write(f"instance: {instance_name}\\ncommand: {json.dumps([str(proton / 'proton'), 'run', str(executable), '--instance', instance_name])}\\n")
+            log.write("\n=== Wyrd external MO2 launch (Steam AppID 489830) ===\n")
+            log.write(f"instance: {instance_name}\ncommand: {json.dumps([str(proton / 'proton'), 'run', str(executable), '--instance', instance_name])}\n")
             log.flush()
             process = subprocess.Popen(
                 [str(proton / "proton"), "run", str(executable),
@@ -82,7 +82,7 @@ def launch_external_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
                 cwd=str(install), env=env, stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
             )
-            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.write(f"wrapper_pid: {process.pid}\n")
             log.flush()
     except OSError as error:
         return {"ok": False, "message": f"Could not launch existing MO2: {error}"}
@@ -140,15 +140,15 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
     try:
         diagnostics.parent.mkdir(parents=True, exist_ok=True)
         with diagnostics.open("a", encoding="utf-8") as log:
-            log.write("\\n=== Wyrd MO2 launch (Steam AppID 489830) ===\\n")
-            log.write(f"instance: {instance_name}\\ncommand: {json.dumps([str(proton / 'proton'), 'run', str(executable), '--instance', instance_name])}\\n")
+            log.write("\n=== Wyrd MO2 launch (Steam AppID 489830) ===\n")
+            log.write(f"instance: {instance_name}\ncommand: {json.dumps([str(proton / 'proton'), 'run', str(executable), '--instance', instance_name])}\n")
             log.flush()
             process = subprocess.Popen(
                 [str(proton / "proton"), "run", str(executable), "--instance", instance_name],
                 cwd=str(install), env=env, stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
             )
-            log.write(f"wrapper_pid: {process.pid}\\n")
+            log.write(f"wrapper_pid: {process.pid}\n")
             log.flush()
     except OSError as error:
         return {"ok": False, "message": f"Could not start MO2 in Skyrim's Proton prefix: {error}"}
