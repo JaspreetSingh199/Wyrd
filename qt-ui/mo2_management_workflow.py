@@ -112,8 +112,8 @@ class Mo2ManagementWorkflowMixin:
         QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
 
 
-    def launch_mo2_gui(self) -> None:
-        """Open MO2's native instance picker in Skyrim's existing Proton prefix."""
+    def launch_mo2_gui(self, instance_name: str | None = None) -> None:
+        """Open the requested MO2 instance directly, without showing the instance picker."""
         try:
             installation = self.instance_state.get("installation", {}) or {}
             executable_value = (
@@ -153,17 +153,26 @@ class Mo2ManagementWorkflowMixin:
                 "WYRD_LAUNCHED": "1",
                 "WYRD_LAUNCH_ID": launch_token,
             })
-            # MO2's own --pick option opens its native instance selector.
-            # Preserve the established Skyrim AppID 489830 Proton context.
+            # Launch the exact verified instance requested by the UI. --pick
+            # deliberately opens the instance manager and is not appropriate
+            # for the per-instance "Open MO2 Mod List" action.
+            inventory = self.instance_state.get("skyrim_instances", [])
+            available_names = {str(item.get("name") or "") for item in inventory}
+            if not instance_name or instance_name not in available_names:
+                raise RuntimeError(
+                    "Choose a currently discovered Skyrim SE MO2 instance before opening its mod list."
+                )
+            # Preserve Skyrim's established AppID 489830 Proton context.
             diagnostics = managed_paths()["root"] / "logs" / "skyrim-launch.log"
             diagnostics.parent.mkdir(parents=True, exist_ok=True)
             with diagnostics.open("a", encoding="utf-8") as log:
                 log.write("\n=== Wyrd Open MO2 session (Steam AppID 489830) ===\n")
                 log.write(f"runtime: {proton}\nprefix: {prefix}\nlaunch_id: {launch_token}\n")
+                log.write(f"instance: {instance_name}\n")
                 log.write("monitoring: session RSS, process/thread count, CPU, winedbg count, host RAM and swap\n")
                 log.flush()
                 process = subprocess.Popen(
-                    [str(proton / "proton"), "run", str(executable), "--pick"],
+                    [str(proton / "proton"), "run", str(executable), "--instance", instance_name],
                     cwd=str(executable.parent), env=env, stdin=subprocess.DEVNULL,
                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                 )
@@ -180,11 +189,14 @@ class Mo2ManagementWorkflowMixin:
             self._mo2_session_peak_processes = 0
             self._mo2_session_warned = set()
             self._mo2_session_timer.start()
-            self._log(f"MO2 native instance-picker started (PID {process.pid}); resource monitoring active.")
-            self.progress_label.setText("Opening MO2 instance picker…")
+            self._log(
+                f"MO2 instance '{instance_name}' opened directly (PID {process.pid}); "
+                "resource monitoring active."
+            )
+            self.progress_label.setText(f"Opening MO2 mod list for {instance_name}…")
         except Exception as error:
-            self._log(f"MO2 launch failed: {error}")
-            QMessageBox.warning(self, "Launch MO2", str(error))
+            self._log(f"MO2 mod-list launch failed: {error}")
+            QMessageBox.warning(self, "Open MO2 Mod List", str(error))
 
 
     def _poll_mo2_session(self) -> None:
