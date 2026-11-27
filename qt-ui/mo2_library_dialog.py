@@ -146,7 +146,7 @@ class Mo2LibraryDialog(QFrame):
             details.setWordWrap(True)
             details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             row_layout.addWidget(details, 1)
-            readiness = QLabel("READY" if block_reason is None else "BLOCKED · HOVER")
+            readiness = QLabel("READY" if block_reason is None else "BLOCKED")
             readiness.setObjectName("launchReady" if block_reason is None else "launchBlocked")
             readiness.setToolTip(block_reason or "All launch preflight checks currently pass.")
             row_layout.addWidget(readiness)
