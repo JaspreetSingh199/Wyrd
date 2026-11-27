@@ -4,9 +4,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton,
+    QCheckBox, QDialog, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout,
 )
 
@@ -20,19 +19,7 @@ class LaunchPreflightWorkflowMixin:
         game_path: Path, prefix: Path, install_root: Path, proton: Path,
         steam_root: Path | None,
     ) -> bool:
-        """Show a visible, read-only checklist and require all checks before launch."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Preparing modded Skyrim")
-        dialog.setMinimumWidth(520)
-        layout = QVBoxLayout(dialog)
-        heading = QLabel("Launch pre-check")
-        heading.setObjectName("section")
-        layout.addWidget(heading)
-        detail = QLabel("Wyrd is checking the selected environment before starting MO2.")
-        detail.setWordWrap(True)
-        detail.setObjectName("muted")
-        layout.addWidget(detail)
-        rows = []
+        """Run checks silently; show a dialog only when a check fails."""
         checks = [
             ("Skyrim installation", lambda: (
                 not game_path.is_symlink() and game_path.is_dir(),
@@ -69,59 +56,57 @@ class LaunchPreflightWorkflowMixin:
                 f"MO2 target: {selected_target.get('title', 'Unknown')}",
             )),
         ]
-        for label, _ in checks:
-            checkbox = QCheckBox(label)
-            checkbox.setEnabled(False)
-            layout.addWidget(checkbox)
-            rows.append(checkbox)
-        progress = QProgressBar()
-        progress.setRange(0, len(checks))
-        progress.setValue(0)
-        layout.addWidget(progress)
-        status = QLabel("Starting checks…")
-        status.setWordWrap(True)
-        status.setObjectName("muted")
-        layout.addWidget(status)
-        buttons = QHBoxLayout()
-        continue_button = QPushButton("Continue to launch")
-        continue_button.setObjectName("primaryAction")
-        continue_button.setEnabled(False)
-        cancel_button = QPushButton("Cancel")
-        buttons.addStretch(1)
-        buttons.addWidget(cancel_button)
-        buttons.addWidget(continue_button)
-        layout.addLayout(buttons)
-        cancel_button.clicked.connect(dialog.reject)
-        continue_button.clicked.connect(dialog.accept)
 
-        failed = False
-        for index, (label, check) in enumerate(checks):
-            detail.setText(f"Checking {label.lower()}…")
-            QCoreApplication.processEvents()
+        results = []
+        for label, check in checks:
             try:
                 passed, message = check()
             except Exception as error:
                 passed, message = False, str(error)
-            rows[index].setChecked(bool(passed))
-            rows[index].setText(f"{label} — {'OK' if passed else 'FAILED'}")
-            progress.setValue(index + 1)
-            status.setText(message)
-            QCoreApplication.processEvents()
+            results.append((label, bool(passed), str(message)))
             if not passed:
-                failed = True
-                detail.setText("Pre-check failed. Wyrd will not launch Skyrim.")
-                status.setText(f"{label}: {message}")
                 break
 
-        if failed:
-            cancel_button.setText("Close")
-            continue_button.hide()
-            dialog.exec()
-            return False
-        detail.setText("All checks passed. Review the checklist, then continue.")
-        status.setText(f"Ready to launch '{selected_target.get('title')}' through MO2 instance '{instance_name}'.")
-        continue_button.setEnabled(True)
-        return dialog.exec() == QDialog.DialogCode.Accepted
+        # A clean preflight is the normal path: no modal, checklist, or extra
+        # confirmation. Continue directly to the existing launch adapter.
+        if all(passed for _label, passed, _message in results) and len(results) == len(checks):
+            return True
+
+        failed_label, _passed, failed_message = results[-1]
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Skyrim launch blocked")
+        dialog.setMinimumWidth(520)
+        layout = QVBoxLayout(dialog)
+        heading = QLabel("Launch pre-check failed")
+        heading.setObjectName("section")
+        layout.addWidget(heading)
+        detail = QLabel(
+            f"Wyrd could not safely launch Skyrim because {failed_label.lower()} failed."
+        )
+        detail.setWordWrap(True)
+        detail.setObjectName("muted")
+        layout.addWidget(detail)
+
+        for label, passed, _message in results:
+            checkbox = QCheckBox(f"{label} — {'OK' if passed else 'FAILED'}")
+            checkbox.setChecked(passed)
+            checkbox.setEnabled(False)
+            layout.addWidget(checkbox)
+
+        status = QLabel(f"{failed_label}: {failed_message}")
+        status.setWordWrap(True)
+        status.setObjectName("muted")
+        layout.addWidget(status)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.accept)
+        buttons.addWidget(close_button)
+        layout.addLayout(buttons)
+        dialog.exec()
+        self._log(f"Modded launch pre-check failed [{failed_label}]: {failed_message}")
+        return False
 
     @staticmethod
     def _preflight_instance_exists(prefix: Path, install_root: Path, instance_name: str) -> tuple[bool, str]:
