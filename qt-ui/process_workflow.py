@@ -50,9 +50,15 @@ class ProcessMonitorWorkflowMixin:
             detail = f"{session.executable_title or 'Skyrim'} is running through MO2."
             state_name = "running"
         elif session.state == "game-exited":
-            status = "Exited"
-            detail = "Skyrim has closed. You can launch it again when ready."
-            state_name = "idle"
+            mo2_scan = detect_mo2_processes(prefix) if prefix else {"ok": False, "processes": []}
+            if mo2_scan.get("ok") and mo2_scan.get("processes"):
+                status = "MO2 running"
+                detail = "Skyrim has exited; Mod Organizer remains open."
+                state_name = "running"
+            else:
+                status = "Exited"
+                detail = "Skyrim has closed. You can launch it again when ready."
+                state_name = "idle"
         elif session.state in {"failed", "timeout"}:
             status = "Launch failed"
             detail = "The last launch did not reach a confirmed game process. Check Launch Diagnostics."
