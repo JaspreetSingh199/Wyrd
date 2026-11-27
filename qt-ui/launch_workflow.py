@@ -115,29 +115,13 @@ class LaunchWorkflowMixin:
             return
 
         game_path = Path(self.game_state["game_dir"]).expanduser()
-        mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
-        if not mo2_state.get("installed"):
-            mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
-        if not mo2_state.get("installed"):
-            # Discovery may find an MO2 instance without finding its executable.
-            # Never guess or launch another copy; keep the inventory visible and
-            # fail closed until an executable can be verified.
-            QMessageBox.warning(
-                self, "MO2 executable unavailable",
-                self.instance_state.get(
-                    "installation_message",
-                    mo2_state.get("message", "MO2 instance found, but no verified ModOrganizer.exe is available."),
-                ),
-            )
-            return
-        proton_value = self.proton_combo.currentData()
-        if not proton_value:
-            QMessageBox.warning(self, "Proton unavailable", "Select a valid Proton runtime before launching.")
-            return
-        # Match the installation selected by the live inventory scan. It
-        # may be external/read-only rather than Wyrd-managed.
+        # Use the exact installation discovered by the live inventory scan.
+        # This may be an external/read-only installation in Skyrim's prefix.
         discovered_installation = self.instance_state.get("installation", {}) or {}
         if not discovered_installation.get("installed"):
+            mo2_state = inspect_skyrim_prefix_mo2_installation(game_path)
+            if not mo2_state.get("installed"):
+                mo2_state = inspect_external_skyrim_prefix_mo2_installation(game_path)
             discovered_installation = mo2_state
         if (
             not discovered_installation.get("installed")
@@ -152,6 +136,10 @@ class LaunchWorkflowMixin:
             )
             self._log("Modded launch blocked: " + message)
             QMessageBox.warning(self, "MO2 executable unavailable", message)
+            return
+        proton_value = self.proton_combo.currentData()
+        if not proton_value:
+            QMessageBox.warning(self, "Proton unavailable", "Select a valid Proton runtime before launching.")
             return
         prefix = Path(discovered_installation["prefix"])
         install_root = Path(discovered_installation["install"])
