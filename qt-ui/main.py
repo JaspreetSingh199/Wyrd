@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from wyrd_settings import read_settings, write_settings, reset_wyrd_settings
 from launch_models import LaunchSession
+from logs_workflow import LogsWorkflowMixin
 from ui_styles import APP_STYLE as STYLE
 from ui_pages import MainWindowPagesMixin
 from launch_workflow import LaunchWorkflowMixin
@@ -34,6 +35,7 @@ class MainWindow(
     LaunchPreflightWorkflowMixin,
     ProcessMonitorWorkflowMixin,
     LaunchDiagnosticsWorkflowMixin,
+    LogsWorkflowMixin,
     ManualProcessDiagnosticsWorkflowMixin,
     EnvironmentWorkflowMixin,
     AudioWorkflowMixin,
@@ -167,6 +169,9 @@ class MainWindow(
         self.environment_nav.setChecked(index == 0)
         self.maintenance_nav.setChecked(index == 1)
         self.logs_nav.setChecked(index == 2)
+        if index == 2:
+            self.refresh_launch_log_view()
+            self.refresh_system_log_view()
 
     def _log(self, message: str) -> None:
         self.log_view.appendPlainText(message)
