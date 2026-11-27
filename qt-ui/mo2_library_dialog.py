@@ -207,9 +207,38 @@ class Mo2LibraryDialog(QFrame):
     def _launch_instance(self, instance: dict, profile_name: str | None = None) -> None:
         if not instance.get("is_skyrim_se"):
             return
+
+        instance_name = str(instance.get("name") or "<unnamed>")
+        selected_profile = profile_name or "<MO2 saved selection>"
+        message = (
+            "[WYRD] Launch Modded button clicked: "
+            f"instance={instance_name!r}, profile={selected_profile!r}, "
+            f"instance_path={instance.get('path')!r}"
+        )
+        # Visible in the terminal that started run.sh and in Wyrd's Maintenance log.
+        print(message, flush=True)
+        owner_log = getattr(self._owner_window, "_log", None)
+        if callable(owner_log):
+            owner_log(message)
+
+        # Keep the click event alongside the Proton/MO2 launch output so a
+        # click that fails preflight is still visible in the same diagnostic file.
+        try:
+            from proton_runtime import managed_paths
+            diagnostics = managed_paths(Path.home())["root"] / "logs" / "skyrim-launch.log"
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            with diagnostics.open("a", encoding="utf-8") as log:
+                log.write("\\n=== WYRD UI ACTION ===\\n")
+                log.write(message + "\\n")
+        except (OSError, KeyError, TypeError) as error:
+            warning = f"[WYRD] Could not append click event to launch log: {error}"
+            print(warning, flush=True)
+            if callable(owner_log):
+                owner_log(warning)
+
         launch = getattr(self._owner_window, "start_skyrim", None)
         if callable(launch):
-            launch(instance_name=instance.get("name"), profile_name=profile_name)
+            launch(instance_name=instance_name, profile_name=profile_name)
 
     def _open_instance_folder(self, instance: dict) -> None:
         raw_path = instance.get("path")
