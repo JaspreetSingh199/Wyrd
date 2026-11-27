@@ -41,28 +41,39 @@ def build_guarded_wine_command(command: list[str], *, max_memory_bytes: int = DE
     if not systemd_run or not controllers.is_file():
         return command, "process-group fallback (cgroup v2/systemd-run unavailable)"
 
-    try:
-        probe = subprocess.run(
-            ["systemctl", "--user", "show-environment"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, timeout=3, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return command, "process-group fallback (user systemd manager unavailable)"
-    if probe.returncode != 0:
-        return command, "process-group fallback (user systemd manager unavailable)"
-
     unit = f"wyrd-wine-installer-{os.getpid()}-{uuid.uuid4().hex[:8]}"
     memory = max(1, int(max_memory_bytes))
     tasks = max(1, int(max_processes))
-    wrapped = [
+    scope_prefix = [
         systemd_run, "--user", "--scope", "--quiet",
         f"--unit={unit}",
         f"--property=MemoryMax={memory}",
         f"--property=TasksMax={tasks}",
         "--",
-        *command,
     ]
+
+    # Probe the exact properties before starting the real installer. A user
+    # manager can exist while lacking permission/delegation for these limits.
+    probe_unit = f"wyrd-wine-guard-probe-{os.getpid()}-{uuid.uuid4().hex[:6]}"
+    probe_command = [
+        systemd_run, "--user", "--scope", "--quiet",
+        f"--unit={probe_unit}",
+        "--property=MemoryMax=67108864",
+        "--property=TasksMax=8",
+        "--", shutil.which("true") or "/usr/bin/true",
+    ]
+    try:
+        probe = subprocess.run(
+            probe_command, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=8, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return command, "process-group fallback (user cgroup limits unavailable)"
+    if probe.returncode != 0:
+        return command, "process-group fallback (user cgroup limits unavailable)"
+
+    wrapped = [*scope_prefix, *command]
     return wrapped, f"systemd cgroup scope {unit} (MemoryMax={memory}, TasksMax={tasks})"
 
 
