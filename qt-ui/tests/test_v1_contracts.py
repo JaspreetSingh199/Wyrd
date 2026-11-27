@@ -80,7 +80,7 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
         self.assertFalse(window._mo2_session_seen)
         window.refresh_all.assert_called_once_with()
 
-    def test_reopen_clears_undetected_session_after_startup_grace(self):
+    def test_reopen_clears_undetected_session_immediately_on_empty_scan(self):
         class Timer:
             def __init__(self):
                 self.active = True
@@ -97,7 +97,7 @@ class Mo2ProcessDetectionTests(unittest.TestCase):
             _mo2_session_timer=timer,
             _mo2_session_prefix=Path("/steam/steamapps/compatdata/489830"),
             _mo2_session_seen=False,
-            _mo2_session_polls=30,
+            _mo2_session_polls=1,
             _mo2_session_loader_active=True,
             _mo2_session_launch_token="old-token",
             _mo2_session_wrapper_pid=1234,
