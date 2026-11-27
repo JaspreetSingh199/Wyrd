@@ -64,7 +64,7 @@ class Mo2LibraryDialog(QFrame):
         self.open_mo2_button.setToolTip(
             "Open a discovered Skyrim Special Edition MO2 instance to review its mods and profiles."
         )
-        self.open_mo2_button.clicked.connect(self._open_selected_mo2)
+        self.open_mo2_button.clicked.connect(lambda _checked=False: self._open_selected_mo2())
         heading_row.addWidget(self.open_mo2_button, 0, Qt.AlignmentFlag.AlignRight)
         layout.addLayout(heading_row)
         self.setup_status = QLabel("MO2 instances are discovered automatically.")
@@ -238,26 +238,24 @@ class Mo2LibraryDialog(QFrame):
             self.setup_status.setText(message)
 
     def _open_selected_mo2(self) -> None:
-        instances = list((getattr(self._owner_window, "instance_state", {}) or {}).get("skyrim_instances", []))
-        if not instances:
-            self.setup_status.setText("No Skyrim Special Edition MO2 instance is available to open.")
+        """Delegate to the established MainWindow Open MO2 workflow.
+
+        Keep instance selection and launch validation in one place so the
+        header action follows the same path as the original Environment action.
+        """
+        owner = self._owner_window
+        launch_action = getattr(owner, "open_mo2_instance", None)
+        if not callable(launch_action):
+            self.setup_status.setText("Wyrd's Open MO2 action is unavailable. Refresh the environment and try again.")
             self.setup_status.show()
+            log = getattr(owner, "_log", None)
+            if callable(log):
+                log("Open MO2 action failed: MainWindow.open_mo2_instance is unavailable.")
             return
-        if len(instances) == 1:
-            self._open_mo2(str(instances[0].get("name") or ""))
-            return
-        from PySide6.QtWidgets import QInputDialog
-        names = [str(item.get("name") or "Unnamed instance") for item in instances]
-        preferred = self.preferred_instance_id
-        initial = next((i for i, item in enumerate(instances)
-                        if str(item.get("path") or "") == preferred
-                        or str(item.get("name") or "") == preferred), 0)
-        instance_name, accepted = QInputDialog.getItem(
-            self, "Open Mod Organizer 2", "Choose a Skyrim SE MO2 instance:",
-            names, initial, False,
-        )
-        if accepted and instance_name:
-            self._open_mo2(instance_name)
+        log = getattr(owner, "_log", None)
+        if callable(log):
+            log("Open MO2 header action clicked.")
+        launch_action()
 
     def _open_mo2(self, instance_name: str) -> None:
         launch = getattr(self._owner_window, "launch_mo2_gui", None)
