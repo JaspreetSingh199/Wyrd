@@ -156,7 +156,10 @@ class Mo2LibraryDialog(QFrame):
             open_mo2.setToolTip(
                 "Open MO2 in Skyrim's existing Proton prefix to review or change the selected instance's mod list."
             )
-            open_mo2.clicked.connect(lambda _checked=False: self._open_mo2())
+            open_mo2.clicked.connect(
+                lambda _checked=False, record=dict(instance):
+                    self._open_mo2(str(record.get("name") or ""))
+            )
             action_row.addWidget(open_mo2)
 
             open_folder = QPushButton("▱  Open Folder")
@@ -227,10 +230,10 @@ class Mo2LibraryDialog(QFrame):
                 message += "\n\nRead errors:\n" + "\n".join(errors[:6])
             self.setup_status.setText(message)
 
-    def _open_mo2(self) -> None:
+    def _open_mo2(self, instance_name: str) -> None:
         launch = getattr(self._owner_window, "launch_mo2_gui", None)
         if callable(launch):
-            launch()
+            launch(instance_name=instance_name)
 
     def _launch_unmodded(self) -> None:
         launch = getattr(self._owner_window, "start_skyrim_direct", None)
