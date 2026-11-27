@@ -34,6 +34,18 @@ class WyrdV1ContractTests(unittest.TestCase):
         install.mkdir(parents=True)
         (install / "ModOrganizer.exe").write_bytes(b"MO2 fixture")
 
+        # Model a real portable MO2 instance. The launch adapter deliberately
+        # re-discovers the selected instance immediately before starting it.
+        dosdevices = prefix / "pfx/dosdevices"
+        dosdevices.mkdir(parents=True, exist_ok=True)
+        (dosdevices / "s:").symlink_to(steam_root, target_is_directory=True)
+        (install / "ModOrganizer.ini").write_text(
+            "[General]\\n"
+            "gameName=Skyrim Special Edition\\n"
+            "gamePath=S:\\\\steamapps\\\\common\\\\Skyrim Special Edition\\n",
+            encoding="utf-8",
+        )
+
         proton = home / "Proton"
         proton.mkdir()
         wrapper = proton / "proton"
