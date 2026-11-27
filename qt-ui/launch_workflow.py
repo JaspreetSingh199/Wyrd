@@ -149,7 +149,7 @@ class LaunchWorkflowMixin:
     def _launch_registered_skyrim_target(
         self, record: dict, game: dict, installation: dict, runtime: dict,
         target_state: dict, game_path: Path, prefix: Path, install_root: Path, proton: Path,
-        steam_root: Path | None = None, profile_name: str | None = None,
+        steam_root: Path | None = None,
     ) -> None:
         discovery = getattr(self, "mo2_discovery_state", None)
         if not discovery or not discovery.get("ok"):
@@ -174,7 +174,7 @@ class LaunchWorkflowMixin:
     def _launch_skyrim_target_from_inventory(
         self, instance_name: str, target_state: dict, game_path: Path,
         prefix: Path, install_root: Path, proton: Path, require_managed: bool,
-        steam_root: Path | None = None,
+        steam_root: Path | None = None, profile_name: str | None = None,
     ) -> None:
         discovery = getattr(self, "mo2_discovery_state", None)
         if not discovery or not discovery.get("ok"):
