@@ -31,7 +31,7 @@ class LaunchWorkflowMixin:
         answer = QMessageBox.question(
             self, "Launch Skyrim through Steam",
             "This launches Skyrim Special Edition directly through Steam, without MO2 or mods. "
-            "Use it for an unmodded audio baseline.\\n\\nContinue?",
+            "Use it for an unmodded audio baseline.\n\nContinue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -41,14 +41,14 @@ class LaunchWorkflowMixin:
         try:
             diagnostics.parent.mkdir(parents=True, exist_ok=True)
             with diagnostics.open("a", encoding="utf-8") as log:
-                log.write("\\n=== Wyrd direct Steam launch (AppID 489830; unmodded) ===\\n")
+                log.write("\n=== Wyrd direct Steam launch (AppID 489830; unmodded) ===\n")
                 log.flush()
                 process = subprocess.Popen(
                     [steam, "-applaunch", "489830"],
                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
-                log.write(f"steam_pid: {process.pid}\\n")
+                log.write(f"steam_pid: {process.pid}\n")
                 log.flush()
         except OSError as error:
             QMessageBox.warning(self, "Steam launch failed", f"Could not start Steam: {error}")
