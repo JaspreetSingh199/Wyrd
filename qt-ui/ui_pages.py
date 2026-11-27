@@ -15,14 +15,14 @@ class MainWindowPagesMixin:
     def _build_pages(self, outer) -> None:
         setup_page = QWidget()
         setup_layout = QVBoxLayout(setup_page)
-        setup_layout.setContentsMargins(8, 12, 8, 12)
-        setup_layout.setSpacing(12)
+        setup_layout.setContentsMargins(16, 18, 16, 18)
+        setup_layout.setSpacing(18)
 
         hero_banner = QFrame()
         hero_banner.setObjectName("heroBanner")
         hero_layout = QVBoxLayout(hero_banner)
-        hero_layout.setContentsMargins(20, 18, 20, 18)
-        hero_layout.setSpacing(4)
+        hero_layout.setContentsMargins(24, 22, 24, 22)
+        hero_layout.setSpacing(8)
         hero_title = QLabel("Your Skyrim Environment")
         hero_title.setObjectName("heroTitle")
         hero_layout.addWidget(hero_title)
@@ -47,7 +47,8 @@ class MainWindowPagesMixin:
         self.precheck_panel = QFrame()
         self.precheck_panel.setObjectName("statusPanel")
         precheck_layout = QVBoxLayout(self.precheck_panel)
-        precheck_layout.setContentsMargins(14, 10, 14, 10)
+        precheck_layout.setContentsMargins(18, 14, 18, 14)
+        precheck_layout.setSpacing(10)
         precheck_top = QHBoxLayout()
         precheck_heading = QLabel("ENVIRONMENT CHECKS")
         precheck_heading.setObjectName("section")
@@ -59,8 +60,8 @@ class MainWindowPagesMixin:
         precheck_top.addWidget(self.precheck_status)
         precheck_layout.addLayout(precheck_top)
         readiness_grid = QGridLayout()
-        readiness_grid.setHorizontalSpacing(16)
-        readiness_grid.setVerticalSpacing(4)
+        readiness_grid.setHorizontalSpacing(22)
+        readiness_grid.setVerticalSpacing(9)
         self.precheck_rows = []
         for index, label in enumerate((
             "Skyrim installation",
@@ -89,8 +90,8 @@ class MainWindowPagesMixin:
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
-        progress_layout.setContentsMargins(16, 12, 16, 14)
-        progress_layout.setSpacing(9)
+        progress_layout.setContentsMargins(20, 16, 20, 18)
+        progress_layout.setSpacing(12)
         progress_header = QHBoxLayout()
         self.progress_label = QLabel("Ready")
         self.progress_label.setObjectName("section")
@@ -107,8 +108,8 @@ class MainWindowPagesMixin:
         setup_layout.addWidget(progress_panel)
 
         configuration_grid = QGridLayout()
-        configuration_grid.setHorizontalSpacing(12)
-        configuration_grid.setVerticalSpacing(12)
+        configuration_grid.setHorizontalSpacing(18)
+        configuration_grid.setVerticalSpacing(18)
         self.game_panel = panel("SKYRIM SPECIAL EDITION", "Detecting your Steam installation…")
         configuration_grid.addWidget(self.game_panel, 0, 0)
 
@@ -170,13 +171,13 @@ class MainWindowPagesMixin:
 
         maintenance_page = QWidget()
         maintenance_layout = QVBoxLayout(maintenance_page)
-        maintenance_layout.setContentsMargins(12, 16, 12, 12)
-        maintenance_layout.setSpacing(12)
+        maintenance_layout.setContentsMargins(18, 20, 18, 18)
+        maintenance_layout.setSpacing(18)
         maintenance_layout.addWidget(self.precheck_panel)
         maintenance_layout.addWidget(self.check_mo2_button)
         diagnostics_grid = QGridLayout()
-        diagnostics_grid.setHorizontalSpacing(12)
-        diagnostics_grid.setVerticalSpacing(12)
+        diagnostics_grid.setHorizontalSpacing(18)
+        diagnostics_grid.setVerticalSpacing(18)
 
         proton_diagnostics_panel = panel(
             "PROTON DIAGNOSTICS",
