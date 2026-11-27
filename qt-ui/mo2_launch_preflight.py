@@ -23,6 +23,7 @@ def inspect_instance_launch(
 ) -> dict:
     """Return a verified launch plan or the first precise blocking reason."""
     checks: list[dict] = []
+    warnings: list[str] = []
 
     def fail(name: str, message: str, details: dict | None = None) -> dict:
         checks.append({"name": name, "ok": False, "message": message})
@@ -130,16 +131,25 @@ def inspect_instance_launch(
         {"windows_path": mapping["windows_game_path"], "linux_path": mapping["resolved_game_path"]},
     )
 
+    # Bethesda's Installed Path value is useful for Bethesda-launched flows,
+    # but it is not required by Wyrd's direct MO2 -> configured executable path.
+    # Keep the check visible as an advisory; never block a valid MO2 launch on it.
     registry = configure_skyrim_se_registry(
         prefix, game, steam_root, proton, mapping["windows_game_path"]
     )
     if not registry.get("ok"):
-        return fail(
-            "bethesda_registry",
-            registry.get("message", "Read-only Skyrim registry verification failed."),
-            {"mapping": mapping},
+        warning = registry.get(
+            "message", "Bethesda Installed Path could not be verified in the existing registry."
         )
-    passed("bethesda_registry", "Bethesda registry path matches Skyrim (read-only verification).")
+        warnings.append(warning)
+        checks.append({
+            "name": "bethesda_registry",
+            "ok": True,
+            "status": "warning",
+            "message": warning,
+        })
+    else:
+        passed("bethesda_registry", "Bethesda registry path matches Skyrim (read-only verification).")
 
     targets = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance["name"],
@@ -168,6 +178,7 @@ def inspect_instance_launch(
         "reason": None,
         "failed_check": None,
         "checks": checks,
+        "warnings": warnings,
         "game_path": str(game),
         "proton_path": str(proton),
         "steam_root": str(steam_root),
