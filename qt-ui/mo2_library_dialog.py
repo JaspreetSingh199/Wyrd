@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QListWidget,
-    QListWidgetItem, QPushButton, QWidget, QFrame, QComboBox,
+    QListWidgetItem, QPushButton, QWidget, QFrame, QComboBox, QSizePolicy,
 )
 
 
@@ -74,7 +74,7 @@ class Mo2LibraryDialog(QFrame):
         self.instances = QListWidget()
         self.instances.setObjectName("mo2Instances")
         self.instances.setMinimumHeight(90)
-        self.instances.setSizePolicy(QWidget.SizePolicy.Policy.Expanding, QWidget.SizePolicy.Policy.Expanding)
+        self.instances.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self.instances, 1)
         unmodded_panel = QFrame()
