@@ -22,9 +22,56 @@ import mo2_management_workflow
 from mo2_library_dialog import Mo2LibraryDialog
 import launch_workflow
 import process_workflow
+import process_monitor
 from launch_models import LaunchSession
 from steam_prefix import steam_compat_prefix
 from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
+
+
+class Mo2ProcessDetectionTests(unittest.TestCase):
+    def test_zombie_mo2_process_is_not_reported_as_running(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "compatdata" / "489830"
+            prefix.mkdir(parents=True)
+            proc = root / "proc"
+            proc.mkdir()
+            zombie = proc / "4321"
+            zombie.mkdir()
+            (zombie / "cmdline").write_bytes(
+                b"Z:\\\\ModOrganizer.exe\\0--instance\\0Skyrim\\0"
+            )
+            (zombie / "environ").write_bytes(
+                f"STEAM_COMPAT_DATA_PATH={prefix}".encode() + bytes([0])
+            )
+            (zombie / "stat").write_text("4321 (ModOrganizer.exe) Z 1 0 0 0 0 0")
+
+            result = process_monitor.detect_mo2_processes(prefix, proc)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["processes"], [])
+
+    def test_live_mo2_process_is_still_detected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "compatdata" / "489830"
+            prefix.mkdir(parents=True)
+            proc = root / "proc"
+            proc.mkdir()
+            live = proc / "4322"
+            live.mkdir()
+            (live / "cmdline").write_bytes(
+                b"Z:\\\\ModOrganizer.exe\\0--instance\\0Skyrim\\0"
+            )
+            (live / "environ").write_bytes(
+                f"STEAM_COMPAT_DATA_PATH={prefix}".encode() + bytes([0])
+            )
+            (live / "stat").write_text("4322 (ModOrganizer.exe) S 1 0 0 0 0 0")
+
+            result = process_monitor.detect_mo2_processes(prefix, proc)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual([item["pid"] for item in result["processes"]], [4322])
 
 
 class OpenMo2ActionTests(unittest.TestCase):
