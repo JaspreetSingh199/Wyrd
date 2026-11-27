@@ -14,6 +14,76 @@ from launch_log_diagnostics import read_launch_diagnostics, classify_launch_diag
 
 
 class ProcessMonitorWorkflowMixin:
+    def _refresh_session_ui_status(self) -> None:
+        """Show a compact, live view of MO2 and Skyrim process state."""
+        if not hasattr(self, "session_status_label"):
+            return
+
+        pending = getattr(self, "_steam_launch_pending", None)
+        launch_waiting = getattr(self, "_mo2_launch_wait_pending", None)
+        session = self.launch_session
+        prefix = (
+            Path(session.prefix_root) if session.prefix_root else
+            _steam_prefix_for_game_path(self.game_state.get("game_dir"))
+        )
+
+        if pending is not None:
+            status, detail, state_name = (
+                "Opening Steam",
+                "Waiting for Steam before handing the launch to MO2.",
+                "active",
+            )
+        elif session.state in {"handoff", "waiting", "unknown"} or launch_waiting is not None:
+            mo2_scan = detect_mo2_processes(prefix) if prefix else {"ok": False, "processes": []}
+            mo2_running = bool(mo2_scan.get("ok") and mo2_scan.get("processes"))
+            if mo2_running:
+                status = "MO2 running"
+                detail = "Mod Organizer is open; waiting for Skyrim to start."
+            else:
+                status = "Launching MO2"
+                detail = "Waiting for Mod Organizer to appear in Skyrim's Proton prefix."
+            state_name = "active"
+        elif session.state == "detected" and any(
+            process.matches_current_process() for process in session.game_processes
+        ):
+            status = "Skyrim running"
+            detail = f"{session.executable_title or 'Skyrim'} is running through MO2."
+            state_name = "running"
+        elif session.state == "game-exited":
+            status = "Exited"
+            detail = "Skyrim has closed. You can launch it again when ready."
+            state_name = "idle"
+        elif session.state in {"failed", "timeout"}:
+            status = "Launch failed"
+            detail = "The last launch did not reach a confirmed game process. Check Launch Diagnostics."
+            state_name = "failed"
+        else:
+            mo2_scan = detect_mo2_processes(prefix) if prefix else {"ok": False, "processes": []}
+            mo2_running = bool(mo2_scan.get("ok") and mo2_scan.get("processes"))
+            game_scan = detect_skyrim_processes(prefix) if prefix else {"ok": False, "processes": []}
+            game_processes = [
+                item for item in game_scan.get("processes", [])
+                if item.get("prefix_attributed")
+            ] if game_scan.get("ok") else []
+            if game_processes:
+                status = "Skyrim running"
+                detail = "Skyrim/SKSE is running in the detected Skyrim Steam prefix."
+                state_name = "running"
+            elif mo2_running:
+                status = "MO2 running"
+                detail = "Mod Organizer is open in Skyrim's Steam prefix."
+                state_name = "running"
+            else:
+                status = "Idle"
+                detail = "No MO2 or Skyrim process detected in the selected Skyrim prefix."
+                state_name = "idle"
+
+        self.session_status_label.setText(status)
+        self.session_status_label.setProperty("sessionState", state_name)
+        self.session_detail_label.setText(detail)
+        self.session_status_label.style().unpolish(self.session_status_label)
+        self.session_status_label.style().polish(self.session_status_label)
+
     def _stop_launch_monitor(self, reason: str | None = None) -> None:
         if self._launch_monitor.isActive():
             self._launch_monitor.stop()
