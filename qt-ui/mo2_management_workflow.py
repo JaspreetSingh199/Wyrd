@@ -146,6 +146,21 @@ class Mo2ManagementWorkflowMixin:
             getattr(self, "_mo2_session_timer", None) is not None
             and self._mo2_session_timer.isActive()
         )
+        # The user may click again in the small window before the next Qt
+        # timer tick notices that MO2 has closed. Reconcile a previously-seen
+        # session synchronously instead of reporting a stale "already opening".
+        if active_session and getattr(self, "_mo2_session_seen", False):
+            previous_prefix = getattr(self, "_mo2_session_prefix", None)
+            if previous_prefix is not None:
+                current = detect_mo2_processes(previous_prefix)
+                if current.get("ok") and not current.get("processes"):
+                    self._mo2_session_timer.stop()
+                    self._mo2_session_prefix = None
+                    self._mo2_session_seen = False
+                    self._mo2_session_loader_active = False
+                    self._mo2_session_launch_token = None
+                    self._log("MO2 was closed before the next session poll; cleared stale session state.")
+                    active_session = False
         if active_session:
             QMessageBox.information(
                 self, "MO2 already opening",
