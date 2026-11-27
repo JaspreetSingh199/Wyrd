@@ -310,15 +310,21 @@ class EnvironmentWorkflowMixin:
             and self.mo2_discovery_state.get("ok")
         )
         busy = bool(self.worker and self.worker.isRunning())
-        ready = bool(
-            self.startup_checks_complete
-            and self.game_state.get("found")
-            and launch_executable_verified
-            and instances
-            and proton
-            and mapping_ok
-            and not busy
-        )
+        # The row-level check also verifies that this exact instance has a
+        # resolvable Skyrim/SKSE executable. A global environment pass alone
+        # is not enough to enable a particular instance's launch button.
+        launch_reasons = [
+            (item, self.mo2_launch_block_reason(item)) for item in instances
+        ]
+        ready = any(reason is None for _item, reason in launch_reasons)
+        blocked = [
+            f"{item.get('name', 'Unnamed instance')}: {reason}"
+            for item, reason in launch_reasons if reason
+        ]
+        if blocked:
+            detail += "\\nLaunch readiness: " + " | ".join(blocked)
+        elif ready:
+            detail += "\\nAt least one Skyrim instance has a verified launch target."
         self.active_instance_label.setText(detail)
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
