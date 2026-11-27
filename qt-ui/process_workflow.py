@@ -33,7 +33,8 @@ class ProcessMonitorWorkflowMixin:
                 "Waiting for Steam before handing the launch to MO2.",
                 "active",
             )
-        elif session.state in {"handoff", "waiting", "unknown"} or launch_waiting is not None:
+        elif (session.state in {"handoff", "waiting"} or launch_waiting is not None
+              or (session.state == "unknown" and self._launch_monitor.isActive())):
             mo2_scan = detect_mo2_processes(prefix) if prefix else {"ok": False, "processes": []}
             mo2_running = bool(mo2_scan.get("ok") and mo2_scan.get("processes"))
             if mo2_running:
