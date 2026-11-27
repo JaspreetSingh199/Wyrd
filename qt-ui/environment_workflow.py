@@ -323,6 +323,50 @@ class EnvironmentWorkflowMixin:
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
 
+    def mo2_launch_block_reason(self, instance: dict) -> str | None:
+        """Explain the first failed safety/readiness check for one instance."""
+        if not instance.get("is_skyrim_se"):
+            return "This MO2 instance is not configured for the detected Skyrim SE installation."
+        if not self.startup_checks_complete:
+            return "Environment scan is still running. Wait for it to finish or refresh."
+        if not self.game_state.get("found"):
+            return "Skyrim Special Edition was not detected."
+        installation = self.instance_state.get("installation", {}) or {}
+        executable_verified = bool(
+            (self.mo2_state.get("installed") and self.mo2_state.get("executable"))
+            or (installation.get("installed") and installation.get("executable"))
+        )
+        if not executable_verified:
+            return self.mo2_state.get("message") or installation.get(
+                "message", "A verified ModOrganizer.exe was not found."
+            )
+        if not self.proton_combo.currentData():
+            return "No compatible Proton runtime is selected."
+        discovery = getattr(self, "mo2_discovery_state", None)
+        if not discovery or not discovery.get("ok"):
+            return (discovery or {}).get(
+                "message", "MO2's Skyrim Steam-drive mapping has not been verified. Refresh the environment."
+            )
+        if self.worker and self.worker.isRunning():
+            return "Another Wyrd setup or installation task is running."
+        try:
+            from mo2_targets import inspect_skyrim_launch_targets
+            game_path = Path(self.game_state["game_dir"]).expanduser()
+            prefix = Path(self.mo2_state["prefix"])
+            install_root = Path(self.mo2_state["install"])
+            targets = inspect_skyrim_launch_targets(
+                prefix, game_path, instance_name=instance.get("name"),
+                install_root=install_root,
+                require_managed=bool(self.mo2_state.get("managed", True)),
+            )
+            if not targets.get("ok") or not targets.get("targets"):
+                return targets.get(
+                    "message", "No verified Skyrim/SKSE executable is configured in this MO2 instance."
+                )
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            return f"Could not verify this instance's launch target: {error}"
+        return None
+
     def manage_mo2_library(self) -> None:
         """Refresh the read-only MO2 inventory widgets from the current scan."""
         saved_game = self.game_state.get("game_dir", "")
