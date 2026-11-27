@@ -351,8 +351,8 @@ QTabWidget#mainTabs::pane { border: none; background: transparent; padding: 0; }
 QTabWidget#logsTabs::pane { background: #19252b; border: 1px solid #536068; border-radius: 8px; padding: 8px; }
 QFrame#interactionOverlay { background: rgba(5, 10, 13, 188); border: none; }
 QFrame#interactionOverlayCard { background: #1b2a31; border: 1px solid #b09666; border-radius: 12px; }
-QLabel#interactionOverlayTitle { color: #f0e5ce; font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 21px; font-weight: 700; }
-QLabel#interactionOverlayDetail { color: #d0c9b9; font-size: 13px; line-height: 1.4; }
+QLabel#interactionOverlayTitle { color: #f0e5ce; font-family: "Noto Serif", "DejaVu Serif", serif; font-size: 21px; font-weight: 700; padding: 2px 0; }
+QLabel#interactionOverlayDetail { color: #d0c9b9; font-size: 13px; padding: 2px 8px; }
 
 QLabel#instanceSectionTitle {
     color: #e6ddca; font-family: "Noto Serif", "DejaVu Serif", serif;
