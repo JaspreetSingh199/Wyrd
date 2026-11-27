@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
-    QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QWidget, QScrollArea,
+    QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QWidget, QScrollArea, QTabWidget,
 )
 from mo2_library_dialog import Mo2LibraryDialog
 from ui_components import add_info_button, panel
@@ -249,21 +249,72 @@ class MainWindowPagesMixin:
         logs_layout = QVBoxLayout(logs_page)
         logs_layout.setContentsMargins(12, 16, 12, 12)
         logs_layout.setSpacing(12)
-        logs_panel = panel(
-            "WYRD LOGS",
-            "Live detection, installation and launch messages. Entries are kept for this application session."
+        self.logs_tabs = QTabWidget()
+
+        application_page = QWidget()
+        application_layout = QVBoxLayout(application_page)
+        application_layout.setContentsMargins(8, 8, 8, 8)
+        application_panel = panel(
+            "APPLICATION ACTIVITY",
+            "Wyrd detection, installation, settings and application errors. Session-only, newest entries at the bottom."
         )
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setMaximumBlockCount(400)
+        self.log_view.setMaximumBlockCount(1000)
         self.log_view.setPlaceholderText("Wyrd messages will appear here as you use the application.")
-        self.log_view.setMinimumHeight(300)
-        logs_panel.layout().addWidget(self.log_view, 1)
-        logs_layout.addWidget(logs_panel, 1)
+        application_panel.layout().addWidget(self.log_view, 1)
+        application_layout.addWidget(application_panel, 1)
+        self.logs_tabs.addTab(application_page, "Application")
+
+        launch_page = QWidget()
+        launch_layout = QVBoxLayout(launch_page)
+        launch_layout.setContentsMargins(8, 8, 8, 8)
+        launch_panel = panel(
+            "STEAMCOMPAT LAUNCH",
+            "Persistent output from the MO2 to Proton to Skyrim launch handoff."
+        )
+        launch_header = QHBoxLayout()
+        launch_header.addStretch(1)
+        self.refresh_launch_logs_button = QPushButton("Refresh")
+        self.refresh_launch_logs_button.setObjectName("secondaryAction")
+        self.refresh_launch_logs_button.clicked.connect(self.refresh_launch_log_view)
+        launch_header.addWidget(self.refresh_launch_logs_button)
+        launch_panel.layout().addLayout(launch_header)
+        self.launch_log_view = QPlainTextEdit()
+        self.launch_log_view.setReadOnly(True)
+        self.launch_log_view.setMaximumBlockCount(3000)
+        self.launch_log_view.setPlaceholderText("The persistent Skyrim launch log will appear here.")
+        launch_panel.layout().addWidget(self.launch_log_view, 1)
+        launch_layout.addWidget(launch_panel, 1)
+        self.logs_tabs.addTab(launch_page, "Launch")
+
+        system_page = QWidget()
+        system_layout = QVBoxLayout(system_page)
+        system_layout.setContentsMargins(8, 8, 8, 8)
+        system_panel = panel(
+            "SYSTEM SNAPSHOT",
+            "Read-only host memory and Wine / Proton process inventory. This is a diagnostic snapshot, not a complete system journal."
+        )
+        system_header = QHBoxLayout()
+        system_header.addStretch(1)
+        self.refresh_system_logs_button = QPushButton("Refresh snapshot")
+        self.refresh_system_logs_button.setObjectName("secondaryAction")
+        self.refresh_system_logs_button.clicked.connect(self.refresh_system_log_view)
+        system_header.addWidget(self.refresh_system_logs_button)
+        system_panel.layout().addLayout(system_header)
+        self.system_log_view = QPlainTextEdit()
+        self.system_log_view.setReadOnly(True)
+        self.system_log_view.setMaximumBlockCount(500)
+        self.system_log_view.setPlaceholderText("Refresh to inspect current host memory and Wine / Proton processes.")
+        system_panel.layout().addWidget(self.system_log_view, 1)
+        system_layout.addWidget(system_panel, 1)
+        self.logs_tabs.addTab(system_page, "System")
+
+        logs_layout.addWidget(self.logs_tabs, 1)
         logs_scroll = QScrollArea()
         logs_scroll.setWidgetResizable(True)
         logs_scroll.setFrameShape(QFrame.Shape.NoFrame)
         logs_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         logs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         logs_scroll.setWidget(logs_page)
-        self.tabs.addTab(logs_scroll, "LOGS")
+
