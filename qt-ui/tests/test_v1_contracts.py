@@ -30,7 +30,7 @@ class WyrdV1ContractTests(unittest.TestCase):
 
         prefix = steam_compat_prefix(steam_root)
         (prefix / "pfx/drive_c/users/steamuser").mkdir(parents=True)
-        install = prefix / "pfx/drive_c/Modding/MO2"
+        install = prefix / "pfx/drive_c/Modding/Skyrim SE"
         install.mkdir(parents=True)
         (install / "ModOrganizer.exe").write_bytes(b"MO2 fixture")
 
