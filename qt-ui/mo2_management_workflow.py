@@ -146,20 +146,29 @@ class Mo2ManagementWorkflowMixin:
             getattr(self, "_mo2_session_timer", None) is not None
             and self._mo2_session_timer.isActive()
         )
-        # The user may click again in the small window before the next Qt
-        # timer tick notices that MO2 has closed. Reconcile a previously-seen
-        # session synchronously instead of reporting a stale "already opening".
-        if active_session and getattr(self, "_mo2_session_seen", False):
+        # Reconcile the process table on every click, including sessions where
+        # MO2 was never detected. The old guard only handled _seen=True, leaving
+        # an undetected launch pending for the full 120-second startup timeout.
+        if active_session:
             previous_prefix = getattr(self, "_mo2_session_prefix", None)
             if previous_prefix is not None:
                 current = detect_mo2_processes(previous_prefix)
-                if current.get("ok") and not current.get("processes"):
+                seen = getattr(self, "_mo2_session_seen", False)
+                polls = int(getattr(self, "_mo2_session_polls", 0) or 0)
+                # Give Proton up to 45 seconds to start MO2. After that, an
+                # empty, successfully-read process scan is stale regardless of
+                # whether the detector ever observed the GUI process.
+                stale_undetected_start = not seen and polls >= 30
+                if current.get("ok") and not current.get("processes") and (seen or stale_undetected_start):
                     self._mo2_session_timer.stop()
                     self._mo2_session_prefix = None
                     self._mo2_session_seen = False
+                    self._mo2_session_polls = 0
                     self._mo2_session_loader_active = False
                     self._mo2_session_launch_token = None
-                    self._log("MO2 was closed before the next session poll; cleared stale session state.")
+                    self._mo2_session_wrapper_pid = None
+                    reason = "MO2 process exited" if seen else "MO2 process was never detected after startup grace period"
+                    self._log(f"{reason}; cleared stale session state before a new Open MO2 request.")
                     active_session = False
         if active_session:
             QMessageBox.information(
