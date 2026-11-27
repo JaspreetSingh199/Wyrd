@@ -136,6 +136,42 @@ QLabel#launchBlocked {
     letter-spacing: .4px;
 }
 
+QLabel#sessionHeading {
+    color: #c8b995;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding-right: 4px;
+}
+QLabel#sessionStatus {
+    color: #d7d2c6;
+    background: #263137;
+    border: 1px solid #657078;
+    border-radius: 5px;
+    padding: 5px 9px;
+    font-size: 11px;
+    font-weight: 700;
+}
+QLabel#sessionStatus[sessionState="active"] {
+    color: #ead6a8;
+    background: #393326;
+    border-color: #8d7952;
+}
+QLabel#sessionStatus[sessionState="running"] {
+    color: #c5dfb5;
+    background: #26372d;
+    border-color: #66835f;
+}
+QLabel#sessionStatus[sessionState="failed"] {
+    color: #edc0ad;
+    background: #3b2926;
+    border-color: #986253;
+}
+QLabel#sessionDetail {
+    color: #c2c1b8;
+    font-size: 12px;
+}
+
 QComboBox, QLineEdit {
     background: #1b2225;
     color: #e0ddd4;
