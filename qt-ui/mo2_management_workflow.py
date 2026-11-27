@@ -6,6 +6,7 @@ import time
 import uuid
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox, QInputDialog
 
 from proton_runtime import _steam_root_for_game, _runtime_environment
@@ -19,6 +20,7 @@ from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
 from process_monitor import detect_mo2_processes, snapshot_wyrd_session
 from proton_runtime import managed_paths
+from steam_client import activate_steam_client, steam_client_status
 
 
 class Mo2ManagementWorkflowMixin:
@@ -48,7 +50,94 @@ class Mo2ManagementWorkflowMixin:
             )
             if not accepted or not instance_name:
                 return
-        self.launch_mo2_gui(instance_name=instance_name)
+        # Opening MO2 is a Steam-dependent desktop action. Start Steam if
+        # needed, wait for its client/UI helper to become ready, then open MO2
+        # only. This deliberately does not invoke the Skyrim launch workflow.
+        if getattr(self, "_steam_launch_pending", None) or getattr(self, "_mo2_steam_launch_pending", None):
+            QMessageBox.information(
+                self, "Steam is starting",
+                "Wyrd is already waiting for Steam to become ready. Please wait for that action to finish.",
+            )
+            return
+        steam_result = activate_steam_client()
+        if not steam_result.get("ok"):
+            message = steam_result.get("message", "Could not open Steam.")
+            self._log("Open MO2 blocked: " + message)
+            QMessageBox.warning(self, "Steam unavailable", message)
+            return
+
+        self._mo2_steam_launch_pending = {
+            "instance_name": instance_name,
+            "attempts": 0,
+            "ready_streak": 0,
+            "last_status": None,
+        }
+        self._show_launch_loader(
+            "Opening Steam…",
+            "Waiting for Steam to finish starting before opening Mod Organizer.",
+        )
+        if not hasattr(self, "_mo2_steam_wait_timer"):
+            self._mo2_steam_wait_timer = QTimer(self)
+            self._mo2_steam_wait_timer.setInterval(1000)
+            self._mo2_steam_wait_timer.timeout.connect(self._poll_steam_before_mo2_open)
+        self._log(
+            "Steam client activation requested for Open MO2 "
+            f"(bootstrap PID {steam_result.get('pid', 'unknown')}); waiting for Steam UI readiness."
+        )
+        self.progress_label.setText("Opening Steam… waiting for its client and UI helper before opening MO2.")
+        self._mo2_steam_wait_timer.start()
+
+    def _poll_steam_before_mo2_open(self) -> None:
+        """Wait for Steam readiness, then open MO2 without launching Skyrim."""
+        pending = getattr(self, "_mo2_steam_launch_pending", None)
+        if not pending:
+            if getattr(self, "_mo2_steam_wait_timer", None) is not None:
+                self._mo2_steam_wait_timer.stop()
+            return
+
+        pending["attempts"] += 1
+        status = steam_client_status()
+        if not status.get("ok"):
+            self._mo2_steam_wait_timer.stop()
+            self._mo2_steam_launch_pending = None
+            message = status.get("message", "Could not inspect Steam client readiness.")
+            self._log("Open MO2 blocked: " + message)
+            self._close_launch_loader("Steam status unavailable", message)
+            QMessageBox.warning(self, "Steam status unavailable", message)
+            self.progress_label.setText("Steam status could not be verified; MO2 was not launched.")
+            return
+
+        status_message = status.get("message", "Checking Steam client status.")
+        self._update_launch_loader(
+            "Opening Steam…",
+            f"{status_message} ({pending['attempts']}/120)",
+        )
+        if status_message != pending["last_status"]:
+            self._log("Open MO2: " + status_message)
+            pending["last_status"] = status_message
+
+        pending["ready_streak"] = pending["ready_streak"] + 1 if status.get("ready") else 0
+        if pending["ready_streak"] >= 2:
+            self._mo2_steam_wait_timer.stop()
+            self._mo2_steam_launch_pending = None
+            instance_name = pending["instance_name"]
+            self._log("Steam is ready. Opening the selected MO2 instance without launching Skyrim.")
+            self.progress_label.setText("Steam is ready; opening MO2…")
+            self._close_launch_loader("Steam ready", "Opening the selected Mod Organizer instance.")
+            QTimer.singleShot(0, lambda name=instance_name: self.launch_mo2_gui(instance_name=name))
+            return
+
+        if pending["attempts"] >= 120:
+            self._mo2_steam_wait_timer.stop()
+            self._mo2_steam_launch_pending = None
+            message = (
+                "Steam did not become ready within 120 seconds. MO2 was not launched. "
+                "Open Steam manually, wait for its Library to finish loading, then retry."
+            )
+            self._log(message)
+            self._close_launch_loader("Steam startup timed out", message)
+            QMessageBox.warning(self, "Steam startup timed out", message)
+            self.progress_label.setText("Steam startup timed out; MO2 was not launched.")
 
     def reset_managed_mo2(self) -> None:
         """Remove only Wyrd-owned MO2 files; never reset Steam's Skyrim prefix."""
