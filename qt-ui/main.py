@@ -75,6 +75,9 @@ class MainWindow(
         self._mo2_session_prefix: Path | None = None
         self._mo2_session_seen = False
         self._mo2_session_polls = 0
+        self._session_ui_timer = QTimer(self)
+        self._session_ui_timer.setInterval(1500)
+        self._session_ui_timer.timeout.connect(self._refresh_session_ui_status)
         self._logs_refresh_timer = QTimer(self)
         self._logs_refresh_timer.setInterval(1000)
         self._logs_refresh_timer.timeout.connect(self.refresh_launch_log_view)
@@ -158,6 +161,8 @@ class MainWindow(
         root_layout.addWidget(content_root, 1)
 
         self._build_pages(outer)
+        self._session_ui_timer.start()
+        QTimer.singleShot(0, self._refresh_session_ui_status)
 
         self.setCentralWidget(root)
         self._update_active_instance_from_scan()
@@ -320,6 +325,7 @@ class MainWindow(
         self._stop_launch_monitor("application is closing")
         self._game_watch_timer.stop()
         self._mo2_session_timer.stop()
+        self._session_ui_timer.stop()
         if self.worker and self.worker.isRunning():
             QMessageBox.information(
                 self, "Setup is running",
