@@ -16,8 +16,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import steam_mo2_launch
 import steam_game_registry
+import steam_client
 from steam_prefix import steam_compat_prefix
 from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
+
+
+class SteamClientActivationTests(unittest.TestCase):
+    def test_explicit_activation_opens_steam_without_launching_a_game(self):
+        with (
+            patch.object(steam_client.shutil, "which", return_value="/usr/bin/steam"),
+            patch.object(steam_client.subprocess, "Popen") as popen,
+        ):
+            popen.return_value.pid = 1234
+            result = steam_client.activate_steam_client()
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(popen.call_args.args[0], ["/usr/bin/steam"])
+        self.assertNotIn("-applaunch", popen.call_args.args[0])
+        self.assertEqual(result["pid"], 1234)
+
+    def test_missing_steam_command_fails_without_starting_a_process(self):
+        with (
+            patch.object(steam_client.shutil, "which", return_value=None),
+            patch.object(steam_client.subprocess, "Popen") as popen,
+        ):
+            result = steam_client.activate_steam_client()
+
+        self.assertFalse(result["ok"])
+        popen.assert_not_called()
 
 
 class WyrdV1ContractTests(unittest.TestCase):
