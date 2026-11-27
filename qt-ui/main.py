@@ -7,7 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QResizeEvent, QThread, QTimer, Qt
+from PySide6.QtCore import QCoreApplication, QPropertyAnimation, QThread, QTimer, Qt
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
     QVBoxLayout, QWidget, QTabWidget, QFrame,
