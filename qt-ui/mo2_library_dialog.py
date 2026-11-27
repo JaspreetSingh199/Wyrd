@@ -258,7 +258,8 @@ class Mo2LibraryDialog(QFrame):
         launch_action()
 
     def _open_mo2(self, instance_name: str) -> None:
-        launch = getattr(self._owner_window, "launch_mo2_gui", None)
+        """Use the same Steam startup/readiness gate as the Open MO2 action."""
+        launch = getattr(self._owner_window, "open_mo2_instance", None)
         if callable(launch):
             launch(instance_name=instance_name)
 
