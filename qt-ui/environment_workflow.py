@@ -157,7 +157,6 @@ class EnvironmentWorkflowMixin:
     def _finalize_environment_readiness(self) -> None:
         """Restore selection, refresh panels, and derive final launch readiness."""
         self._set_scan_progress(92, "Finalizing environment readiness…")
-        self._refresh_audio_status()
         ready = bool(self.game_state.get("found") and self.proton_builds)
         self.install_button.setEnabled(
             ready
@@ -181,7 +180,7 @@ class EnvironmentWorkflowMixin:
         active_ready = bool(getattr(self, 'active_launch_ready', False))
         self._update_precheck(
             4, "Detected MO2 environment", active_ready,
-            self.active_instance_label.text(),
+            getattr(self, "_active_instance_summary", "MO2 launch readiness was not established."),
         )
         self.precheck_progress.setFormat("")
         self._set_scan_progress(100, "Environment scan complete.")
@@ -291,24 +290,6 @@ class EnvironmentWorkflowMixin:
             discovered_installation.get("installed")
             and discovered_installation.get("executable")
         )
-        if not self.game_state.get("found"):
-            detail = "Skyrim Special Edition has not been detected."
-        elif not launch_executable_verified:
-            if instances:
-                names = ", ".join(item.get("name", "Unnamed instance") for item in instances)
-                detail = (
-                    f"Discovered {len(instances)} Skyrim MO2 instance(s): {names}. "
-                    "The MO2 executable is not verified, so modded launch is unavailable."
-                )
-            else:
-                detail = self.instance_state.get(
-                    "message", "No MO2 instance or verified MO2 installation was found."
-                )
-        elif instances:
-            names = ", ".join(item.get("name", "Unnamed instance") for item in instances)
-            detail = f"Automatically discovered {len(instances)} Skyrim MO2 instance(s): {names}"
-        else:
-            detail = "MO2 is installed, but no Skyrim Special Edition instance was found. Create one in MO2, then refresh."
         # The row-level check also verifies that this exact instance has a
         # resolvable Skyrim/SKSE executable. A global environment pass alone
         # is not enough to enable a particular instance's launch button.
@@ -324,7 +305,11 @@ class EnvironmentWorkflowMixin:
             detail += "\nLaunch readiness: " + " | ".join(blocked)
         elif ready:
             detail += "\nAt least one Skyrim instance has a verified launch target."
-        self.active_instance_label.setText(detail)
+        self._active_instance_summary = (
+            f"{len(instances)} Skyrim instance(s) discovered; "
+            + ("at least one has a verified launch target." if ready
+               else "none currently has a verified launch target.")
+        )
         self.active_launch_ready = ready
         self.mo2_library_widget.set_launch_ready(ready)
 
