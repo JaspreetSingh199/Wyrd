@@ -31,6 +31,36 @@ class MainWindowPagesMixin:
         hero_layout.addWidget(hero_subtitle)
         setup_layout.addWidget(hero_banner)
 
+        # Persistent launch activity card. Unlike the general setup progress
+        # panel, environment refreshes must not hide this while Steam/Proton run.
+        self.launch_loader_panel = QFrame()
+        self.launch_loader_panel.setObjectName("launchLoaderPanel")
+        launch_loader_layout = QVBoxLayout(self.launch_loader_panel)
+        launch_loader_layout.setContentsMargins(16, 12, 16, 12)
+        launch_loader_layout.setSpacing(7)
+        launch_loader_header = QHBoxLayout()
+        self.launch_loader_heading = QLabel("LAUNCHING SKYRIM")
+        self.launch_loader_heading.setObjectName("section")
+        launch_loader_header.addWidget(self.launch_loader_heading, 1)
+        self.launch_loader_elapsed = QLabel("Elapsed 00:00")
+        self.launch_loader_elapsed.setObjectName("muted")
+        launch_loader_header.addWidget(self.launch_loader_elapsed)
+        launch_loader_layout.addLayout(launch_loader_header)
+        self.launch_loader_detail = QLabel(
+            "Wyrd will show each step while Steam, MO2 and Skyrim start."
+        )
+        self.launch_loader_detail.setObjectName("muted")
+        self.launch_loader_detail.setWordWrap(True)
+        launch_loader_layout.addWidget(self.launch_loader_detail)
+        self.launch_loader_progress = QProgressBar()
+        self.launch_loader_progress.setRange(0, 0)
+        self.launch_loader_progress.setTextVisible(False)
+        self.launch_loader_progress.setMinimumHeight(9)
+        self.launch_loader_progress.setMaximumHeight(9)
+        launch_loader_layout.addWidget(self.launch_loader_progress)
+        self.launch_loader_panel.hide()
+        setup_layout.addWidget(self.launch_loader_panel)
+
         self.precheck_panel = QFrame()
         self.precheck_panel.setObjectName("statusPanel")
         precheck_layout = QVBoxLayout(self.precheck_panel)
