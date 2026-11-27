@@ -52,29 +52,33 @@ release-bundle job remains enabled. Re-enable the test job by setting that
 repository variable after the refactor is ready for verification.
 
 
-## Standalone Linux build (AppImage)
 
-Wyrd can be distributed as a self-contained x86_64 AppImage. The AppImage bundles
-the Python runtime, PySide6 and Qt libraries; users do not need to create a
-virtual environment or install Python packages.
+## Standalone Linux executable
 
-Download `Wyrd-x86_64.AppImage` from the GitHub Actions artifact or a published
-release, then run:
+The release workflow builds a single-file x86_64 Linux executable with PyInstaller
+and publishes it inside `Wyrd-linux-x86_64.zip`.
+
+1. Download and extract the ZIP.
+2. Open the extracted `Wyrd-linux-x86_64` directory.
+3. Run:
 
 ~~~bash
-chmod +x Wyrd-x86_64.AppImage
-./Wyrd-x86_64.AppImage
+chmod +x Wyrd
+./Wyrd
 ~~~
 
-The AppImage packages Wyrd itself, not the user's gaming environment. Steam,
-the selected Proton runtime, Skyrim Special Edition, and any external archive
-utilities remain host-installed dependencies. Wyrd continues to discover the
-user's existing Steam libraries, Proton installations, MO2 instances, settings
-and AppID 489830 prefix in their normal locations. The bundle does not contain,
-copy, reset or relocate game data or saves.
+Python, PySide6 and the Qt application runtime are bundled. Wyrd does not bundle
+Steam, Proton, Skyrim Special Edition, MO2, or external archive utilities; those
+remain host-installed dependencies. The executable uses the user's existing
+Steam libraries, Proton installations, MO2 data and Skyrim AppID 489830
+compatdata prefix in their normal locations. It does not relocate game data,
+reset the prefix, or move saves.
 
-The AppImage build is defined by `qt-ui/Wyrd.spec` and
-`.github/workflows/appimage.yml`. It runs on Ubuntu 22.04 and publishes an
-x86_64 AppImage artifact for 30 days. Use the workflow's manual dispatch to
-build on demand, or push a packaging/application change to
-`feature/mo2-environments`.
+The binary targets x86_64 Linux with glibc. Compatible host graphics,
+display-server and system libraries are still required. This is a standalone
+application executable, not a fully static Linux binary.
+
+The build is defined by `qt-ui/Wyrd.spec` and
+`.github/workflows/standalone.yml`. Pushes to `main` that change application
+or packaging files trigger a build; it can also be started manually from
+GitHub Actions. The workflow uploads the ZIP artifact for 30 days.
