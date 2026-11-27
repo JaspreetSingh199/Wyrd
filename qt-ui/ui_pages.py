@@ -96,7 +96,7 @@ class MainWindowPagesMixin:
         configuration_grid = QGridLayout()
         configuration_grid.setHorizontalSpacing(12)
         configuration_grid.setVerticalSpacing(12)
-        self.game_panel = panel("SKYRIM", "Detecting your Steam installation…")
+        self.game_panel = panel("SKYRIM SPECIAL EDITION", "Detecting your Steam installation…")
         configuration_grid.addWidget(self.game_panel, 0, 0)
 
         runtime_panel = QFrame()
