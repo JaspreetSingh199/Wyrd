@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QListWidget,
+    QHBoxLayout, QVBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QPushButton, QVBoxLayout, QWidget, QFrame, QComboBox,
 )
 
@@ -51,9 +51,15 @@ class Mo2LibraryDialog(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(10)
-        heading = QLabel("SKYRIM ENVIRONMENTS")
-        heading.setObjectName("section")
-        layout.addWidget(heading)
+        heading_row = QHBoxLayout()
+        heading = QLabel("MO2 Instances")
+        heading.setObjectName("instanceSectionTitle")
+        heading_row.addWidget(heading)
+        self.instance_count = QLabel("0 Instances")
+        self.instance_count.setObjectName("instanceCount")
+        heading_row.addWidget(self.instance_count)
+        heading_row.addStretch(1)
+        layout.addLayout(heading_row)
         self.setup_status = QLabel("MO2 instances are discovered automatically.")
         self.setup_status.setObjectName("muted")
         self.setup_status.setWordWrap(True)
@@ -70,19 +76,32 @@ class Mo2LibraryDialog(QFrame):
         )
         self.launch_mo2_button.clicked.connect(self._open_mo2)
         actions.addWidget(self.launch_mo2_button)
-        self.launch_unmodded_button = QPushButton("Launch Unmodded")
-        self.launch_unmodded_button.setToolTip(
-            "Launch Skyrim directly through Steam without MO2 or mods."
-        )
-        self.launch_unmodded_button.clicked.connect(self._launch_unmodded)
-        actions.addWidget(self.launch_unmodded_button)
         actions.addStretch(1)
         layout.addLayout(actions)
 
         self.instances = QListWidget()
+        self.instances.setObjectName("mo2Instances")
         self.instances.setMinimumHeight(90)
         self.instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self.instances)
+        unmodded_panel = QFrame()
+        unmodded_panel.setObjectName("unmoddedLaunchPanel")
+        unmodded_row = QHBoxLayout(unmodded_panel)
+        unmodded_row.setContentsMargins(18, 12, 18, 12)
+        steam_mark = QLabel("◉")
+        steam_mark.setObjectName("steamMark")
+        unmodded_row.addWidget(steam_mark)
+        unmodded_title = QLabel("Unmodded Launch")
+        unmodded_title.setObjectName("unmoddedTitle")
+        unmodded_row.addWidget(unmodded_title)
+        self.launch_unmodded_button = QPushButton("▶  Launch Skyrim (Steam)")
+        self.launch_unmodded_button.setObjectName("secondaryAction")
+        self.launch_unmodded_button.clicked.connect(self._launch_unmodded)
+        unmodded_row.addWidget(self.launch_unmodded_button)
+        unmodded_description = QLabel("Launch directly through Steam, without MO2.")
+        unmodded_description.setObjectName("muted")
+        unmodded_row.addWidget(unmodded_description, 1)
+        layout.addWidget(unmodded_panel)
         self._launch_ready = False
 
     def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
@@ -116,12 +135,39 @@ class Mo2LibraryDialog(QFrame):
             row = QFrame()
             row.setObjectName("mo2InstanceRow")
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(8, 5, 8, 5)
-            row_layout.setSpacing(8)
+            row_layout.setContentsMargins(10, 8, 10, 8)
+            row_layout.setSpacing(14)
 
-            launch = QPushButton("Launch Modded")
+            artwork = QFrame()
+            artwork.setObjectName("instanceArtwork")
+            artwork.setFixedSize(188, 112)
+            artwork_layout = QVBoxLayout(artwork)
+            artwork_layout.setContentsMargins(10, 8, 10, 8)
+            artwork_mark = QLabel("ᛉ")
+            artwork_mark.setObjectName("instanceArtworkMark")
+            artwork_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            artwork_layout.addWidget(artwork_mark, 1)
+            artwork_caption = QLabel("THE ELDER SCROLLS")
+            artwork_caption.setObjectName("instanceArtworkCaption")
+            artwork_caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            artwork_layout.addWidget(artwork_caption)
+            row_layout.addWidget(artwork)
+
+            details_column = QVBoxLayout()
+            details_column.setSpacing(6)
+            name = QLabel(instance.get("name") or "Unnamed MO2 instance")
+            name.setObjectName("instanceName")
+            details_column.addWidget(name)
+            profile_name = instance.get("selected_profile") or "No profile selected"
+            mode = "Portable instance" if instance.get("portable") else "MO2 instance"
+            meta = QLabel(f"◈  {mode}    ·    Profile: {profile_name}")
+            meta.setObjectName("instanceMeta")
+            details_column.addWidget(meta)
+
+            action_row = QHBoxLayout()
+            launch = QPushButton("▶  Launch Modded")
             launch.setObjectName("primaryAction")
-            launch.setMinimumHeight(38)
+            launch.setMinimumHeight(42)
             reason_getter = getattr(self._owner_window, "mo2_launch_block_reason", None)
             block_reason = (
                 reason_getter(instance) if callable(reason_getter)
@@ -129,40 +175,36 @@ class Mo2LibraryDialog(QFrame):
                       else "Wyrd's environment checks have not marked modded launch ready.")
             )
             launch.setEnabled(block_reason is None)
-            launch.setToolTip(
-                block_reason or "Launch Skyrim through this MO2 instance's virtual filesystem."
-            )
-            row_layout.addWidget(launch)
+            launch.setToolTip(block_reason or "Launch Skyrim through this MO2 instance's virtual filesystem.")
+            action_row.addWidget(launch)
 
-            open_folder = QPushButton("Open folder")
-            open_folder.setMinimumHeight(38)
-            open_folder.setToolTip("Open this MO2 instance's folder.")
+            open_folder = QPushButton("▱  Open Folder")
+            open_folder.setMinimumHeight(42)
             open_folder.clicked.connect(
                 lambda _checked=False, record=dict(instance): self._open_instance_folder(record)
             )
-            row_layout.addWidget(open_folder)
+            action_row.addWidget(open_folder)
+            action_row.addStretch(1)
+            details_column.addLayout(action_row)
+            row_layout.addLayout(details_column, 1)
 
-            details = QLabel(_instance_label(instance))
-            details.setWordWrap(True)
-            details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            row_layout.addWidget(details, 1)
-            readiness = QLabel("READY" if block_reason is None else "BLOCKED")
+            right_column = QVBoxLayout()
+            readiness = QLabel("✓  Ready" if block_reason is None else "⚠  Check Required")
             readiness.setObjectName("launchReady" if block_reason is None else "launchBlocked")
             detail_getter = getattr(self._owner_window, "mo2_launch_status_detail", None)
             readiness.setToolTip(
                 detail_getter(instance) if callable(detail_getter)
                 else block_reason or "All required launch preflight checks currently pass."
             )
-            row_layout.addWidget(readiness)
+            right_column.addWidget(readiness, 0, Qt.AlignmentFlag.AlignRight)
 
             profile_picker = QComboBox()
             profile_picker.setObjectName("profilePicker")
             profile_names = list(instance.get("profiles") or [])
             if profile_names:
                 profile_picker.addItems(profile_names)
-                current_profile = instance.get("selected_profile") or ""
-                if current_profile in profile_names:
-                    profile_picker.setCurrentText(current_profile)
+                if profile_name in profile_names:
+                    profile_picker.setCurrentText(profile_name)
                 profile_picker.setToolTip(
                     "Choose the MO2 profile to use for this launch. This does not change MO2's saved profile."
                 )
@@ -172,16 +214,14 @@ class Mo2LibraryDialog(QFrame):
                 profile_picker.setToolTip(
                     "No profile folders could be safely verified for this instance. MO2's current profile will be used."
                 )
-            profile_label = QLabel("Profile")
-            profile_label.setObjectName("muted")
-            row_layout.addWidget(profile_label)
-            profile_picker.setMinimumWidth(150)
-            row_layout.addWidget(profile_picker)
+            right_column.addStretch(1)
+            right_column.addWidget(profile_picker)
+            row_layout.addLayout(right_column)
+
             launch.clicked.connect(
                 lambda _checked=False, record=dict(instance), picker=profile_picker:
                     self._launch_instance(record, picker.currentText() if picker.isEnabled() else None)
             )
-
             item.setSizeHint(row.sizeHint())
             item.setData(Qt.ItemDataRole.UserRole, instance)
             self.instances.addItem(item)
@@ -190,20 +230,20 @@ class Mo2LibraryDialog(QFrame):
                 self.selected_instance_record = dict(instance)
 
         self.instances.setVisible(bool(instances))
+        self.instance_count.setText(f"{len(inventory.get('skyrim_instances', []))} Instances")
+        self.instances.setVisible(bool(instances))
         if instances:
-            self.setup_status.setText(
-                f"Found {len(instances)} MO2 instance(s); "
-                f"{len(inventory.get('skyrim_instances', []))} match Skyrim SE. "
-                "Each Skyrim instance has its own launch action."
-            )
+            self.setup_status.setText("")
+            self.setup_status.hide()
         else:
+            self.setup_status.show()
             message = inventory.get("message", "No MO2 instances were found in the known locations.")
             roots = inventory.get("scan_roots", [])
             errors = inventory.get("errors", [])
             if roots:
-                message += "\\n\\nLocations checked:\\n" + "\\n".join(roots)
+                message += "\n\nLocations checked:\n" + "\n".join(roots)
             if errors:
-                message += "\\n\\nRead errors:\\n" + "\\n".join(errors[:6])
+                message += "\n\nRead errors:\n" + "\n".join(errors[:6])
             self.setup_status.setText(message)
 
     def _open_mo2(self) -> None:
