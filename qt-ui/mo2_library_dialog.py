@@ -70,6 +70,12 @@ class Mo2LibraryDialog(QFrame):
         )
         self.launch_mo2_button.clicked.connect(self._open_mo2)
         actions.addWidget(self.launch_mo2_button)
+        self.launch_unmodded_button = QPushButton("Launch Unmodded")
+        self.launch_unmodded_button.setToolTip(
+            "Launch Skyrim directly through Steam without MO2 or mods."
+        )
+        self.launch_unmodded_button.clicked.connect(self._launch_unmodded)
+        actions.addWidget(self.launch_unmodded_button)
         actions.addStretch(1)
         layout.addLayout(actions)
 
@@ -190,6 +196,11 @@ class Mo2LibraryDialog(QFrame):
 
     def _open_mo2(self) -> None:
         launch = getattr(self._owner_window, "launch_mo2_gui", None)
+        if callable(launch):
+            launch()
+
+    def _launch_unmodded(self) -> None:
+        launch = getattr(self._owner_window, "start_skyrim_direct", None)
         if callable(launch):
             launch()
 
