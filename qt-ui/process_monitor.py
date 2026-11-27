@@ -39,6 +39,17 @@ def detect_mo2_processes(
         }
         if "modorganizer.exe" not in names:
             continue
+        # A Wine process can remain briefly as a zombie after its GUI exits.
+        # Its old cmdline/environment still look like MO2, so treating it as
+        # live would keep Wyrd's session timer active indefinitely.
+        try:
+            stat_text = (entry / "stat").read_text(encoding="utf-8")
+            stat_fields = stat_text[stat_text.rfind(")") + 2:].split()
+            process_state = stat_fields[0] if stat_fields else ""
+        except (OSError, IndexError):
+            continue
+        if process_state in {"Z", "X"} or not process_state:
+            continue
         variables = {}
         for item in raw_env.split(bytes([0])):
             if b"=" not in item:
