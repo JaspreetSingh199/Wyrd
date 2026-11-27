@@ -184,6 +184,7 @@ class EnvironmentWorkflowMixin:
         )
         self.precheck_progress.setFormat("")
         self._set_scan_progress(100, "Environment scan complete.")
+        self.progress_panel.hide()
         self.precheck_status.setText(
             "Startup checks complete. " +
             ("A detected MO2 instance is ready for launch." if active_ready
