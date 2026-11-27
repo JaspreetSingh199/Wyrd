@@ -59,12 +59,6 @@ class Mo2LibraryDialog(QFrame):
         self.instance_count.setObjectName("instanceCount")
         heading_row.addWidget(self.instance_count)
         heading_row.addStretch(1)
-        self.launch_mo2_button = QPushButton("Open MO2")
-        self.launch_mo2_button.setToolTip(
-            "Open MO2's native instance manager in Skyrim's existing Proton prefix."
-        )
-        self.launch_mo2_button.clicked.connect(self._open_mo2)
-        heading_row.addWidget(self.launch_mo2_button)
         layout.addLayout(heading_row)
         self.setup_status = QLabel("MO2 instances are discovered automatically.")
         self.setup_status.setObjectName("muted")
@@ -144,7 +138,7 @@ class Mo2LibraryDialog(QFrame):
             details_column.addWidget(meta)
 
             action_row = QHBoxLayout()
-            launch = QPushButton("▶  Launch Modded")
+            launch = QPushButton("▶  Launch Modded Skyrim")
             launch.setObjectName("primaryAction")
             launch.setMinimumHeight(42)
             reason_getter = getattr(self._owner_window, "mo2_launch_block_reason", None)
@@ -156,6 +150,14 @@ class Mo2LibraryDialog(QFrame):
             launch.setEnabled(block_reason is None)
             launch.setToolTip(block_reason or "Launch Skyrim through this MO2 instance's virtual filesystem.")
             action_row.addWidget(launch)
+
+            open_mo2 = QPushButton("Open MO2 Mod List")
+            open_mo2.setMinimumHeight(42)
+            open_mo2.setToolTip(
+                "Open MO2 in Skyrim's existing Proton prefix to review or change the selected instance's mod list."
+            )
+            open_mo2.clicked.connect(lambda _checked=False: self._open_mo2())
+            action_row.addWidget(open_mo2)
 
             open_folder = QPushButton("▱  Open Folder")
             open_folder.setMinimumHeight(42)
@@ -242,7 +244,7 @@ class Mo2LibraryDialog(QFrame):
         instance_name = str(instance.get("name") or "<unnamed>")
         selected_profile = profile_name or "<MO2 saved selection>"
         message = (
-            "[WYRD] Launch Modded button clicked: "
+            "[WYRD] Launch Modded Skyrim button clicked: "
             f"instance={instance_name!r}, profile={selected_profile!r}, "
             f"instance_path={instance.get('path')!r}"
         )
