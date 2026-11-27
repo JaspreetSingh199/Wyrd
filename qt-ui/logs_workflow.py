@@ -71,7 +71,7 @@ class LogsWorkflowMixin:
         except OSError as error:
             output.append(f"Host memory unavailable: {error}")
 
-        output.extend(["", "Wine guard policy: MO2 installer only; 6 GiB RSS / 256-process hard limits.", "Persistent Skyrim game sessions are never automatically terminated by this guard.", "", "Wine / Proton related processes (largest RSS first):"])
+        output.extend(["", "Open MO2 session monitoring: per-launch RSS, process/thread count, CPU ticks, winedbg count, host available RAM and swap are sampled while the session is active. Samples and Wine stderr are written to skyrim-launch.log.", "Resource monitoring is observational; it does not claim a hard cgroup limit for Open MO2. The installer has its separate resource guard. No shared wineserver or persistent Skyrim session is automatically terminated.", "", "Wine / Proton related processes (largest RSS first):"])
         processes = []
         try:
             entries = Path("/proc").iterdir()
