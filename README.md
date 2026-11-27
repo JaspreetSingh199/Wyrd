@@ -7,7 +7,6 @@ Wyrd is a focused Qt6 Linux GUI for setting up and launching Skyrim Special Edit
 - Detect Skyrim Special Edition installations in Steam libraries.
 - Discover compatible Proton runtimes.
 - Install and verify official Mod Organizer 2.
-- Maintain an isolated, Wyrd-owned Proton prefix.
 - Configure Skyrim-specific MO2 integration safely.
 - Launch MO2 and work toward launching Skyrim through MO2.
 
