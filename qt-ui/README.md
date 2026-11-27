@@ -50,3 +50,31 @@ progress. The tests remain in the repository but are skipped unless the
 repository Actions variable `WYRD_RUN_TESTS` is set to `true`. The source
 release-bundle job remains enabled. Re-enable the test job by setting that
 repository variable after the refactor is ready for verification.
+
+
+## Standalone Linux build (AppImage)
+
+Wyrd can be distributed as a self-contained x86_64 AppImage. The AppImage bundles
+the Python runtime, PySide6 and Qt libraries; users do not need to create a
+virtual environment or install Python packages.
+
+Download `Wyrd-x86_64.AppImage` from the GitHub Actions artifact or a published
+release, then run:
+
+~~~bash
+chmod +x Wyrd-x86_64.AppImage
+./Wyrd-x86_64.AppImage
+~~~
+
+The AppImage packages Wyrd itself, not the user's gaming environment. Steam,
+the selected Proton runtime, Skyrim Special Edition, and any external archive
+utilities remain host-installed dependencies. Wyrd continues to discover the
+user's existing Steam libraries, Proton installations, MO2 instances, settings
+and AppID 489830 prefix in their normal locations. The bundle does not contain,
+copy, reset or relocate game data or saves.
+
+The AppImage build is defined by `qt-ui/Wyrd.spec` and
+`.github/workflows/appimage.yml`. It runs on Ubuntu 22.04 and publishes an
+x86_64 AppImage artifact for 30 days. Use the workflow's manual dispatch to
+build on demand, or push a packaging/application change to
+`feature/mo2-environments`.
