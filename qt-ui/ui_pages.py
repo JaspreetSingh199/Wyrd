@@ -134,7 +134,7 @@ class MainWindowPagesMixin:
             self, prefix_path=prefix_path, install_path=install_path,
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
-        setup_layout.addWidget(self.mo2_library_widget)
+        setup_layout.addWidget(self.mo2_library_widget, 1)
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
@@ -147,7 +147,6 @@ class MainWindowPagesMixin:
         utility_actions.addStretch(1)
         setup_layout.addLayout(utility_actions)
 
-        setup_layout.addStretch(1)
         setup_scroll = QScrollArea()
         setup_scroll.setWidgetResizable(True)
         setup_scroll.setFrameShape(QFrame.Shape.NoFrame)
