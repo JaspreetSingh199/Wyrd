@@ -165,6 +165,8 @@ class MainWindow(
         QTimer.singleShot(0, self._refresh_session_ui_status)
 
         self.setCentralWidget(root)
+        self._interaction_root = root
+        self._interaction_lock_reason = None
         self._update_active_instance_from_scan()
         self._restoring_selection = False
         # Let Qt paint the startup checklist before any filesystem/Steam scans
@@ -174,6 +176,22 @@ class MainWindow(
         QTimer.singleShot(150, self.refresh_all)
         # Show onboarding only after initial detection and path population finish.
         QTimer.singleShot(250, self._run_first_launch_setup)
+
+    def _set_interaction_locked(self, locked: bool, reason: str = "") -> None:
+        """Prevent main-window interaction during scans and active MO2/game sessions.
+
+        The native window controls remain available, so users can still minimize
+        or close Wyrd. Background process/session timers continue updating status.
+        """
+        root = getattr(self, "_interaction_root", None)
+        if root is None:
+            return
+        if locked:
+            self._interaction_lock_reason = reason or "A Wyrd operation is active."
+            root.setEnabled(False)
+        else:
+            self._interaction_lock_reason = None
+            root.setEnabled(True)
 
     def _select_page(self, index: int) -> None:
         self.tabs.setCurrentIndex(index)
