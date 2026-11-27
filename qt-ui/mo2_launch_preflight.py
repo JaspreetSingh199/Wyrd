@@ -158,9 +158,6 @@ def inspect_instance_launch(
         profiles = instance.get("profiles") or []
         if profile_name not in profiles:
             return fail("mo2_profile", "The selected MO2 profile is no longer in the verified profile list.")
-        profile_path = Path(instance.get("selected_profile_path") or "")
-        if profile_path and profile_path.exists() and profile_path.is_symlink():
-            return fail("mo2_profile", "The selected MO2 profile path is a symlink; launch was refused.")
         passed("mo2_profile", f"MO2 profile '{profile_name}' is present in the verified profile list.")
 
     return {
