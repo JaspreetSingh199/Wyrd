@@ -261,13 +261,14 @@ class MainWindowPagesMixin:
 
         logs_page = QWidget()
         logs_layout = QVBoxLayout(logs_page)
-        logs_layout.setContentsMargins(12, 16, 12, 12)
-        logs_layout.setSpacing(12)
+        logs_layout.setContentsMargins(16, 16, 16, 16)
+        logs_layout.setSpacing(16)
         self.logs_tabs = QTabWidget()
 
         application_page = QWidget()
         application_layout = QVBoxLayout(application_page)
         application_layout.setContentsMargins(8, 8, 8, 8)
+        application_layout.setSpacing(12)
         application_panel = panel(
             "APPLICATION ACTIVITY",
             "Wyrd detection, installation, settings and application errors. Persistent, newest entries at the bottom."
@@ -290,6 +291,7 @@ class MainWindowPagesMixin:
         launch_page = QWidget()
         launch_layout = QVBoxLayout(launch_page)
         launch_layout.setContentsMargins(8, 8, 8, 8)
+        launch_layout.setSpacing(12)
         launch_panel = panel(
             "STEAMCOMPAT LAUNCH",
             "Persistent output from the MO2 to Proton to Skyrim launch handoff."
@@ -312,6 +314,7 @@ class MainWindowPagesMixin:
         system_page = QWidget()
         system_layout = QVBoxLayout(system_page)
         system_layout.setContentsMargins(8, 8, 8, 8)
+        system_layout.setSpacing(12)
         system_panel = panel(
             "SYSTEM SNAPSHOT",
             "Read-only host memory and Wine / Proton process inventory. This is a diagnostic snapshot, not a complete system journal."
