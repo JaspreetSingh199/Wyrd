@@ -317,4 +317,5 @@ class MainWindowPagesMixin:
         logs_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         logs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         logs_scroll.setWidget(logs_page)
+        self.tabs.addTab(logs_scroll, "LOGS")
 
