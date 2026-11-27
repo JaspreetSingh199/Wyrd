@@ -29,6 +29,30 @@ from wyrd_mo2 import managed_paths, read_settings, reset_wyrd_settings
 
 
 class Mo2ProcessDetectionTests(unittest.TestCase):
+    def test_proton_wrapper_argument_is_not_mistaken_for_mo2_gui(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = root / "compatdata" / "489830"
+            prefix.mkdir(parents=True)
+            proc = root / "proc"
+            proc.mkdir()
+            wrapper = proc / "146755"
+            wrapper.mkdir()
+            (wrapper / "cmdline").write_bytes(
+                b"/steam/Proton - Experimental/proton\0run\0"
+                b"Z:\\ModOrganizer.exe\0--instance\0Skyrim\0"
+            )
+            (wrapper / "comm").write_text("python3\\n")
+            (wrapper / "environ").write_bytes(
+                f"STEAM_COMPAT_DATA_PATH={prefix}".encode() + bytes([0])
+            )
+            (wrapper / "stat").write_text("146755 (python3) S 1 0 0 0 0 0")
+
+            result = process_monitor.detect_mo2_processes(prefix, proc)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["processes"], [])
+
     def test_zombie_mo2_process_is_not_reported_as_running(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
