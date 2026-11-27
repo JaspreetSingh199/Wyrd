@@ -202,6 +202,12 @@ class LaunchWorkflowMixin:
         if answer != QMessageBox.StandardButton.Yes:
             return
 
+        if steam_root is None:
+            message = "Steam's installation root was not verified; Skyrim launch was refused."
+            self._log(message)
+            QMessageBox.warning(self, "Steam root unavailable", message)
+            return
+
         # Steam is intentionally not started during Wyrd startup or discovery.
         # After confirmation, open Steam and wait for its main process plus UI
         # helper before rechecking Skyrim and handing off to MO2. Do not use
