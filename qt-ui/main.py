@@ -2,7 +2,9 @@
 """Qt 6 desktop application for Wyrd's Skyrim + Mod Organizer 2 workflow."""
 from __future__ import annotations
 
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt
@@ -27,6 +29,7 @@ from audio_workflow import AudioWorkflowMixin
 from mo2_management_workflow import Mo2ManagementWorkflowMixin
 from setup_workflow import SetupWorkflowMixin
 from ui_path_helpers import _same_filesystem_path
+from proton_runtime import managed_paths
 
 
 class MainWindow(
@@ -170,11 +173,34 @@ class MainWindow(
         self.maintenance_nav.setChecked(index == 1)
         self.logs_nav.setChecked(index == 2)
         if index == 2:
+            self.refresh_application_log_view()
             self.refresh_launch_log_view()
             self.refresh_system_log_view()
 
     def _log(self, message: str) -> None:
-        self.log_view.appendPlainText(message)
+        """Append to the visible session and bounded persistent application log."""
+        stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        entry = f"[{stamp}] {message}"
+        self.log_view.appendPlainText(entry)
+        try:
+            root = managed_paths()["root"]
+            if root.is_symlink():
+                return
+            logs_dir = root / "logs"
+            if logs_dir.is_symlink():
+                return
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            path = logs_dir / "application.log"
+            rotated = logs_dir / "application.log.1"
+            if path.is_symlink() or rotated.is_symlink():
+                return
+            if path.is_file() and path.stat().st_size > 2 * 1024 * 1024:
+                os.replace(path, rotated)
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(entry + "\\n")
+        except OSError:
+            # Logging must never interrupt launch, detection or recovery workflows.
+            pass
 
     def _reset_precheck(self) -> None:
         """Put the visible startup checklist into its pending state."""
