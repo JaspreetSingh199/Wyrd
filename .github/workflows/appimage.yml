@@ -30,7 +30,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes             libfuse2 patchelf desktop-file-utils file wget
+          sudo apt-get install --yes libfuse2 patchelf desktop-file-utils file wget
           python -m pip install --upgrade pip
           python -m pip install -r qt-ui/requirements.txt pyinstaller
 
@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/scalable/apps
-          cp dist/Wyrd AppDir/usr/bin/Wyrd
+          cp qt-ui/dist/Wyrd AppDir/usr/bin/Wyrd
           cp packaging/wyrd.svg AppDir/usr/share/icons/hicolor/scalable/apps/wyrd.svg
           cp packaging/wyrd.desktop AppDir/wyrd.desktop
           cp packaging/AppRun AppDir/AppRun
@@ -52,7 +52,7 @@ jobs:
       - name: Build AppImage
         run: |
           set -euo pipefail
-          wget -q             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage             -O appimagetool
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
           ARCH=x86_64 ./appimagetool AppDir Wyrd-x86_64.AppImage
 
