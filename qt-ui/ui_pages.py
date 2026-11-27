@@ -265,9 +265,6 @@ class MainWindowPagesMixin:
         logs_layout.setSpacing(16)
         self.logs_tabs = QTabWidget()
         self.logs_tabs.setObjectName("logsTabs")
-        self.logs_tabs.currentChanged.connect(
-            lambda index: self._fade_widget_in(self.logs_tabs.widget(index))
-        )
 
         application_page = QWidget()
         application_layout = QVBoxLayout(application_page)
