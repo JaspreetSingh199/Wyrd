@@ -2,7 +2,7 @@ name: Wyrd tests and release bundle (including MO2 environments)
 
 on:
   push:
-    branches: [main, v1/mo2, v1/Please-god, feature/mo2-environments]
+    branches: [main, v1/mo2, v1/Please-god, feature/mo2-environments, v1-skyrim-design]
   pull_request:
     branches: [main]
 
