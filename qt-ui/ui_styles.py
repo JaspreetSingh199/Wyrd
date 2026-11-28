@@ -352,10 +352,54 @@ QLabel#instanceArtwork {
     border: 1px solid #8a7959;
     border-radius: 7px;
 }
+QLabel#profileArtwork {
+    background: #17272d;
+    border: 1px solid #b49a6a;
+    border-radius: 5px;
+}
+QToolButton#artworkMenuButton {
+    background: #26363c;
+    color: #e6dcc8;
+    border: 1px solid #877655;
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+QToolButton#artworkMenuButton:hover {
+    background: #3a4545;
+    border-color: #c5a66f;
+    color: #fff2d8;
+}
+QMenu {
+    background: #1b282d;
+    color: #e7dfd0;
+    border: 1px solid #9b845b;
+    padding: 5px;
+}
+QMenu::item { padding: 7px 24px 7px 12px; border-radius: 4px; }
+QMenu::item:selected { background: #39464a; color: #fff0d3; }
 QLabel#heroArtwork {
     background: #1b2b31;
     border: 1px solid #8a7959;
     border-radius: 8px;
+}
+QFrame#heroShade {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 rgba(8,16,21,235), stop:0.42 rgba(10,19,24,180),
+        stop:0.72 rgba(10,19,24,75), stop:1 rgba(10,19,24,35));
+    border: 1px solid #8a7959;
+    border-radius: 8px;
+}
+QLabel#heroEyebrow {
+    color: #d0b783; font-size: 10px; font-weight: 700;
+    letter-spacing: 2px; padding-left: 5px;
+}
+QLabel#heroTitle {
+    color: #f2e7d1; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 35px; font-weight: 700; padding: 2px 4px 0 4px;
+}
+QLabel#heroSubtitle {
+    color: #e0d7c7; font-family: "Noto Serif", "DejaVu Serif", serif;
+    font-size: 15px; padding: 0 5px 3px 5px;
 }
 QPushButton#primaryAction {
     background: #715632; border: 1px solid #c19c5d; border-radius: 8px;
