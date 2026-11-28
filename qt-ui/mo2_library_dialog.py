@@ -43,6 +43,7 @@ class Mo2LibraryDialog(QFrame):
         self.install_path = str(install_path or "")
         self.game_path = str(game_path or "")
         self.proton_path = str(proton_path or "")
+        self.mo2_installed = False
         self.preferred_instance_id = selected_instance_id
         self.discovery: dict = {}
         self.selected_instance_record: dict | None = None
