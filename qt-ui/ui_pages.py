@@ -81,12 +81,12 @@ class MainWindowPagesMixin:
         # The checklist itself communicates readiness. A 6px progress bar with
         # centered text was unreadable and visually collided with the checks.
         self.precheck_progress.hide()
-        self.check_mo2_button = QPushButton("Check installation")
+        self.check_mo2_button = QPushButton("Open MO2 installation folder")
         self.check_mo2_button.setObjectName("secondaryAction")
         self.check_mo2_button.setToolTip(
-            "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
+            "Open the verified MO2 installation directory in your file manager."
         )
-        self.check_mo2_button.clicked.connect(self.check_mo2_installation)
+        self.check_mo2_button.clicked.connect(self.open_mo2_installation_folder)
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
@@ -155,10 +155,6 @@ class MainWindowPagesMixin:
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
-        self.diagnostics_button = QPushButton("View launch log")
-        self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
-        self.launch_status_button = QPushButton("Check launch status")
-        self.launch_status_button.clicked.connect(self.check_launch_status)
         utility_actions = QHBoxLayout()
         utility_actions.addWidget(self.install_button)
         utility_actions.addStretch(1)
@@ -214,22 +210,6 @@ class MainWindowPagesMixin:
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         diagnostics_grid.addWidget(self.audio_panel, 0, 1)
-
-        diagnostics_panel = panel(
-            "LAUNCH DIAGNOSTICS",
-            "Check whether Skyrim or SKSE is running and open the detailed launch log when troubleshooting."
-        )
-        diagnostic_row = QHBoxLayout()
-        diagnostic_row.addWidget(self.diagnostics_button)
-        add_info_button(diagnostic_row, self, "View launch log", "Opens the recent Skyrim/MO2 launch log. Use it when a launch fails or when you need the detailed Proton and MO2 output.")
-        diagnostic_row.addWidget(self.launch_status_button)
-        add_info_button(diagnostic_row, self, "Check launch status", "Scans for Skyrim/SKSE processes and checks the launch handoff Wyrd is tracking. It can report a running process, an exited process, or an inconclusive result; it does not start or stop the game.")
-        diagnostic_row.addStretch(1)
-        diagnostics_panel.layout().addLayout(diagnostic_row)
-        diagnostics_grid.addWidget(diagnostics_panel, 1, 0, 1, 2)
-        diagnostics_grid.setColumnStretch(0, 1)
-        diagnostics_grid.setColumnStretch(1, 1)
-        maintenance_layout.addLayout(diagnostics_grid)
 
         recovery_panel = panel(
             "RECOVERY & MAINTENANCE",
