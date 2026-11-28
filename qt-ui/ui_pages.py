@@ -161,10 +161,9 @@ class MainWindowPagesMixin:
         self.install_button = QPushButton("Install MO2")
         self.install_button.setObjectName("secondaryAction")
         self.install_button.clicked.connect(self.install_mo2)
-        utility_actions = QHBoxLayout()
-        utility_actions.addWidget(self.install_button)
-        utility_actions.addStretch(1)
-        setup_layout.addLayout(utility_actions)
+        # Installation is exposed contextually in the MO2 Instances header.
+        # Keep the button object for the existing installer workflow state,
+        # but do not render a duplicate Install MO2 action on this page.
 
         setup_scroll = QScrollArea()
         setup_scroll.setWidgetResizable(True)
