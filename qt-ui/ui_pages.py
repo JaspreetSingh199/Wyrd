@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
-    QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QWidget, QScrollArea, QTabWidget,
+    QProgressBar, QPushButton, QVBoxLayout, QGridLayout, QWidget, QScrollArea, QTabWidget, QStackedLayout,
 )
 from mo2_library_dialog import Mo2LibraryDialog
 from ui_components import add_info_button, panel
@@ -23,11 +23,35 @@ class MainWindowPagesMixin:
 
         hero_banner = QFrame()
         hero_banner.setObjectName("heroBanner")
-        hero_layout = QHBoxLayout(hero_banner)
-        hero_layout.setContentsMargins(24, 16, 20, 16)
-        hero_layout.setSpacing(18)
+        hero_banner.setMinimumHeight(190)
+        hero_stack = QStackedLayout(hero_banner)
+        hero_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
+        hero_stack.setContentsMargins(0, 0, 0, 0)
+
+        hero_art = QLabel()
+        hero_art.setObjectName("heroArtwork")
+        hero_art.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hero_art.setScaledContents(True)
+        hero_image = QPixmap(str(Path(__file__).resolve().parent / "assets" / "skyrim_hero.svg"))
+        if not hero_image.isNull():
+            hero_art.setPixmap(hero_image)
+        hero_stack.addWidget(hero_art)
+
+        hero_shade = QFrame()
+        hero_shade.setObjectName("heroShade")
+        hero_shade.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        hero_stack.addWidget(hero_shade)
+
+        hero_content = QWidget()
+        hero_content.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        hero_layout = QHBoxLayout(hero_content)
+        hero_layout.setContentsMargins(30, 20, 30, 20)
+        hero_layout.setSpacing(20)
         hero_text = QVBoxLayout()
-        hero_text.setSpacing(8)
+        hero_text.setSpacing(7)
+        hero_eyebrow = QLabel("THE NORDIC MODDING WORKSPACE")
+        hero_eyebrow.setObjectName("heroEyebrow")
+        hero_text.addWidget(hero_eyebrow)
         hero_title = QLabel("Your Skyrim Environment")
         hero_title.setObjectName("heroTitle")
         hero_text.addWidget(hero_title)
@@ -36,6 +60,7 @@ class MainWindowPagesMixin:
         hero_text.addWidget(hero_subtitle)
 
         session_row = QHBoxLayout()
+        session_row.setSpacing(10)
         session_heading = QLabel("SESSION")
         session_heading.setObjectName("sessionHeading")
         session_row.addWidget(session_heading)
@@ -46,24 +71,11 @@ class MainWindowPagesMixin:
         self.session_detail_label.setObjectName("sessionDetail")
         self.session_detail_label.setWordWrap(True)
         session_row.addWidget(self.session_detail_label, 1)
+        hero_text.addSpacing(4)
         hero_text.addLayout(session_row)
         hero_text.addStretch(1)
         hero_layout.addLayout(hero_text, 1)
-        hero_art = QLabel()
-        hero_art.setObjectName("heroArtwork")
-        hero_art.setMinimumSize(280, 126)
-        hero_art.setMaximumWidth(440)
-        hero_art.setStyleSheet(
-            "QLabel#heroArtwork { background: #1b2b31; border: 1px solid #75694f; border-radius: 8px; }"
-        )
-        hero_image = QPixmap(str(Path(__file__).resolve().parent / "assets" / "skyrim_hero.svg"))
-        if not hero_image.isNull():
-            hero_art.setPixmap(hero_image.scaled(
-                440, 132, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                Qt.TransformationMode.SmoothTransformation,
-            ))
-            hero_art.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hero_layout.addWidget(hero_art, 0)
+        hero_stack.addWidget(hero_content)
         setup_layout.addWidget(hero_banner)
 
         self.precheck_panel = QFrame()
