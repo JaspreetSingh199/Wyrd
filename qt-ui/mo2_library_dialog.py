@@ -165,8 +165,11 @@ class Mo2LibraryDialog(QFrame):
                 "Open MO2 in Skyrim's existing Proton prefix to review or change the selected instance's mod list."
             )
             open_mo2.clicked.connect(
-                lambda _checked=False, record=dict(instance):
-                    self._open_mo2(str(record.get("name") or ""))
+                lambda _checked=False, record=dict(instance), picker=profile_picker:
+                    self._open_mo2(
+                        str(record.get("name") or ""),
+                        picker.currentText() if picker.isEnabled() else None,
+                    )
             )
             action_row.addWidget(open_mo2)
 
@@ -258,11 +261,11 @@ class Mo2LibraryDialog(QFrame):
             log("Open MO2 header action clicked.")
         launch_action()
 
-    def _open_mo2(self, instance_name: str) -> None:
-        """Use the same Steam startup/readiness gate as the Open MO2 action."""
+    def _open_mo2(self, instance_name: str, profile_name: str | None = None) -> None:
+        """Open this instance and its currently selected profile in MO2."""
         launch = getattr(self._owner_window, "open_mo2_instance", None)
         if callable(launch):
-            launch(instance_name=instance_name)
+            launch(instance_name=instance_name, profile_name=profile_name)
 
     def _launch_unmodded(self) -> None:
         launch = getattr(self._owner_window, "start_skyrim_direct", None)
