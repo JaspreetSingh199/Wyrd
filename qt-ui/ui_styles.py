@@ -82,8 +82,8 @@ QPushButton#secondaryAction {
 QPushButton#infoButton {
     background: transparent;
     color: #b9aa88;
-    border: 1px solid #756b56;
-    border-radius: 11px;
+    border: none;
+    border-radius: 0;
     padding: 0;
     min-height: 23px;
     max-height: 23px;
@@ -95,7 +95,7 @@ QPushButton#infoButton {
 QPushButton#infoButton:hover {
     background: #29383c;
     color: #f0dfb9;
-    border-color: #b29a6d;
+    border-color: transparent;
 }
 QPushButton#infoButton:pressed {
     background: #344247;
