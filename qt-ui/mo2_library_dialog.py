@@ -151,17 +151,9 @@ class Mo2LibraryDialog(QFrame):
             row_layout.setSpacing(14)
 
 
-            art_file = "skyrim_instance_castle.svg" if instance_index % 2 == 0 else "skyrim_instance_mountains.svg"
-            art_path = Path(__file__).resolve().parent / "assets" / art_file
             art_label = QLabel()
             art_label.setObjectName("instanceArtwork")
             art_label.setFixedSize(180, 96)
-            art_pixmap = QPixmap(str(art_path))
-            if not art_pixmap.isNull():
-                art_label.setPixmap(art_pixmap.scaled(
-                    180, 96, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                    Qt.TransformationMode.SmoothTransformation,
-                ))
             art_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             row_layout.addWidget(art_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -172,9 +164,18 @@ class Mo2LibraryDialog(QFrame):
             details_column.addWidget(name)
             profile_name = instance.get("selected_profile") or "No profile selected"
             mode = "Portable instance" if instance.get("portable") else "MO2 instance"
+            profile_meta_row = QHBoxLayout()
+            profile_meta_row.setSpacing(8)
             meta = QLabel(f"◈  {mode}    ·    Profile: {profile_name}")
             meta.setObjectName("instanceMeta")
-            details_column.addWidget(meta)
+            profile_meta_row.addWidget(meta)
+            profile_art_label = QLabel()
+            profile_art_label.setObjectName("profileArtwork")
+            profile_art_label.setFixedSize(34, 24)
+            profile_art_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            profile_meta_row.addWidget(profile_art_label)
+            profile_meta_row.addStretch(1)
+            details_column.addLayout(profile_meta_row)
 
             action_row = QHBoxLayout()
             launch = QPushButton("▶  Launch Modded Skyrim")
@@ -234,6 +235,43 @@ class Mo2LibraryDialog(QFrame):
                     "No profile folders could be safely verified for this instance. MO2's current profile will be used."
                 )
 
+            self._refresh_artwork_labels(instance, art_label, profile_art_label,
+                                          profile_picker.currentText() if profile_picker.isEnabled() else None)
+            profile_picker.currentTextChanged.connect(
+                lambda selected, record=dict(instance), image=profile_art_label:
+                    self._refresh_profile_artwork(record, selected, image)
+            )
+
+            artwork_button = QToolButton()
+            artwork_button.setObjectName("artworkMenuButton")
+            artwork_button.setText("Artwork  ▾")
+            artwork_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            artwork_menu = QMenu(artwork_button)
+            instance_menu = artwork_menu.addMenu("Instance artwork")
+            profile_menu = artwork_menu.addMenu("Profile artwork")
+            for menu, scope in ((instance_menu, "instance"), (profile_menu, "profile")):
+                choose_action = menu.addAction("Choose image…")
+                choose_action.triggered.connect(
+                    lambda _checked=False, selected_scope=scope, record=dict(instance),
+                           picker=profile_picker, instance_image=art_label, profile_image=profile_art_label:
+                        self._choose_artwork(record, selected_scope, picker, instance_image, profile_image)
+                )
+                random_action = menu.addAction("Randomise artwork")
+                random_action.triggered.connect(
+                    lambda _checked=False, selected_scope=scope, record=dict(instance),
+                           picker=profile_picker, instance_image=art_label, profile_image=profile_art_label:
+                        self._randomize_artwork(record, selected_scope, picker, instance_image, profile_image)
+                )
+                reset_action = menu.addAction("Restore default")
+                reset_action.triggered.connect(
+                    lambda _checked=False, selected_scope=scope, record=dict(instance),
+                           picker=profile_picker, instance_image=art_label, profile_image=profile_art_label:
+                        self._reset_artwork(record, selected_scope, picker, instance_image, profile_image)
+                )
+            profile_menu.setEnabled(profile_picker.isEnabled())
+            artwork_button.setMenu(artwork_menu)
+            action_row.addWidget(artwork_button)
+
             open_mo2.clicked.connect(
                 lambda _checked=False, record=dict(instance), picker=profile_picker:
                     self._open_mo2(
@@ -272,6 +310,86 @@ class Mo2LibraryDialog(QFrame):
             if errors:
                 message += "\n\nRead errors:\n" + "\n".join(errors[:6])
             self.setup_status.setText(message)
+
+    def _refresh_artwork_labels(self, instance: dict, instance_label: QLabel,
+                                profile_label: QLabel, profile: str | None) -> None:
+        self._set_artwork_pixmap(instance_label, get_artwork(instance, "instance"))
+        if profile:
+            self._set_artwork_pixmap(profile_label, get_artwork(instance, "profile", profile))
+            profile_label.setToolTip(f"Artwork for profile: {profile}")
+        else:
+            profile_label.clear()
+            profile_label.setToolTip("No verified profile artwork")
+
+    @staticmethod
+    def _set_artwork_pixmap(label: QLabel, path: Path) -> None:
+        pixmap = QPixmap(str(path))
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(
+                label.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            label.setPixmap(pixmap)
+        else:
+            label.clear()
+
+    def _refresh_profile_artwork(self, instance: dict, profile: str,
+                                 profile_label: QLabel) -> None:
+        if profile:
+            self._set_artwork_pixmap(profile_label, get_artwork(instance, "profile", profile))
+            profile_label.setToolTip(f"Artwork for profile: {profile}")
+
+    def _artwork_scope_profile(self, scope: str, picker: QComboBox) -> str | None:
+        if scope != "profile":
+            return None
+        return picker.currentText() if picker.isEnabled() else None
+
+    def _refresh_artwork_after_change(self, instance: dict, picker: QComboBox,
+                                      instance_label: QLabel, profile_label: QLabel) -> None:
+        profile = picker.currentText() if picker.isEnabled() else None
+        self._refresh_artwork_labels(instance, instance_label, profile_label, profile)
+
+    def _choose_artwork(self, instance: dict, scope: str, picker: QComboBox,
+                        instance_label: QLabel, profile_label: QLabel) -> None:
+        profile = self._artwork_scope_profile(scope, picker)
+        if scope == "profile" and not profile:
+            self.setup_status.setText("Choose a verified MO2 profile before assigning profile artwork.")
+            self.setup_status.show()
+            return
+        source, _filter = QFileDialog.getOpenFileName(
+            self, "Choose Wyrd artwork", str(Path.home()),
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp)",
+        )
+        if not source:
+            return
+        preview = QPixmap(source)
+        if preview.isNull():
+            self.setup_status.setText("That file could not be opened as an image.")
+            self.setup_status.show()
+            return
+        try:
+            set_custom_artwork(instance, scope, source, profile)
+        except (OSError, ValueError) as error:
+            self.setup_status.setText(f"Could not save artwork: {error}")
+            self.setup_status.show()
+            return
+        self._refresh_artwork_after_change(instance, picker, instance_label, profile_label)
+
+    def _randomize_artwork(self, instance: dict, scope: str, picker: QComboBox,
+                           instance_label: QLabel, profile_label: QLabel) -> None:
+        profile = self._artwork_scope_profile(scope, picker)
+        if scope == "profile" and not profile:
+            return
+        randomize_artwork(instance, scope, profile)
+        self._refresh_artwork_after_change(instance, picker, instance_label, profile_label)
+
+    def _reset_artwork(self, instance: dict, scope: str, picker: QComboBox,
+                       instance_label: QLabel, profile_label: QLabel) -> None:
+        profile = self._artwork_scope_profile(scope, picker)
+        if scope == "profile" and not profile:
+            return
+        reset_artwork(instance, scope, profile)
+        self._refresh_artwork_after_change(instance, picker, instance_label, profile_label)
 
     def _open_selected_mo2(self) -> None:
         """Delegate to the established MainWindow Open MO2 workflow.
