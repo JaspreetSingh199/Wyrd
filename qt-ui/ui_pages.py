@@ -1,6 +1,8 @@
 """MainWindow page construction, kept separate from window lifecycle/state."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
@@ -20,15 +22,17 @@ class MainWindowPagesMixin:
 
         hero_banner = QFrame()
         hero_banner.setObjectName("heroBanner")
-        hero_layout = QVBoxLayout(hero_banner)
-        hero_layout.setContentsMargins(24, 22, 24, 22)
-        hero_layout.setSpacing(8)
+        hero_layout = QHBoxLayout(hero_banner)
+        hero_layout.setContentsMargins(24, 16, 20, 16)
+        hero_layout.setSpacing(18)
+        hero_text = QVBoxLayout()
+        hero_text.setSpacing(8)
         hero_title = QLabel("Your Skyrim Environment")
         hero_title.setObjectName("heroTitle")
-        hero_layout.addWidget(hero_title)
+        hero_text.addWidget(hero_title)
         hero_subtitle = QLabel("Manage Skyrim SE, Proton and Mod Organizer 2 instances.")
         hero_subtitle.setObjectName("heroSubtitle")
-        hero_layout.addWidget(hero_subtitle)
+        hero_text.addWidget(hero_subtitle)
 
         session_row = QHBoxLayout()
         session_heading = QLabel("SESSION")
@@ -41,7 +45,24 @@ class MainWindowPagesMixin:
         self.session_detail_label.setObjectName("sessionDetail")
         self.session_detail_label.setWordWrap(True)
         session_row.addWidget(self.session_detail_label, 1)
-        hero_layout.addLayout(session_row)
+        hero_text.addLayout(session_row)
+        hero_text.addStretch(1)
+        hero_layout.addLayout(hero_text, 1)
+        hero_art = QLabel()
+        hero_art.setObjectName("heroArtwork")
+        hero_art.setMinimumSize(280, 126)
+        hero_art.setMaximumWidth(440)
+        hero_art.setStyleSheet(
+            "QLabel#heroArtwork { background: #1b2b31; border: 1px solid #75694f; border-radius: 8px; }"
+        )
+        hero_image = QPixmap(str(Path(__file__).resolve().parent / "assets" / "skyrim_hero.svg"))
+        if not hero_image.isNull():
+            hero_art.setPixmap(hero_image.scaled(
+                440, 132, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+            hero_art.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hero_layout.addWidget(hero_art, 0)
         setup_layout.addWidget(hero_banner)
 
         self.precheck_panel = QFrame()
