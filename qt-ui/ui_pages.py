@@ -87,6 +87,12 @@ class MainWindowPagesMixin:
             "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
         )
         self.check_mo2_button.clicked.connect(self.check_mo2_installation)
+        self.open_mo2_install_folder_button = QPushButton("Open MO2 installation folder")
+        self.open_mo2_install_folder_button.setObjectName("secondaryAction")
+        self.open_mo2_install_folder_button.setToolTip(
+            "Open the verified MO2 program directory in your file manager."
+        )
+        self.open_mo2_install_folder_button.clicked.connect(self.open_mo2_installation_folder)
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
@@ -173,7 +179,12 @@ class MainWindowPagesMixin:
         maintenance_layout.setContentsMargins(18, 20, 18, 18)
         maintenance_layout.setSpacing(18)
         maintenance_layout.addWidget(self.precheck_panel)
-        maintenance_layout.addWidget(self.check_mo2_button)
+        maintenance_actions = QHBoxLayout()
+        maintenance_actions.setSpacing(10)
+        maintenance_actions.addWidget(self.check_mo2_button)
+        maintenance_actions.addWidget(self.open_mo2_install_folder_button)
+        maintenance_actions.addStretch(1)
+        maintenance_layout.addLayout(maintenance_actions)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(18)
         diagnostics_grid.setVerticalSpacing(18)
