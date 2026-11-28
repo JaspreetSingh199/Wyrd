@@ -6,8 +6,9 @@ import time
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QMessageBox, QInputDialog
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtGui import QDesktopServices
 
 from proton_runtime import _steam_root_for_game, _runtime_environment
 from steam_mo2_discovery import (
@@ -15,6 +16,7 @@ from steam_mo2_discovery import (
     inspect_external_skyrim_prefix_mo2_installation,
 )
 from steam_mo2_management import reset_wyrd_mo2
+from wyrd_settings import reset_wyrd_settings
 from steam_prefix import APP_ID, steam_compat_prefix
 from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
@@ -172,12 +174,72 @@ class Mo2ManagementWorkflowMixin:
         result = reset_wyrd_mo2(game_path=Path(self.game_state["game_dir"]))
         self._log(result.get("message", "MO2 removal attempted."))
         if result.get("ok"):
-            self.progress_label.setText("Wyrd-managed MO2 removed.")
-            QMessageBox.information(self, "MO2 removed", result["message"])
+            # Removing MO2 is a full environment reset from Wyrd's perspective:
+            # clear Wyrd preferences only after the verified MO2 removal succeeds.
+            settings_result = reset_wyrd_settings()
+            if settings_result.get("ok"):
+                self._saved_settings = {"first_run_completed": False}
+                self._saved_game_path = None
+                self._restoring_selection = True
+                self.proton_combo.blockSignals(True)
+                if self.proton_combo.count():
+                    self.proton_combo.setCurrentIndex(0)
+                self.proton_combo.blockSignals(False)
+                self.mo2_library_widget.preferred_instance_id = ""
+                self._saved_settings["first_run_completed"] = False
+                self._log("MO2 removed; Wyrd preferences reset. First-launch setup will run next time Wyrd starts.")
+                self.progress_label.setText("MO2 removed. Wyrd settings reset.")
+                QMessageBox.information(
+                    self, "MO2 removed",
+                    result["message"] + "\n\nWyrd preferences were also reset. First-launch setup will appear the next time you start Wyrd."
+                )
+            else:
+                self._log("MO2 removed, but Wyrd settings could not be reset: " + settings_result.get("message", "Unknown error"))
+                QMessageBox.warning(
+                    self, "MO2 removed; settings reset incomplete",
+                    result["message"] + "\n\nMO2 was removed, but Wyrd preferences could not be reset: "
+                    + settings_result.get("message", "Unknown error")
+                )
+            self._restoring_selection = False
         else:
             QMessageBox.warning(self, "MO2 removal incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
         self._update_active_instance_from_scan()
+
+
+    def open_mo2_installation_folder(self) -> None:
+        """Open the verified MO2 program directory in the desktop file manager."""
+        game_value = self.game_state.get("game_dir") if self.game_state.get("found") else None
+        if not game_value:
+            QMessageBox.information(
+                self, "MO2 installation unavailable",
+                "Skyrim Special Edition must be detected before Wyrd can locate its MO2 installation.",
+            )
+            return
+        game = Path(game_value).expanduser()
+        try:
+            state = inspect_skyrim_prefix_mo2_installation(game)
+            if not state.get("installed"):
+                external_state = inspect_external_skyrim_prefix_mo2_installation(game)
+                if external_state.get("installed"):
+                    state = external_state
+            install_value = state.get("install")
+            if not state.get("installed") or not install_value:
+                raise OSError(
+                    state.get("message", "No verified MO2 installation directory was found.")
+                )
+            install = Path(install_value).expanduser()
+            if install.is_symlink() or not install.is_dir():
+                raise OSError("The verified MO2 installation folder is missing or unsafe.")
+            resolved = install.resolve(strict=True)
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved))):
+                raise OSError("The desktop environment could not open the MO2 installation folder.")
+            self._log("Opened MO2 installation folder: " + str(resolved))
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(
+                self, "Could not open MO2 installation folder", str(error)
+            )
+            self._log("Could not open MO2 installation folder: " + str(error))
 
 
     def check_mo2_installation(self) -> None:
@@ -222,7 +284,7 @@ class Mo2ManagementWorkflowMixin:
                     lines.append(f"MO2 instance folders found: {len(instances)}")
                     lines.append(f"Skyrim SE instances found: {len(skyrim_instances)}")
                     for item in instances:
-                        lines.append(f"  • {item.get('name', 'Unnamed')} — {item.get('instance_path', 'path unknown')}")
+                        lines.append(f"  • {item.get('name', 'Unnamed')} — {item.get('path') or item.get('instance_path') or 'path unknown'}")
                     if not inventory.get("ok"):
                         lines.append("Instance scan: " + inventory.get("message", "unavailable"))
                 except Exception as error:
@@ -553,7 +615,7 @@ class Mo2ManagementWorkflowMixin:
         self.worker = SteamPrefixInstallWorker(str(proton_path), self.game_state["game_dir"])
         self.worker.progress.connect(self._on_install_progress)
         self.worker.completed.connect(self._on_install_completed)
-        self.install_button.setEnabled(False)
+        self.mo2_library_widget.open_mo2_button.setEnabled(False)
         self.refresh_button.setEnabled(False)
         self.proton_combo.setEnabled(False)
         self.progress.setValue(0)

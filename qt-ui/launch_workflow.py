@@ -361,7 +361,6 @@ class LaunchWorkflowMixin:
             self.launch_session.poll_count = 0
             if self.launch_session.wrapper_pid:
                 self._launch_monitor.start()
-            self.launch_status_button.setEnabled(True)
             self.progress_label.setText("MO2 launch handoff started; game startup is not yet confirmed.")
             self._log("Launch diagnostics: " + result.get("log_path", "unavailable"))
             self._log("Waiting for MO2 or Skyrim process detection before dismissing launch loader.")

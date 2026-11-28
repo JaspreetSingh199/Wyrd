@@ -87,6 +87,12 @@ class MainWindowPagesMixin:
             "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
         )
         self.check_mo2_button.clicked.connect(self.check_mo2_installation)
+        self.open_mo2_install_folder_button = QPushButton("Open MO2 installation folder")
+        self.open_mo2_install_folder_button.setObjectName("secondaryAction")
+        self.open_mo2_install_folder_button.setToolTip(
+            "Open the verified MO2 program directory in your file manager."
+        )
+        self.open_mo2_install_folder_button.clicked.connect(self.open_mo2_installation_folder)
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
@@ -152,17 +158,9 @@ class MainWindowPagesMixin:
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget, 1)
-        self.install_button = QPushButton("Install MO2")
-        self.install_button.setObjectName("secondaryAction")
-        self.install_button.clicked.connect(self.install_mo2)
-        self.diagnostics_button = QPushButton("View launch log")
-        self.diagnostics_button.clicked.connect(self.show_launch_diagnostics)
-        self.launch_status_button = QPushButton("Check launch status")
-        self.launch_status_button.clicked.connect(self.check_launch_status)
-        utility_actions = QHBoxLayout()
-        utility_actions.addWidget(self.install_button)
-        utility_actions.addStretch(1)
-        setup_layout.addLayout(utility_actions)
+        # Installation is exposed contextually in the MO2 Instances header.
+        # Keep the button object for the existing installer workflow state,
+        # but do not render a duplicate Install MO2 action on this page.
 
         setup_scroll = QScrollArea()
         setup_scroll.setWidgetResizable(True)
@@ -177,7 +175,12 @@ class MainWindowPagesMixin:
         maintenance_layout.setContentsMargins(18, 20, 18, 18)
         maintenance_layout.setSpacing(18)
         maintenance_layout.addWidget(self.precheck_panel)
-        maintenance_layout.addWidget(self.check_mo2_button)
+        maintenance_actions = QHBoxLayout()
+        maintenance_actions.setSpacing(10)
+        maintenance_actions.addWidget(self.check_mo2_button)
+        maintenance_actions.addWidget(self.open_mo2_install_folder_button)
+        maintenance_actions.addStretch(1)
+        maintenance_layout.addLayout(maintenance_actions)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(18)
         diagnostics_grid.setVerticalSpacing(18)
@@ -214,22 +217,6 @@ class MainWindowPagesMixin:
         audio_actions.addStretch(1)
         audio_layout.addLayout(audio_actions)
         diagnostics_grid.addWidget(self.audio_panel, 0, 1)
-
-        diagnostics_panel = panel(
-            "LAUNCH DIAGNOSTICS",
-            "Check whether Skyrim or SKSE is running and open the detailed launch log when troubleshooting."
-        )
-        diagnostic_row = QHBoxLayout()
-        diagnostic_row.addWidget(self.diagnostics_button)
-        add_info_button(diagnostic_row, self, "View launch log", "Opens the recent Skyrim/MO2 launch log. Use it when a launch fails or when you need the detailed Proton and MO2 output.")
-        diagnostic_row.addWidget(self.launch_status_button)
-        add_info_button(diagnostic_row, self, "Check launch status", "Scans for Skyrim/SKSE processes and checks the launch handoff Wyrd is tracking. It can report a running process, an exited process, or an inconclusive result; it does not start or stop the game.")
-        diagnostic_row.addStretch(1)
-        diagnostics_panel.layout().addLayout(diagnostic_row)
-        diagnostics_grid.addWidget(diagnostics_panel, 1, 0, 1, 2)
-        diagnostics_grid.setColumnStretch(0, 1)
-        diagnostics_grid.setColumnStretch(1, 1)
-        maintenance_layout.addLayout(diagnostics_grid)
 
         recovery_panel = panel(
             "RECOVERY & MAINTENANCE",

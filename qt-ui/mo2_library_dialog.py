@@ -43,6 +43,7 @@ class Mo2LibraryDialog(QFrame):
         self.install_path = str(install_path or "")
         self.game_path = str(game_path or "")
         self.proton_path = str(proton_path or "")
+        self.mo2_installed = False
         self.preferred_instance_id = selected_instance_id
         self.discovery: dict = {}
         self.selected_instance_record: dict | None = None
@@ -99,11 +100,17 @@ class Mo2LibraryDialog(QFrame):
         layout.addWidget(unmodded_panel)
         self._launch_ready = False
 
-    def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path=""):
+    def update_context(self, *, prefix_path="", install_path="", game_path="", proton_path="", installed=False):
         self.prefix_path = str(prefix_path or "")
         self.install_path = str(install_path or "")
         self.game_path = str(game_path or "")
         self.proton_path = str(proton_path or "")
+        self.mo2_installed = bool(installed)
+        self.open_mo2_button.setText("Open MO2" if self.mo2_installed else "Install MO2")
+        self.open_mo2_button.setToolTip(
+            "Open MO2 Instance Manager to create or manage instances." if self.mo2_installed
+            else "Install MO2. Existing instance data will be preserved."
+        )
         self._show_inventory()
 
     def discover(self):
@@ -119,6 +126,16 @@ class Mo2LibraryDialog(QFrame):
     def _show_inventory(self):
         inventory = getattr(self._owner_window, "instance_state", {}) or {}
         instances = inventory.get("instances", [])
+        if not self.mo2_installed:
+            self.instances.clear()
+            self.instances.hide()
+            self.instance_count.setText("MO2 not installed")
+            self.setup_status.setText(
+                "Mod Organizer 2 is not installed. Existing instance folders have been left untouched "
+                "and will be rediscovered after MO2 is installed again."
+            )
+            self.setup_status.show()
+            return
         selected_path = (
             self.selected_instance_record.get("path")
             if self.selected_instance_record else None
@@ -249,6 +266,14 @@ class Mo2LibraryDialog(QFrame):
         header action follows the same path as the original Environment action.
         """
         owner = self._owner_window
+        if not self.mo2_installed:
+            install_action = getattr(owner, "install_mo2", None)
+            if callable(install_action):
+                install_action()
+            else:
+                self.setup_status.setText("Wyrd's MO2 installer is unavailable. Refresh and try again.")
+                self.setup_status.show()
+            return
         launch_action = getattr(owner, "open_mo2_instance", None)
         if not callable(launch_action):
             self.setup_status.setText("Wyrd's Open MO2 action is unavailable. Refresh the environment and try again.")

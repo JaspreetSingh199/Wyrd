@@ -59,7 +59,8 @@ def inspect_skyrim_prefix_mo2_installation(game_path: Path, home: Path | None = 
             and Path(metadata.get("install", "")).expanduser() == install
         )
         return {
-            "installed": bool(owned), "executable": str(executable) if owned else None,
+            "installed": bool(owned), "managed": bool(owned),
+            "executable": str(executable) if owned else None,
             "metadata": metadata if owned else {}, "prefix": str(prefix),
             "install": str(install), "steam_root": str(steam_root),
             "message": "Wyrd-managed MO2 is installed in Skyrim's Steam prefix." if owned
