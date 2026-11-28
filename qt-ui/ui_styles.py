@@ -80,20 +80,29 @@ QPushButton#secondaryAction {
     border-color: #626c6d;
 }
 QPushButton#infoButton {
-    background: #242c2e;
-    color: #c8b995;
-    border: 1px solid #756b56;
-    border-radius: 10px;
+    background: transparent;
+    color: #b9aa88;
+    border: none;
+    border-radius: 0;
     padding: 0;
-    min-height: 0;
-    min-width: 0;
-    font-size: 11px;
-    font-weight: 700;
+    min-height: 23px;
+    max-height: 23px;
+    min-width: 23px;
+    max-width: 23px;
+    font-size: 15px;
+    font-weight: 400;
 }
 QPushButton#infoButton:hover {
-    background: #3b403c;
-    color: #f3e7ca;
-    border-color: #b29a6d;
+    background: rgba(178, 154, 109, 38);
+    color: #f0dfb9;
+    border: none;
+    border-radius: 11px;
+}
+QPushButton#infoButton:pressed {
+    background: rgba(178, 154, 109, 62);
+    color: #fff0ce;
+    border: none;
+    border-radius: 11px;
 }
 
 QLabel#heading {

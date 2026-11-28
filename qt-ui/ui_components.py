@@ -6,9 +6,9 @@ from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 def add_info_button(layout, parent, title: str, explanation: str) -> QPushButton:
     """Add a compact hover-help control beside an advanced action."""
-    info = QPushButton("i")
+    info = QPushButton("ⓘ")
     info.setObjectName("infoButton")
-    info.setFixedSize(20, 20)
+    info.setFixedSize(23, 23)
     info.setToolTip(explanation)
     info.setToolTipDuration(15000)
     info.setAccessibleName(f"Information about {title}")

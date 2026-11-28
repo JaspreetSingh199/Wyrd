@@ -168,19 +168,34 @@ class MainWindowPagesMixin:
         setup_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         setup_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         setup_scroll.setWidget(setup_page)
-        self.tabs.addTab(setup_scroll, "ENVIRONMENT")
+        self.tabs.addTab(setup_scroll, "LAUNCH")
 
         maintenance_page = QWidget()
         maintenance_layout = QVBoxLayout(maintenance_page)
         maintenance_layout.setContentsMargins(18, 20, 18, 18)
         maintenance_layout.setSpacing(18)
         maintenance_layout.addWidget(self.precheck_panel)
-        maintenance_actions = QHBoxLayout()
-        maintenance_actions.setSpacing(10)
-        maintenance_actions.addWidget(self.check_mo2_button)
-        maintenance_actions.addWidget(self.open_mo2_install_folder_button)
-        maintenance_actions.addStretch(1)
-        maintenance_layout.addLayout(maintenance_actions)
+        mo2_tools_panel = panel(
+            "MO2 INSTALLATION TOOLS",
+            "Inspect the current MO2 installation or open its verified program folder. "
+            "These actions do not modify your instances, profiles or mod data."
+        )
+        mo2_tools_actions = QHBoxLayout()
+        mo2_tools_actions.setSpacing(10)
+        mo2_tools_actions.addWidget(self.check_mo2_button)
+        add_info_button(
+            mo2_tools_actions, self, "Check installation",
+            "Runs a read-only diagnostic of Skyrim, its Proton prefix, the MO2 program files and discovered MO2 instances. It does not install, remove or modify anything."
+        )
+        mo2_tools_actions.addSpacing(8)
+        mo2_tools_actions.addWidget(self.open_mo2_install_folder_button)
+        add_info_button(
+            mo2_tools_actions, self, "Open MO2 installation folder",
+            "Opens the verified MO2 program installation directory in your file manager. This is the application folder, not an instance's mods, profiles or downloads."
+        )
+        mo2_tools_actions.addStretch(1)
+        mo2_tools_panel.layout().addLayout(mo2_tools_actions)
+        maintenance_layout.addWidget(mo2_tools_panel)
         diagnostics_grid = QGridLayout()
         diagnostics_grid.setHorizontalSpacing(18)
         diagnostics_grid.setVerticalSpacing(18)
