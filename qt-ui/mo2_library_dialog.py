@@ -164,13 +164,6 @@ class Mo2LibraryDialog(QFrame):
             open_mo2.setToolTip(
                 "Open MO2 in Skyrim's existing Proton prefix to review or change the selected instance's mod list."
             )
-            open_mo2.clicked.connect(
-                lambda _checked=False, record=dict(instance), picker=profile_picker:
-                    self._open_mo2(
-                        str(record.get("name") or ""),
-                        picker.currentText() if picker.isEnabled() else None,
-                    )
-            )
             action_row.addWidget(open_mo2)
 
             open_folder = QPushButton("▱  Open Folder")
@@ -209,6 +202,14 @@ class Mo2LibraryDialog(QFrame):
                 profile_picker.setToolTip(
                     "No profile folders could be safely verified for this instance. MO2's current profile will be used."
                 )
+
+            open_mo2.clicked.connect(
+                lambda _checked=False, record=dict(instance), picker=profile_picker:
+                    self._open_mo2(
+                        str(record.get("name") or ""),
+                        picker.currentText() if picker.isEnabled() else None,
+                    )
+            )
             right_column.addStretch(1)
             right_column.addWidget(profile_picker)
             row_layout.addLayout(right_column)
