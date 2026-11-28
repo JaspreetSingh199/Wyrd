@@ -14,6 +14,32 @@ from ui_components import add_info_button, panel
 from ui_path_helpers import initial_mo2_dialog_paths
 
 
+
+class CoverImageLabel(QLabel):
+    """Paint a source pixmap as a centered cover image without distorting it."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._source_pixmap = QPixmap()
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    def set_cover_pixmap(self, pixmap: QPixmap) -> None:
+        self._source_pixmap = QPixmap(pixmap)
+        self._update_cover_pixmap()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_cover_pixmap()
+
+    def _update_cover_pixmap(self) -> None:
+        if self._source_pixmap.isNull() or self.width() <= 0 or self.height() <= 0:
+            return
+        self.setPixmap(self._source_pixmap.scaled(
+            self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        ))
+
+
 class MainWindowPagesMixin:
     def _build_pages(self, outer) -> None:
         setup_page = QWidget()
@@ -28,13 +54,11 @@ class MainWindowPagesMixin:
         hero_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
         hero_stack.setContentsMargins(0, 0, 0, 0)
 
-        hero_art = QLabel()
+        hero_art = CoverImageLabel()
         hero_art.setObjectName("heroArtwork")
-        hero_art.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hero_art.setScaledContents(True)
         hero_image = QPixmap(str(Path(__file__).resolve().parent / "assets" / "skyrim_hero.svg"))
         if not hero_image.isNull():
-            hero_art.setPixmap(hero_image)
+            hero_art.set_cover_pixmap(hero_image)
         hero_stack.addWidget(hero_art)
 
         hero_shade = QFrame()
