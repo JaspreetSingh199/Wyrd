@@ -277,12 +277,6 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
         return {"ok": False, "message": "The selected MO2 instance is no longer present in the verified inventory."}
     if profile_name is not None and profile_name not in selected_instance.get("profiles", []):
         return {"ok": False, "message": "The selected MO2 profile is no longer present in the verified profile list."}
-    if profile_name is not None:
-        try:
-            _persist_mo2_selected_profile(selected_instance, profile_name, prefix)
-        except (OSError, ValueError, RuntimeError) as error:
-            return {"ok": False, "message": f"Could not remember the selected MO2 profile safely: {error}"}
-
     targets = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance_name, install_root=install,
         require_managed=False,
@@ -297,6 +291,11 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
     ]
     if len(matches) != 1 or wanted.is_symlink() or not wanted.is_file():
         return {"ok": False, "message": "Selected Skyrim executable is no longer uniquely verified in this MO2 instance."}
+    if profile_name is not None:
+        try:
+            _persist_mo2_selected_profile(selected_instance, profile_name, prefix)
+        except (OSError, ValueError, RuntimeError) as error:
+            return {"ok": False, "message": f"Could not remember the selected MO2 profile safely: {error}"}
 
     env = _runtime_environment(proton, steam_root, prefix)
     env.update({
