@@ -6,8 +6,9 @@ import time
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QMessageBox, QInputDialog
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtGui import QDesktopServices
 
 from proton_runtime import _steam_root_for_game, _runtime_environment
 from steam_mo2_discovery import (
@@ -180,55 +181,35 @@ class Mo2ManagementWorkflowMixin:
         self._update_active_instance_from_scan()
 
 
-    def check_mo2_installation(self) -> None:
-        """Show a read-only inventory of Skyrim prefix, MO2 files and instances."""
-        lines = []
-        game_value = self.game_state.get("game_dir") if self.game_state.get("found") else None
-        if not game_value:
-            lines.append("Skyrim game: NOT DETECTED")
-            prefix = None
-        else:
-            game = Path(game_value).expanduser()
-            lines.append(f"Skyrim game: {'OK' if game.is_dir() else 'MISSING'}")
-            lines.append(f"Game path: {game}")
-            try:
-                state = inspect_skyrim_prefix_mo2_installation(game)
-            except Exception as error:
-                state = {"installed": False, "message": str(error)}
-            prefix_value = state.get("prefix")
-            prefix = Path(prefix_value).expanduser() if prefix_value else None
-            if prefix is None:
-                try:
-                    prefix = steam_compat_prefix(_steam_root_for_game(game, Path.home()))
-                except Exception as error:
-                    lines.append(f"Steam prefix: UNKNOWN ({error})")
-            if prefix is not None:
-                pfx = prefix / "pfx"
-                drive_c = pfx / "drive_c"
-                lines.append(f"Skyrim compatdata prefix: {'EXISTS' if prefix.is_dir() else 'MISSING'}")
-                lines.append(f"Prefix initialized (pfx/drive_c): {'YES' if drive_c.is_dir() else 'NO'}")
-                lines.append(f"Prefix path: {prefix}")
-                install = prefix / "pfx/drive_c/Modding/MO2"
-                executable = install / "ModOrganizer.exe"
-                marker = install / ".wyrd-managed.json"
-                lines.append(f"MO2 install directory: {'EXISTS' if install.is_dir() else 'MISSING'}")
-                lines.append(f"ModOrganizer.exe: {'EXISTS' if executable.is_file() and not executable.is_symlink() else 'MISSING'}")
-                lines.append(f"Wyrd ownership marker: {'EXISTS' if marker.is_file() and not marker.is_symlink() else 'MISSING'}")
-                try:
-                    from steam_mo2_discovery import inspect_any_skyrim_prefix_mo2_instances
-                    inventory = inspect_any_skyrim_prefix_mo2_instances(game)
-                    instances = inventory.get("instances", []) if inventory.get("ok") else []
-                    skyrim_instances = inventory.get("skyrim_instances", []) if inventory.get("ok") else []
-                    lines.append(f"MO2 instance folders found: {len(instances)}")
-                    lines.append(f"Skyrim SE instances found: {len(skyrim_instances)}")
-                    for item in instances:
-                        lines.append(f"  • {item.get('name', 'Unnamed')} — {item.get('instance_path', 'path unknown')}")
-                    if not inventory.get("ok"):
-                        lines.append("Instance scan: " + inventory.get("message", "unavailable"))
-                except Exception as error:
-                    lines.append(f"MO2 instance scan: ERROR ({error})")
-
-        QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
+    def open_mo2_installation_folder(self) -> None:
+        """Open the verified MO2 program directory in the desktop file manager."""
+        if not self.game_state.get("found"):
+            QMessageBox.information(
+                self, "MO2 installation unavailable",
+                "Skyrim Special Edition must be detected before Wyrd can locate its MO2 installation.",
+            )
+            return
+        try:
+            state = inspect_skyrim_prefix_mo2_installation(
+                Path(self.game_state["game_dir"])
+            )
+            install_value = state.get("install")
+            if not state.get("installed") or not install_value:
+                raise OSError(
+                    state.get("message", "No verified MO2 installation directory was found.")
+                )
+            install = Path(install_value).expanduser()
+            if install.is_symlink() or not install.is_dir():
+                raise OSError("The verified MO2 installation folder is missing or unsafe.")
+            resolved = install.resolve(strict=True)
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved))):
+                raise OSError("The desktop environment could not open the MO2 installation folder.")
+            self._log("Opened MO2 installation folder: " + str(resolved))
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(
+                self, "Could not open MO2 installation folder", str(error)
+            )
+            self._log("Could not open MO2 installation folder: " + str(error))
 
 
     def launch_mo2_gui(
