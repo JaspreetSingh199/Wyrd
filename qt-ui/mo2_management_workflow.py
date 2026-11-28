@@ -21,21 +21,31 @@ from steam_workers import SteamPrefixInstallWorker
 from process_monitor import detect_mo2_processes, snapshot_wyrd_session
 from proton_runtime import managed_paths
 from steam_client import activate_steam_client, steam_client_status
+from steam_mo2_launch import _persist_mo2_selected_profile
 
 
 class Mo2ManagementWorkflowMixin:
-    def open_mo2_instance(self, instance_name: str | None = None) -> None:
+    def open_mo2_instance(self, instance_name: str | None = None, profile_name: str | None = None) -> None:
         """Open MO2's native Instance Manager, or a named instance when requested."""
         # Header-level Open MO2 opens MO2's own Instance Manager, where users
         # create, remove and manage instances. Per-instance actions pass a name.
         if instance_name is not None:
             inventory = getattr(self, "instance_state", {}) or {}
             instances = list(inventory.get("skyrim_instances", []))
-            available_names = {str(item.get("name") or "") for item in instances}
-            if instance_name not in available_names:
+            selected_instance = next(
+                (item for item in instances if str(item.get("name") or "") == instance_name),
+                None,
+            )
+            if selected_instance is None:
                 QMessageBox.warning(
                     self, "MO2 instance unavailable",
                     "That instance is no longer in the current discovery results. Refresh the environment and try again.",
+                )
+                return
+            if profile_name is not None and profile_name not in selected_instance.get("profiles", []):
+                QMessageBox.warning(
+                    self, "MO2 profile unavailable",
+                    "That profile is no longer present in the verified profile list. Refresh the environment and try again.",
                 )
                 return
 
@@ -54,6 +64,7 @@ class Mo2ManagementWorkflowMixin:
 
         self._mo2_steam_launch_pending = {
             "instance_name": instance_name,
+            "profile_name": profile_name,
             "attempts": 0,
             "ready_streak": 0,
             "last_status": None,
@@ -107,10 +118,15 @@ class Mo2ManagementWorkflowMixin:
             self._mo2_steam_wait_timer.stop()
             self._mo2_steam_launch_pending = None
             instance_name = pending["instance_name"]
+            profile_name = pending.get("profile_name")
             self._log("Steam is ready. Opening MO2 without launching Skyrim.")
             self.progress_label.setText("Steam is ready; opening MO2…")
             self._close_launch_loader("Steam ready", "Opening Mod Organizer.")
-            QTimer.singleShot(0, lambda name=instance_name: self.launch_mo2_gui(instance_name=name))
+            QTimer.singleShot(
+                0,
+                lambda name=instance_name, profile=profile_name:
+                    self.launch_mo2_gui(instance_name=name, profile_name=profile),
+            )
             return
 
         if pending["attempts"] >= 120:
@@ -215,8 +231,10 @@ class Mo2ManagementWorkflowMixin:
         QMessageBox.information(self, "MO2 installation check", "\n".join(lines))
 
 
-    def launch_mo2_gui(self, instance_name: str | None = None) -> None:
-        """Open MO2's native Instance Manager or a requested instance directly."""
+    def launch_mo2_gui(
+        self, instance_name: str | None = None, profile_name: str | None = None,
+    ) -> None:
+        """Open MO2's native Instance Manager or a requested instance/profile directly."""
         active_session = (
             getattr(self, "_mo2_session_timer", None) is not None
             and self._mo2_session_timer.isActive()
@@ -309,10 +327,22 @@ class Mo2ManagementWorkflowMixin:
             if instance_name is not None:
                 inventory = self.instance_state.get("skyrim_instances", [])
                 available_names = {str(item.get("name") or "") for item in inventory}
-                if instance_name not in available_names:
+                selected_instance = next(
+                    (item for item in inventory if str(item.get("name") or "") == instance_name),
+                    None,
+                )
+                if selected_instance is None:
                     raise RuntimeError(
                         "That MO2 instance is no longer in the current discovery results."
                     )
+                if profile_name is not None:
+                    if profile_name not in selected_instance.get("profiles", []):
+                        raise RuntimeError(
+                            "That MO2 profile is no longer present in the verified profile list."
+                        )
+                    _persist_mo2_selected_profile(selected_instance, profile_name, prefix)
+            elif profile_name is not None:
+                raise RuntimeError("A profile can only be selected when opening a specific MO2 instance.")
             # Preserve Skyrim's established AppID 489830 Proton context.
             diagnostics = managed_paths()["root"] / "logs" / "skyrim-launch.log"
             diagnostics.parent.mkdir(parents=True, exist_ok=True)
@@ -324,6 +354,7 @@ class Mo2ManagementWorkflowMixin:
                 log.flush()
                 mo2_args = (
                     ["--instance", instance_name]
+                    + (["--profile", profile_name] if profile_name is not None else [])
                     if instance_name is not None else ["--pick"]
                 )
                 process = subprocess.Popen(
