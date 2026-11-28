@@ -25,52 +25,20 @@ from steam_client import activate_steam_client, steam_client_status
 
 class Mo2ManagementWorkflowMixin:
     def open_mo2_instance(self, instance_name: str | None = None) -> None:
-        """Start Steam if needed, then open a discovered Skyrim MO2 instance."""
-        inventory = getattr(self, "instance_state", {}) or {}
-        # Use the same complete live inventory shown in the Environment page.
-        # The narrower skyrim_instances cache can lag or contain only a subset,
-        # which previously let Open MO2 skip the intended instance picker.
-        instances = [
-            item for item in inventory.get("instances", [])
-            if item.get("is_skyrim_se")
-        ]
-        if not instances:
+        """Open MO2's native Instance Manager, or a named instance when requested."""
+        # Header-level Open MO2 opens MO2's own Instance Manager, where users
+        # create, remove and manage instances. Per-instance actions pass a name.
+        if instance_name is not None:
+            inventory = getattr(self, "instance_state", {}) or {}
             instances = list(inventory.get("skyrim_instances", []))
-        if not instances:
-            QMessageBox.warning(
-                self, "MO2 unavailable",
-                self.instance_state.get(
-                    "message",
-                    "No Skyrim Special Edition MO2 instance was discovered. Refresh the environment and try again.",
-                ),
-            )
-            return
-        available_names = {str(item.get("name") or "") for item in instances}
-        if instance_name:
+            available_names = {str(item.get("name") or "") for item in instances}
             if instance_name not in available_names:
                 QMessageBox.warning(
                     self, "MO2 instance unavailable",
                     "That instance is no longer in the current discovery results. Refresh the environment and try again.",
                 )
                 return
-        else:
-            # Always ask explicitly, even when only one eligible instance is
-            # currently discovered. Open MO2 is a picker action, not an
-            # implicit "launch whichever instance happens to be first" action.
-            names = [str(item.get("name") or "Unnamed instance") for item in instances]
-            preferred = getattr(self.mo2_library_widget, "preferred_instance_id", "")
-            initial = next((i for i, item in enumerate(instances)
-                            if str(item.get("path") or "") == preferred
-                            or str(item.get("name") or "") == preferred), 0)
-            instance_name, accepted = QInputDialog.getItem(
-                self, "Open Mod Organizer 2", "Choose a Skyrim SE MO2 instance:",
-                names, initial, False,
-            )
-            if not accepted or not instance_name:
-                return
-        # Opening MO2 is a Steam-dependent desktop action. Start Steam if
-        # needed, wait for its client/UI helper to become ready, then open MO2
-        # only. This deliberately does not invoke the Skyrim launch workflow.
+
         if getattr(self, "_steam_launch_pending", None) or getattr(self, "_mo2_steam_launch_pending", None):
             QMessageBox.information(
                 self, "Steam is starting",
@@ -336,26 +304,30 @@ class Mo2ManagementWorkflowMixin:
                 "WYRD_LAUNCHED": "1",
                 "WYRD_LAUNCH_ID": launch_token,
             })
-            # Launch the exact verified instance requested by the UI. --pick
-            # deliberately opens the instance manager and is not appropriate
-            # for the per-instance "Open MO2 Mod List" action.
-            inventory = self.instance_state.get("skyrim_instances", [])
-            available_names = {str(item.get("name") or "") for item in inventory}
-            if not instance_name or instance_name not in available_names:
-                raise RuntimeError(
-                    "Choose a currently discovered Skyrim SE MO2 instance before opening its mod list."
-                )
+            # Header-level Open MO2 uses --pick for MO2's native Instance
+            # Manager. Per-instance Open MO2 Mod List uses --instance.
+            if instance_name is not None:
+                inventory = self.instance_state.get("skyrim_instances", [])
+                available_names = {str(item.get("name") or "") for item in inventory}
+                if instance_name not in available_names:
+                    raise RuntimeError(
+                        "That MO2 instance is no longer in the current discovery results."
+                    )
             # Preserve Skyrim's established AppID 489830 Proton context.
             diagnostics = managed_paths()["root"] / "logs" / "skyrim-launch.log"
             diagnostics.parent.mkdir(parents=True, exist_ok=True)
             with diagnostics.open("a", encoding="utf-8") as log:
                 log.write("\n=== Wyrd Open MO2 session (Steam AppID 489830) ===\n")
                 log.write(f"runtime: {proton}\nprefix: {prefix}\nlaunch_id: {launch_token}\n")
-                log.write(f"instance: {instance_name}\n")
+                log.write(f"instance: {instance_name or '<native instance manager>'}\n")
                 log.write("monitoring: session RSS, process/thread count, CPU, winedbg count, host RAM and swap\n")
                 log.flush()
+                mo2_args = (
+                    ["--instance", instance_name]
+                    if instance_name is not None else ["--pick"]
+                )
                 process = subprocess.Popen(
-                    [str(proton / "proton"), "run", str(executable), "--instance", instance_name],
+                    [str(proton / "proton"), "run", str(executable), *mo2_args],
                     cwd=str(executable.parent), env=env, stdin=subprocess.DEVNULL,
                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                 )
@@ -374,14 +346,24 @@ class Mo2ManagementWorkflowMixin:
             self._mo2_session_loader_active = True
             self._show_launch_loader(
                 "Opening MO2…",
-                f"Starting MO2 instance '{instance_name}' through Proton. Waiting for Mod Organizer to appear.",
+                (
+                    "Opening Mod Organizer's Instance Manager through Proton."
+                    if instance_name is None
+                    else f"Starting MO2 instance '{instance_name}' through Proton. Waiting for Mod Organizer to appear."
+                ),
             )
             self._mo2_session_timer.start()
             self._log(
-                f"MO2 instance '{instance_name}' opened directly (PID {process.pid}); "
-                "resource monitoring active."
+                (
+                    f"MO2 Instance Manager opened (PID {process.pid}); "
+                    if instance_name is None
+                    else f"MO2 instance '{instance_name}' opened directly (PID {process.pid}); "
+                ) + "resource monitoring active."
             )
-            self.progress_label.setText(f"Opening MO2 mod list for {instance_name}…")
+            self.progress_label.setText(
+                "Opening MO2 Instance Manager…" if instance_name is None
+                else f"Opening MO2 mod list for {instance_name}…"
+            )
         except Exception as error:
             if getattr(self, "_mo2_session_loader_active", False):
                 self._mo2_session_loader_active = False
