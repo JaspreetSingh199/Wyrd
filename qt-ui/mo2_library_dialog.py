@@ -383,7 +383,12 @@ class Mo2LibraryDialog(QFrame):
         profile = self._artwork_scope_profile(scope, picker)
         if scope == "profile" and not profile:
             return
-        randomize_artwork(instance, scope, profile)
+        try:
+            randomize_artwork(instance, scope, profile)
+        except OSError as error:
+            self.setup_status.setText(f"Could not randomise artwork: {error}")
+            self.setup_status.show()
+            return
         self._refresh_artwork_after_change(instance, picker, instance_label, profile_label)
 
     def _reset_artwork(self, instance: dict, scope: str, picker: QComboBox,
@@ -391,7 +396,12 @@ class Mo2LibraryDialog(QFrame):
         profile = self._artwork_scope_profile(scope, picker)
         if scope == "profile" and not profile:
             return
-        reset_artwork(instance, scope, profile)
+        try:
+            reset_artwork(instance, scope, profile)
+        except OSError as error:
+            self.setup_status.setText(f"Could not restore artwork: {error}")
+            self.setup_status.show()
+            return
         self._refresh_artwork_after_change(instance, picker, instance_label, profile_label)
 
     def _open_selected_mo2(self) -> None:
