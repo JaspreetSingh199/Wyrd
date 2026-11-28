@@ -67,10 +67,11 @@ class ArtworkManagerTests(unittest.TestCase):
         link.symlink_to(source)
         with self.assertRaises(OSError):
             artwork_manager.set_custom_artwork(self.instance, "instance", link)
-        with patch.object(Path, "stat") as stat:
-            stat.return_value.st_size = 21 * 1024 * 1024
-            with self.assertRaises(OSError):
-                artwork_manager.set_custom_artwork(self.instance, "instance", source)
+        oversized = Path(self.temp_dir.name) / "oversized.jpg"
+        with oversized.open("wb") as handle:
+            handle.truncate(21 * 1024 * 1024)
+        with self.assertRaises(OSError):
+            artwork_manager.set_custom_artwork(self.instance, "instance", oversized)
 
 
 if __name__ == "__main__":
