@@ -26,7 +26,16 @@ from steam_client import activate_steam_client, steam_client_status
 class Mo2ManagementWorkflowMixin:
     def open_mo2_instance(self, instance_name: str | None = None) -> None:
         """Start Steam if needed, then open a discovered Skyrim MO2 instance."""
-        instances = list(self.instance_state.get("skyrim_instances", []))
+        inventory = getattr(self, "instance_state", {}) or {}
+        # Use the same complete live inventory shown in the Environment page.
+        # The narrower skyrim_instances cache can lag or contain only a subset,
+        # which previously let Open MO2 skip the intended instance picker.
+        instances = [
+            item for item in inventory.get("instances", [])
+            if item.get("is_skyrim_se")
+        ]
+        if not instances:
+            instances = list(inventory.get("skyrim_instances", []))
         if not instances:
             QMessageBox.warning(
                 self, "MO2 unavailable",
@@ -44,9 +53,10 @@ class Mo2ManagementWorkflowMixin:
                     "That instance is no longer in the current discovery results. Refresh the environment and try again.",
                 )
                 return
-        elif len(instances) == 1:
-            instance_name = str(instances[0].get("name") or "")
         else:
+            # Always ask explicitly, even when only one eligible instance is
+            # currently discovered. Open MO2 is a picker action, not an
+            # implicit "launch whichever instance happens to be first" action.
             names = [str(item.get("name") or "Unnamed instance") for item in instances]
             preferred = getattr(self.mo2_library_widget, "preferred_instance_id", "")
             initial = next((i for i, item in enumerate(instances)
