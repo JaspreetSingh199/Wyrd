@@ -107,9 +107,9 @@ class Mo2ManagementWorkflowMixin:
             self._mo2_steam_wait_timer.stop()
             self._mo2_steam_launch_pending = None
             instance_name = pending["instance_name"]
-            self._log("Steam is ready. Opening the selected MO2 instance without launching Skyrim.")
+            self._log("Steam is ready. Opening MO2 without launching Skyrim.")
             self.progress_label.setText("Steam is ready; opening MO2…")
-            self._close_launch_loader("Steam ready", "Opening the selected Mod Organizer instance.")
+            self._close_launch_loader("Steam ready", "Opening Mod Organizer.")
             QTimer.singleShot(0, lambda name=instance_name: self.launch_mo2_gui(instance_name=name))
             return
 
@@ -216,7 +216,7 @@ class Mo2ManagementWorkflowMixin:
 
 
     def launch_mo2_gui(self, instance_name: str | None = None) -> None:
-        """Open the requested MO2 instance directly, without showing MO2's picker."""
+        """Open MO2's native Instance Manager or a requested instance directly."""
         active_session = (
             getattr(self, "_mo2_session_timer", None) is not None
             and self._mo2_session_timer.isActive()
