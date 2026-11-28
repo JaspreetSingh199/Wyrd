@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+import stat
+import tempfile
 import subprocess
 import uuid
 from pathlib import Path
@@ -160,6 +164,56 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
 
 
 
+
+def _persist_mo2_selected_profile(instance: dict, profile_name: str, prefix: Path) -> None:
+    """Persist Wyrd's chosen profile in this verified instance's General settings."""
+    if not profile_name or any(char in profile_name for char in "\\r\\n"):
+        raise ValueError("The selected MO2 profile name is invalid.")
+    config_value = instance.get("config")
+    if not config_value:
+        raise RuntimeError("The selected MO2 instance has no verified ModOrganizer.ini path.")
+    config = Path(config_value).expanduser()
+    if config.is_symlink() or not config.is_file():
+        raise RuntimeError("The selected MO2 instance configuration is missing or unsafe.")
+    resolved_config = config.resolve(strict=True)
+    resolved_prefix = prefix.resolve(strict=True)
+    try:
+        resolved_config.relative_to(resolved_prefix)
+    except ValueError as error:
+        raise RuntimeError("The selected MO2 configuration is outside Skyrim's verified Proton prefix.") from error
+
+    original = config.read_text(encoding="utf-8-sig")
+    section = re.search(r"(?ims)^\\s*\\[General\\]\\s*\\r?\\n(.*?)(?=^\\s*\\[|\\Z)", original)
+    if section is None:
+        raise RuntimeError("The selected MO2 configuration has no General section.")
+    general = section.group(1)
+    setting = "selected_profile=@ByteArray(" + profile_name + ")"
+    key = re.compile(r"(?im)^\\s*selected_profile\\s*=.*$")
+    if key.search(general):
+        updated_general = key.sub(setting, general, count=1)
+    else:
+        updated_general = general.rstrip("\\r\\n") + "\\n" + setting + "\\n"
+    updated = original[:section.start(1)] + updated_general + original[section.end(1):]
+    if updated == original:
+        return
+
+    mode = stat.S_IMODE(config.stat().st_mode)
+    fd, temporary_name = tempfile.mkstemp(prefix=".ModOrganizer.ini.", dir=str(config.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(updated)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary_name, mode)
+        os.replace(temporary_name, config)
+    except Exception:
+        try:
+            os.unlink(temporary_name)
+        except OSError:
+            pass
+        raise
+
+
 def launch_skyrim_via_mo2_in_skyrim_prefix(
     proton_path: Path, game_path: Path, instance_name: str,
     executable_title: str, expected_binary: Path | str,
@@ -223,6 +277,11 @@ def launch_skyrim_via_mo2_in_skyrim_prefix(
         return {"ok": False, "message": "The selected MO2 instance is no longer present in the verified inventory."}
     if profile_name is not None and profile_name not in selected_instance.get("profiles", []):
         return {"ok": False, "message": "The selected MO2 profile is no longer present in the verified profile list."}
+    if profile_name is not None:
+        try:
+            _persist_mo2_selected_profile(selected_instance, profile_name, prefix)
+        except (OSError, ValueError, RuntimeError) as error:
+            return {"ok": False, "message": f"Could not remember the selected MO2 profile safely: {error}"}
 
     targets = inspect_skyrim_launch_targets(
         prefix, game, instance_name=instance_name, install_root=install,
