@@ -6,8 +6,9 @@ import time
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtWidgets import QMessageBox
+from PySide6.QtGui import QDesktopServices
 
 from proton_runtime import _steam_root_for_game, _runtime_environment
 from steam_mo2_discovery import (
@@ -178,6 +179,41 @@ class Mo2ManagementWorkflowMixin:
             QMessageBox.warning(self, "MO2 removal incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
         self._update_active_instance_from_scan()
+
+
+    def open_mo2_installation_folder(self) -> None:
+        """Open the verified MO2 program directory in the desktop file manager."""
+        game_value = self.game_state.get("game_dir") if self.game_state.get("found") else None
+        if not game_value:
+            QMessageBox.information(
+                self, "MO2 installation unavailable",
+                "Skyrim Special Edition must be detected before Wyrd can locate its MO2 installation.",
+            )
+            return
+        game = Path(game_value).expanduser()
+        try:
+            state = inspect_skyrim_prefix_mo2_installation(game)
+            if not state.get("installed"):
+                external_state = inspect_external_skyrim_prefix_mo2_installation(game)
+                if external_state.get("installed"):
+                    state = external_state
+            install_value = state.get("install")
+            if not state.get("installed") or not install_value:
+                raise OSError(
+                    state.get("message", "No verified MO2 installation directory was found.")
+                )
+            install = Path(install_value).expanduser()
+            if install.is_symlink() or not install.is_dir():
+                raise OSError("The verified MO2 installation folder is missing or unsafe.")
+            resolved = install.resolve(strict=True)
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved))):
+                raise OSError("The desktop environment could not open the MO2 installation folder.")
+            self._log("Opened MO2 installation folder: " + str(resolved))
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(
+                self, "Could not open MO2 installation folder", str(error)
+            )
+            self._log("Could not open MO2 installation folder: " + str(error))
 
 
     def check_mo2_installation(self) -> None:
