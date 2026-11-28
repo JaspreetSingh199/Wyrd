@@ -111,7 +111,7 @@ class MainWindow(
         sidebar_layout.addWidget(brand_subtitle)
         sidebar_layout.addSpacing(30)
 
-        self.environment_nav = QPushButton("⌂   Environment")
+        self.environment_nav = QPushButton("⌂   Launch")
         self.environment_nav.setObjectName("navButton")
         self.environment_nav.setCheckable(True)
         self.environment_nav.setChecked(True)
