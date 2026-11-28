@@ -13,7 +13,10 @@ from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QPushButton, QWidget, QFrame, QComboBox, QSizePolicy,
+    QFileDialog, QMenu, QToolButton,
 )
+
+from artwork_manager import get_artwork, randomize_artwork, reset_artwork, set_custom_artwork
 
 
 def _instance_label(instance: dict) -> str:
