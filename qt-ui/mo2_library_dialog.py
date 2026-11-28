@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QPushButton, QWidget, QFrame, QComboBox, QSizePolicy,
@@ -76,7 +76,7 @@ class Mo2LibraryDialog(QFrame):
         self.instances = QListWidget()
         self.instances.setObjectName("mo2Instances")
         self.instances.setMinimumHeight(90)
-        self.instances.setSpacing(4)
+        self.instances.setSpacing(8)
         self.instances.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.instances.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         layout.addWidget(self.instances, 1)
@@ -142,17 +142,31 @@ class Mo2LibraryDialog(QFrame):
         )
         self.instances.clear()
         self.selected_instance_record = None
-        for instance in instances:
+        for instance_index, instance in enumerate(instances):
             item = QListWidgetItem()
             row = QFrame()
             row.setObjectName("mo2InstanceRow")
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(9, 6, 9, 6)
-            row_layout.setSpacing(12)
+            row_layout.setContentsMargins(10, 9, 10, 9)
+            row_layout.setSpacing(14)
 
+
+            art_file = "skyrim_instance_castle.svg" if instance_index % 2 == 0 else "skyrim_instance_mountains.svg"
+            art_path = Path(__file__).resolve().parent / "assets" / art_file
+            art_label = QLabel()
+            art_label.setObjectName("instanceArtwork")
+            art_label.setFixedSize(180, 96)
+            art_pixmap = QPixmap(str(art_path))
+            if not art_pixmap.isNull():
+                art_label.setPixmap(art_pixmap.scaled(
+                    180, 96, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation,
+                ))
+            art_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            row_layout.addWidget(art_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
             details_column = QVBoxLayout()
-            details_column.setSpacing(4)
+            details_column.setSpacing(6)
             name = QLabel(instance.get("name") or "Unnamed MO2 instance")
             name.setObjectName("instanceName")
             details_column.addWidget(name)
