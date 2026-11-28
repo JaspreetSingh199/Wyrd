@@ -357,5 +357,6 @@ class EnvironmentWorkflowMixin:
             install_path=install_path or "",
             game_path=saved_game or "",
             proton_path=self.proton_combo.currentData() or "",
+            installed=bool(self.mo2_state.get("installed")),
         )
         self.mo2_library_widget.update_context(**context)
