@@ -152,22 +152,27 @@ class EnvironmentWorkflowMixin:
                 f"{owner} installation · {self.mo2_state.get('version', 'MO2')}\n"
                 f"{instance_summary}"
             )
-            self.install_button.hide()
+            self.mo2_library_widget.open_mo2_button.setText("Open MO2")
+            self.mo2_library_widget.open_mo2_button.setEnabled(True)
             self._log("Skyrim-prefix MO2 inspection: " + owner + " installation.")
         else:
             self.mo2_panel.detail_label.setText(self.mo2_state.get("message", "MO2 is not installed."))
-            self.install_button.setText("Install MO2")
-            self.install_button.show()
-            self.install_button.setEnabled(bool(self.game_state.get("found") and self.proton_builds))
+            self.mo2_library_widget.open_mo2_button.setText("Install MO2")
+            self.mo2_library_widget.open_mo2_button.setEnabled(
+                bool(self.game_state.get("found") and self.proton_builds)
+            )
 
     def _finalize_environment_readiness(self) -> None:
         """Restore selection, refresh panels, and derive final launch readiness."""
         self._set_scan_progress(92, "Finalizing environment readiness…")
         ready = bool(self.game_state.get("found") and self.proton_builds)
-        self.install_button.setEnabled(
-            ready
-            and not (self.worker and self.worker.isRunning())
-            and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
+        self.mo2_library_widget.open_mo2_button.setEnabled(
+            bool(self.mo2_state.get("installed"))
+            or (
+                ready
+                and not (self.worker and self.worker.isRunning())
+                and not getattr(self, "mo2_target_occupied", self.mo2_state.get("installed"))
+            )
         )
         self.proton_combo.setEnabled(bool(self.proton_builds) and not (self.worker and self.worker.isRunning()))
         self._restore_saved_selection()
