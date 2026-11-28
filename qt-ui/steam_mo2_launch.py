@@ -167,7 +167,7 @@ def launch_mo2_in_skyrim_prefix(proton_path: Path, game_path: Path,
 
 def _persist_mo2_selected_profile(instance: dict, profile_name: str, prefix: Path) -> None:
     """Persist Wyrd's chosen profile in this verified instance's General settings."""
-    if not profile_name or any(char in profile_name for char in "\\r\\n"):
+    if not profile_name or any(char in profile_name for char in "\r\n"):
         raise ValueError("The selected MO2 profile name is invalid.")
     config_value = instance.get("config")
     if not config_value:
@@ -183,16 +183,16 @@ def _persist_mo2_selected_profile(instance: dict, profile_name: str, prefix: Pat
         raise RuntimeError("The selected MO2 configuration is outside Skyrim's verified Proton prefix.") from error
 
     original = config.read_text(encoding="utf-8-sig")
-    section = re.search(r"(?ims)^\\s*\\[General\\]\\s*\\r?\\n(.*?)(?=^\\s*\\[|\\Z)", original)
+    section = re.search(r"(?ims)^\s*\[General\]\s*\r?\n(.*?)(?=^\s*\[|\Z)", original)
     if section is None:
         raise RuntimeError("The selected MO2 configuration has no General section.")
     general = section.group(1)
     setting = "selected_profile=@ByteArray(" + profile_name + ")"
-    key = re.compile(r"(?im)^\\s*selected_profile\\s*=.*$")
+    key = re.compile(r"(?im)^\s*selected_profile\s*=.*$")
     if key.search(general):
         updated_general = key.sub(setting, general, count=1)
     else:
-        updated_general = general.rstrip("\\r\\n") + "\\n" + setting + "\\n"
+        updated_general = general.rstrip("\r\n") + "\n" + setting + "\n"
     updated = original[:section.start(1)] + updated_general + original[section.end(1):]
     if updated == original:
         return
