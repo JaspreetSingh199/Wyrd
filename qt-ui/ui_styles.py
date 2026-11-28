@@ -93,13 +93,16 @@ QPushButton#infoButton {
     font-weight: 400;
 }
 QPushButton#infoButton:hover {
-    background: #29383c;
+    background: rgba(178, 154, 109, 38);
     color: #f0dfb9;
-    border-color: transparent;
+    border: none;
+    border-radius: 11px;
 }
 QPushButton#infoButton:pressed {
-    background: #344247;
-    color: #f3e7ca;
+    background: rgba(178, 154, 109, 62);
+    color: #fff0ce;
+    border: none;
+    border-radius: 11px;
 }
 
 QLabel#heading {
