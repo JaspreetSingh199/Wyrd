@@ -158,9 +158,6 @@ class MainWindowPagesMixin:
             game_path=game_path, proton_path=self._saved_settings.get("proton", ""),
         )
         setup_layout.addWidget(self.mo2_library_widget, 1)
-        self.install_button = QPushButton("Install MO2")
-        self.install_button.setObjectName("secondaryAction")
-        self.install_button.clicked.connect(self.install_mo2)
         # Installation is exposed contextually in the MO2 Instances header.
         # Keep the button object for the existing installer workflow state,
         # but do not render a duplicate Install MO2 action on this page.
