@@ -198,7 +198,7 @@ class Mo2LibraryDialog(QFrame):
                 if profile_name in profile_names:
                     profile_picker.setCurrentText(profile_name)
                 profile_picker.setToolTip(
-                    "Choose the MO2 profile to use for this launch. This does not change MO2's saved profile."
+                    "Choose the MO2 profile for this launch. Wyrd saves it as this instance's preferred profile."
                 )
             else:
                 profile_picker.addItem("No verified profiles")
