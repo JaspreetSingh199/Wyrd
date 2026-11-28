@@ -16,6 +16,7 @@ from steam_mo2_discovery import (
     inspect_external_skyrim_prefix_mo2_installation,
 )
 from steam_mo2_management import reset_wyrd_mo2
+from wyrd_settings import reset_wyrd_settings
 from steam_prefix import APP_ID, steam_compat_prefix
 from ui_path_helpers import _steam_prefix_for_game_path
 from steam_workers import SteamPrefixInstallWorker
@@ -173,8 +174,33 @@ class Mo2ManagementWorkflowMixin:
         result = reset_wyrd_mo2(game_path=Path(self.game_state["game_dir"]))
         self._log(result.get("message", "MO2 removal attempted."))
         if result.get("ok"):
-            self.progress_label.setText("Wyrd-managed MO2 removed.")
-            QMessageBox.information(self, "MO2 removed", result["message"])
+            # Removing MO2 is a full environment reset from Wyrd's perspective:
+            # clear Wyrd preferences only after the verified MO2 removal succeeds.
+            settings_result = reset_wyrd_settings()
+            if settings_result.get("ok"):
+                self._saved_settings = {"first_run_completed": False}
+                self._saved_game_path = None
+                self._restoring_selection = True
+                self.proton_combo.blockSignals(True)
+                if self.proton_combo.count():
+                    self.proton_combo.setCurrentIndex(0)
+                self.proton_combo.blockSignals(False)
+                self.mo2_library_widget.preferred_instance_id = ""
+                self._saved_settings["first_run_completed"] = False
+                self._log("MO2 removed; Wyrd preferences reset. First-launch setup will run next time Wyrd starts.")
+                self.progress_label.setText("MO2 removed. Wyrd settings reset.")
+                QMessageBox.information(
+                    self, "MO2 removed",
+                    result["message"] + "\n\nWyrd preferences were also reset. First-launch setup will appear the next time you start Wyrd."
+                )
+            else:
+                self._log("MO2 removed, but Wyrd settings could not be reset: " + settings_result.get("message", "Unknown error"))
+                QMessageBox.warning(
+                    self, "MO2 removed; settings reset incomplete",
+                    result["message"] + "\n\nMO2 was removed, but Wyrd preferences could not be reset: "
+                    + settings_result.get("message", "Unknown error")
+                )
+            self._restoring_selection = False
         else:
             QMessageBox.warning(self, "MO2 removal incomplete", result.get("message", "Reset failed safely."))
         self.refresh_all()
