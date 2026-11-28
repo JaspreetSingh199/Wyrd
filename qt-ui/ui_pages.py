@@ -81,12 +81,12 @@ class MainWindowPagesMixin:
         # The checklist itself communicates readiness. A 6px progress bar with
         # centered text was unreadable and visually collided with the checks.
         self.precheck_progress.hide()
-        self.check_mo2_button = QPushButton("Open MO2 installation folder")
+        self.check_mo2_button = QPushButton("Check installation")
         self.check_mo2_button.setObjectName("secondaryAction")
         self.check_mo2_button.setToolTip(
-            "Open the verified MO2 installation directory in your file manager."
+            "Check whether Skyrim's Proton prefix, MO2 installation and MO2 instances exist."
         )
-        self.check_mo2_button.clicked.connect(self.open_mo2_installation_folder)
+        self.check_mo2_button.clicked.connect(self.check_mo2_installation)
         progress_panel = QFrame()
         progress_panel.setObjectName("runtimePanel")
         progress_layout = QVBoxLayout(progress_panel)
