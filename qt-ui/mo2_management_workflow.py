@@ -615,7 +615,7 @@ class Mo2ManagementWorkflowMixin:
         self.worker = SteamPrefixInstallWorker(str(proton_path), self.game_state["game_dir"])
         self.worker.progress.connect(self._on_install_progress)
         self.worker.completed.connect(self._on_install_completed)
-        self.install_button.setEnabled(False)
+        self.mo2_library_widget.open_mo2_button.setEnabled(False)
         self.refresh_button.setEnabled(False)
         self.proton_combo.setEnabled(False)
         self.progress.setValue(0)
